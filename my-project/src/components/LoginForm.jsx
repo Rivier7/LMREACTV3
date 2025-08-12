@@ -8,7 +8,7 @@ function LoginForm() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
-
+  const { login } = useAuth();
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -20,7 +20,11 @@ function LoginForm() {
 
       const token = res.data.token;
       saveToken(token); // Save to localStorage
+      console.log('Login success:', res.data);
+
+      login(token);
       navigate('/dashboard');
+
     } catch (err) {
       console.error(err);
       setError('Invalid login credentials');
