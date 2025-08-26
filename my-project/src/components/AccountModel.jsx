@@ -46,7 +46,7 @@ const AccountModel = ({ accountId, onClose, onRemove }) => {
     <>
       {/* Overlay */}
       <div className="fixed inset-0 bg-black bg-opacity-50 z-40"></div>
-      
+
       {/* Modal Backdrop (for closing on click) */}
       <div
         className="fixed inset-0 bg-black bg-opacity-50 z-40"

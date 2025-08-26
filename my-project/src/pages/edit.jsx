@@ -116,7 +116,9 @@ const Edit = () => {
     for (const leg of updatedLegs) {
       const result = await validateFlight(leg);
       leg.valid = result.valid;
-      leg.validMessage = result.message;
+      leg.validMessage = result.mismatchedFields;
+      leg.flightOperatingdays = result.operatingDays;
+
     }
     setLegs(updatedLegs);
     setIsLoading(false);
@@ -419,6 +421,7 @@ const Edit = () => {
                         onChange={(e) => handleInputChange(index, 'flightOperatingdays', e.target.value)}
                         className="text-xs px-3 py-2 border border-gray-300 rounded focus:border-gray-500 focus:outline-none transition-all duration-200"
                       />
+
                     </div>
                     <div className="mt-4 flex items-center justify-between">
                       <div className="flex items-center">
