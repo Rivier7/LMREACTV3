@@ -1,38 +1,38 @@
 import React, { useState, useRef } from "react";
-import { postAccountExcel } from '../api/api'; 
+import { postAccountExcel, downloadExcelTemplate } from '../api/api';
 
 export default function FileUploader() {
   const [file, setFile] = useState(null);
-  const [uploadStatus, setUploadStatus] = useState(""); 
-  const [loading, setLoading] = useState(false); 
+  const [uploadStatus, setUploadStatus] = useState("");
+  const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
 
   function handleFileChange(e) {
     if (e.target.files && e.target.files.length > 0) {
       setFile(e.target.files[0]);
-      setUploadStatus(""); 
+      setUploadStatus("");
     }
   }
 
   async function handleUpload() {
     if (!file) return;
 
-    setLoading(true); 
+    setLoading(true);
     try {
-      await postAccountExcel(file);  
-      setUploadStatus("success");    
+      await postAccountExcel(file);
+      setUploadStatus("success");
 
       setTimeout(() => {
-        setUploadStatus("");  
-        setFile(null);         
-        fileInputRef.current.value = null;  
-        setLoading(false);     
-        window.location.reload();  
-      }, 1500); 
+        setUploadStatus("");
+        setFile(null);
+        fileInputRef.current.value = null;
+        setLoading(false);
+        window.location.reload();
+      }, 1500);
     } catch (error) {
       console.error("Upload failed", error);
-      setUploadStatus("error");  
-      setLoading(false);         
+      setUploadStatus("error");
+      setLoading(false);
     }
   }
 
@@ -53,6 +53,14 @@ export default function FileUploader() {
         onClick={() => fileInputRef.current.click()}
       >
         Choose File
+      </button>
+
+      {/* Download Template Button */}
+      <button
+        className="px-4 py-2 border border-blue-500 text-blue-500 rounded-md bg-white hover:bg-blue-500 hover:text-white transition-colors"
+        onClick={() => downloadExcelTemplate().catch(err => { console.error('Download template failed', err); alert('Failed to download template'); })}
+      >
+        Download Excel Template
       </button>
 
       {/* If file is selected */}

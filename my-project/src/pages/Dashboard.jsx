@@ -78,48 +78,93 @@ function Dashboard() {
   return (
     <>
       <Header />
-      <div className="p-8">
-        {/* Dashboard Title */}
-        <h1 className="text-4xl font-bold text-center mb-10">Lane Management Dashboard</h1>
 
-        {/* Total Counts Section with Bar Chart */}
-        <div className="text-center mb-10">
-          <h2 className="text-2xl font-bold mb-4">Lane Distribution </h2>
-          <div className="max-w-xs mx-auto">
+      <main className="max-w-7xl mx-auto p-8">
+        {/* Title */}
+        <div className="mb-8 text-center">
+          <h1 className="text-4xl font-extrabold text-gray-900">Lane Management Dashboard</h1>
+          <p className="text-gray-500 mt-2">Overview of lanes and accounts — quick stats and trends</p>
+        </div>
+
+        {/* Top stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+          <div className="bg-white p-6 rounded-2xl shadow flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500">Total Lanes</p>
+              <p className="text-3xl font-bold text-gray-900">{counts.total ?? 0}</p>
+            </div>
+            <div className="rounded-full bg-blue-50 text-blue-600 p-3">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="24" height="24" rx="6" fill="currentColor" /></svg>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl shadow flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500">Active Lanes</p>
+              <p className="text-3xl font-bold text-green-600">{counts.valid ?? 0}</p>
+            </div>
+            <div className="rounded-full bg-green-50 text-green-600 p-3">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="currentColor" /></svg>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl shadow flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500">Invalid Lanes</p>
+              <p className="text-3xl font-bold text-red-600">{counts.invalid ?? 0}</p>
+            </div>
+            <div className="rounded-full bg-red-50 text-red-600 p-3">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 6L18 18M6 18L18 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </div>
+          </div>
+        </div>
+
+        {/* Chart card */}
+        <div className="bg-white p-6 rounded-2xl shadow mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-800">Lane Distribution</h2>
+            <p className="text-sm text-gray-500">Last 30 days</p>
+          </div>
+          <div className="w-full">
             <Bar data={barData} options={barOptions} />
           </div>
         </div>
 
         {/* Account Overview Section */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+        <section>
+          <h2 className="text-xl font-bold mb-6 text-gray-900">Account Overview</h2>
 
-          <h2 className="col-span-full text-xl font-bold mb-6 text-center">Account Overview</h2>
-          {accounts.map((account) => (
-            <div
-              key={account.id}
-              className="bg-white shadow-lg rounded-2xl p-6 hover:shadow-xl transition duration-300"
-            >
-              <h3 className="text-2xl font-semibold text-gray-800 border-b pb-3 mb-4">
-                {account.accountName}
-              </h3>
-              <div className="space-y-3">
-                <p className="text-lg">
-                  <span className="font-medium text-gray-600">Total Lanes:</span>{' '}
-                  <span className="text-blue-600 font-semibold">{account.totalCount}</span>
-                </p>
-                <p className="text-lg">
-                  <span className="font-medium text-gray-600">Active Lanes:</span>{' '}
-                  <span className="text-green-600 font-semibold">{account.validCount}</span>
-                </p>
-                <p className="text-lg">
-                  <span className="font-medium text-gray-600">Invalid Lanes:</span>{' '}
-                  <span className="text-red-600 font-semibold">{account.invalidCount}</span>
-                </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {accounts.map((account) => (
+              <div key={account.id} className="bg-white rounded-2xl shadow p-6 hover:shadow-xl transition duration-300">
+                <div className="flex items-start justify-between">
+                  <h3 className="text-lg font-semibold text-gray-800">{account.accountName}</h3>
+                  <div className="text-sm text-gray-500">ID {account.id}</div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-3 gap-4">
+                  <div className="bg-gray-50 rounded-lg p-3 text-center">
+                    <div className="text-sm text-gray-500">Total</div>
+                    <div className="text-lg font-bold text-blue-600">{account.totalCount}</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3 text-center">
+                    <div className="text-sm text-gray-500">Active</div>
+                    <div className="text-lg font-bold text-green-600">{account.validCount}</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3 text-center">
+                    <div className="text-sm text-gray-500">Invalid</div>
+                    <div className="text-lg font-bold text-red-600">{account.invalidCount}</div>
+                  </div>
+                </div>
+
+                {account.description && (
+                  <p className="mt-4 text-sm text-gray-500">{account.description}</p>
+                )}
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </section>
-      </div>
+      </main>
     </>
   );
 }

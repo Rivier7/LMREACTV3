@@ -4,7 +4,7 @@ import { jwtDecode } from "jwt-decode";
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(localStorage.getItem("token") || "");
+  const [token, setToken] = useState(localStorage.getItem("token") || null);
 
   // Function to check if token is expired
   const isTokenExpired = (jwt) => {
