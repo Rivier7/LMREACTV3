@@ -4,6 +4,7 @@ import Dashboard from "./pages/Dashboard";
 import PrivateRoute from "./components/PrivateRoute";
 import AllLanes from "./pages/allLanes";
 import Accounts from './pages/Accounts';
+import AccountLanes from './pages/AccountLanes';
 import Edit from "./pages/edit";
 
 
@@ -13,39 +14,46 @@ function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
 
-        
+
         <Route path="/dashboard" element={
           <PrivateRoute>
             <Dashboard />
           </PrivateRoute>
         } />
 
-         <Route path="/lanes" element={
+        <Route path="/lanes" element={
           <PrivateRoute>
-            <AllLanes/>
+            <AllLanes />
           </PrivateRoute>
-        } />  
+        } />
 
-          <Route path="/Accounts" element={
+        <Route path="/Accounts" element={
           <PrivateRoute>
-            <Accounts/>
+            <Accounts />
           </PrivateRoute>
-        } />  
+        } />
 
 
-           <Route path="/edit" element={
+        <Route path="/edit" element={
           <PrivateRoute>
-            <Edit/>
+            <Edit />
           </PrivateRoute>
-        } />  
+        } />
 
-         <Route path="/" element={
+        <Route path="/accountLanes/:accountId" element={
           <PrivateRoute>
-            <Dashboard/>
+            <AccountLanes />
           </PrivateRoute>
-        } />  
+        } />
 
-        
+
+        <Route path="/" element={
+          <PrivateRoute>
+            <Dashboard />
+          </PrivateRoute>
+        } />
+
+
       </Routes>
     </Router>
   );

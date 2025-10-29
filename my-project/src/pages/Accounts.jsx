@@ -1,15 +1,21 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getAccountExcel, getAllAccounts } from '../api/api';
 import AccountModel from "../components/AccountModel";
 import FileUploader from '../components/FileUploader';
 import Header from '../components/Header';
 
 const Accounts = () => {
+  const navigate = useNavigate();
   const [Account, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState(null);
+
+  const handleSelectAccount = (accountId) => {
+    navigate(`/accountLanes/${accountId}`);
+  };
 
   const loadAccounts = async () => {
     try {

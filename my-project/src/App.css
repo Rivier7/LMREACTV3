@@ -1,9 +1,42 @@
-
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-5px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-fadeIn {
   animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Wider table adjustments: make cells wider and font-size smaller for tables using the .wider-table class */
+.wider-table {
+  /* Tailwind's text-xs is applied on the element too; this is a fallback/guarantee */
+  font-size: 0.75rem;
+}
+
+.wider-table th,
+.wider-table td {
+  /* increase horizontal padding so cells appear wider */
+  padding-left: 1.25rem;
+  /* 20px */
+  padding-right: 1.25rem;
+  /* ensure a minimum width for each column */
+  min-width: 180px;
+  /* prevent awkward wrapping so width takes effect */
+  white-space: nowrap;
+}
+
+/* Nested (legs) table inside expanded rows should be slightly narrower but also use small font */
+.nested-table th,
+.nested-table td {
+  font-size: 0.75rem;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  min-width: 120px;
 }
