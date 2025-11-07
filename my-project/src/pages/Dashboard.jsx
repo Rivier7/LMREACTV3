@@ -1,29 +1,34 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { TrendingUp, Download, ChevronRight } from 'lucide-react';
 import Header from '../components/Header';
-import { allLaneCount, getLaneCounts } from '../api/api';
+import FileUploader from '../components/FileUploader';
+import { allLaneCount, getLaneCounts, getAccountExcel } from '../api/api';
 
 function Dashboard() {
   const [accounts, setAccounts] = useState([]);
   const [counts, setCounts] = useState({ total: 0, valid: 0, invalid: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const navigate = useNavigate();
+
+  const handleSelectAccount = (accountId) => {
+    console.log(`Selected account ID: ${accountId}`);
+    navigate(`/accountLanes/${accountId}`);
+  };
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Run both requests in parallel
         const [accountsData, countsData] = await Promise.all([
           allLaneCount(),
           getLaneCounts()
         ]);
-
         setAccounts(accountsData || []);
         setCounts(countsData || { total: 0, valid: 0, invalid: 0 });
-
-        if (!accountsData || accountsData.length === 0) {
-          setError('No accounts data available');
-        }
       } catch (err) {
         console.error('API Error:', err);
         setError('An error occurred while loading data.');
@@ -35,149 +40,230 @@ function Dashboard() {
     fetchData();
   }, []);
 
-  // State and data management only
-
   if (loading) {
-    return <div className="text-center py-6 text-lg">Loading dashboard...</div>;
+    return <div className="text-center py-12 text-lg text-gray-500">Loading dashboard...</div>;
   }
 
   if (error) {
-    return <>      <Header />
-      <div className="text-center text-red-600 py-6">{error}</div></>;
+    return (
+      <>
+        <Header />
+        <div className="text-center text-red-600 py-6">{error}</div>
+      </>
+    );
   }
+
+  const validPercentage = counts.total > 0 ? (counts.valid / counts.total) * 100 : 0;
+  const invalidPercentage = counts.total > 0 ? (counts.invalid / counts.total) * 100 : 0;
+
+  // Filter accounts
+  const filteredAccounts = accounts.filter((account) => {
+    const matchesSearch = account.accountName.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus =
+      statusFilter === 'all' ||
+      (statusFilter === 'valid' && account.validCount > 0 && account.invalidCount === 0) ||
+      (statusFilter === 'invalid' && account.invalidCount > 0);
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <>
       <Header />
 
-      <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-        {/* Title */}
-        <div className="mb-8">
-          <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100">
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900">Lane Management Dashboard</h1>
-            <p className="mt-2 text-gray-600">Real-time overview of your lane operations and metrics</p>
-          </div>
-        </div>
+      <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <div className="max-w-7xl mx-auto p-6 lg:p-8">
+          {/* Top Section */}
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8 mb-10">
+            {/* Left: Title & Upload */}
+            <div>
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">Dashboard</h1>
+              <p className="text-gray-600">Manage and monitor your account lanes</p>
+              <div className="mt-6">
+                <FileUploader />
+              </div>
+            </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-          {/* Total Lanes Card */}
-          <div className="bg-white rounded-2xl shadow-lg p-6 transform transition-all duration-300 hover:scale-105">
-            <div className="flex items-center space-x-4">
-              <div className="rounded-xl bg-blue-100 p-3">
-                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Lanes</p>
-                <p className="text-2xl sm:text-3xl font-bold text-blue-600">{counts.total ?? 0}</p>
-              </div>
-            </div>
-            <div className="mt-4 h-1 w-full bg-blue-100 rounded-full overflow-hidden">
-              <div className="h-1 bg-blue-600 rounded-full" style={{ width: '100%' }}></div>
-            </div>
-          </div>
-
-          {/* Active Lanes Card */}
-          <div className="bg-white rounded-2xl shadow-lg p-6 transform transition-all duration-300 hover:scale-105">
-            <div className="flex items-center space-x-4">
-              <div className="rounded-xl bg-green-100 p-3">
-                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">Active Lanes</p>
-                <p className="text-2xl sm:text-3xl font-bold text-green-600">{counts.valid ?? 0}</p>
-              </div>
-            </div>
-            <div className="mt-4 h-1 w-full bg-green-100 rounded-full overflow-hidden">
-              <div className="h-1 bg-green-600 rounded-full" style={{ width: `${(counts.valid / counts.total * 100) || 0}%` }}></div>
-            </div>
-          </div>
-
-          {/* Invalid Lanes Card */}
-          <div className="bg-white rounded-2xl shadow-lg p-6 transform transition-all duration-300 hover:scale-105">
-            <div className="flex items-center space-x-4">
-              <div className="rounded-xl bg-red-100 p-3">
-                <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">Invalid Lanes</p>
-                <p className="text-2xl sm:text-3xl font-bold text-red-600">{counts.invalid ?? 0}</p>
-              </div>
-            </div>
-            <div className="mt-4 h-1 w-full bg-red-100 rounded-full overflow-hidden">
-              <div className="h-1 bg-red-600 rounded-full" style={{ width: `${(counts.invalid / counts.total * 100) || 0}%` }}></div>
-            </div>
-          </div>
-        </div>
-
-        {/* Account Overview Section */}
-        <section className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-900">Account Overview</h2>
-            <span className="px-4 py-2 bg-blue-100 text-blue-800 rounded-xl text-sm font-medium">
-              {accounts.length} Active Accounts
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {accounts.map((account) => (
-              <div key={account.id}
-                className="group bg-white rounded-2xl shadow-lg p-6 hover:shadow-2xl transition-all duration-300 border border-gray-100">
-                <div className="flex items-start justify-between mb-4">
+            {/* Right: Stats Cards */}
+            <div className="grid grid-cols-3 gap-4 flex-shrink-0">
+              {/* Total Lanes */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
-                      {account.accountName}
-                    </h3>
-                    <div className="text-sm text-gray-500">Account #{account.id}</div>
+                    <p className="text-sm font-medium text-gray-600 mb-1">Total Lanes</p>
+                    <p className="text-3xl font-bold text-gray-900">{counts.total ?? 0}</p>
                   </div>
-                  <div className="bg-blue-50 text-blue-600 px-2 py-1 rounded-md text-xs font-semibold">
-                    Active
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-gray-50 rounded-xl p-3 text-center group-hover:bg-blue-50 transition-colors">
-                    <div className="text-xs font-medium text-gray-500 mb-1">Total</div>
-                    <div className="text-lg font-bold text-blue-600">{account.totalCount}</div>
-                  </div>
-                  <div className="bg-gray-50 rounded-xl p-3 text-center group-hover:bg-green-50 transition-colors">
-                    <div className="text-xs font-medium text-gray-500 mb-1">Active</div>
-                    <div className="text-lg font-bold text-green-600">{account.validCount}</div>
-                  </div>
-                  <div className="bg-gray-50 rounded-xl p-3 text-center group-hover:bg-red-50 transition-colors">
-                    <div className="text-xs font-medium text-gray-500 mb-1">Invalid</div>
-                    <div className="text-lg font-bold text-red-600">{account.invalidCount}</div>
-                  </div>
-                </div>
-
-                {account.description && (
-                  <p className="mt-4 text-sm text-gray-600 line-clamp-2">{account.description}</p>
-                )}
-
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Success Rate</span>
-                    <span className="font-medium text-gray-900">
-                      {((account.validCount / account.totalCount) * 100 || 0).toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="mt-2 h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-1.5 bg-green-500 rounded-full transition-all duration-500"
-                      style={{ width: `${(account.validCount / account.totalCount * 100) || 0}%` }}
-                    ></div>
+                  <div className="text-blue-600 text-3xl opacity-20">
+                    <TrendingUp size={32} />
                   </div>
                 </div>
               </div>
-            ))}
+
+              {/* Active Lanes */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 mb-1">Active</p>
+                    <p className="text-3xl font-bold text-green-600">{counts.valid ?? 0}</p>
+                    <p className="text-xs text-gray-500 mt-2">{validPercentage.toFixed(0)}% healthy</p>
+                  </div>
+                  <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                    <span className="text-green-600 font-bold text-lg">✓</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Invalid Lanes */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 mb-1">Invalid</p>
+                    <p className="text-3xl font-bold text-red-600">{counts.invalid ?? 0}</p>
+                    <p className="text-xs text-gray-500 mt-2">{invalidPercentage.toFixed(0)}% attention</p>
+                  </div>
+                  <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                    <span className="text-red-600 font-bold text-lg">!</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </section>
+
+          {/* Account Overview Section */}
+          <section>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Accounts</h2>
+                <p className="text-gray-600 text-sm mt-1">{filteredAccounts.length} of {accounts.length} accounts</p>
+              </div>
+              <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm font-semibold">
+                {accounts.length} Active
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="mb-6 flex flex-col sm:flex-row gap-4">
+              {/* Search */}
+              <div className="flex-1">
+                <input
+                  type="text"
+                  placeholder="Search by account name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                />
+              </div>
+
+              {/* Status Filter */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setStatusFilter('all')}
+                  className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${statusFilter === 'all'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => setStatusFilter('valid')}
+                  className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${statusFilter === 'valid'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                >
+                  Valid
+                </button>
+                <button
+                  onClick={() => setStatusFilter('invalid')}
+                  className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${statusFilter === 'invalid'
+                    ? 'bg-red-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                >
+                  Invalid
+                </button>
+              </div>
+            </div>
+
+            {/* No Results */}
+            {filteredAccounts.length === 0 && (
+              <div className="text-center py-12">
+                <p className="text-gray-500 text-lg">No accounts match your filters</p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredAccounts.map((account) => (
+                <div
+                  key={account.accountId}
+                  className="group bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg hover:border-blue-200 transition-all duration-300"
+                >
+                  {/* Card Header */}
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-5 border-b border-gray-100">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+                          {account.accountName}
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-1">ID: {account.accountId}</p>
+                      </div>
+                      <div className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                        Active
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card Body */}
+                  <div className="p-5">
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-3 gap-3 mb-5">
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-blue-600">{account.totalCount}</p>
+                        <p className="text-xs text-gray-500 mt-1">Total</p>
+                      </div>
+                      <div className="text-center border-l border-r border-gray-100">
+                        <p className="text-2xl font-bold text-green-600">{account.validCount}</p>
+                        <p className="text-xs text-gray-500 mt-1">Active</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-red-600">{account.invalidCount}</p>
+                        <p className="text-xs text-gray-500 mt-1">Invalid</p>
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    {account.description && (
+                      <p className="text-sm text-gray-600 line-clamp-2 mb-5 pb-5 border-b border-gray-100">
+                        {account.description}
+                      </p>
+                    )}
+
+                    {/* Buttons */}
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => handleSelectAccount(account.accountId)}
+                        className="w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-all duration-200 flex items-center justify-center gap-2"
+                        aria-label={`Select account ${account.accountName}`}
+                      >
+                        View Lanes
+                        <ChevronRight size={16} />
+                      </button>
+
+                      <button
+                        onClick={() => getAccountExcel(account.accountId)}
+                        className="w-full px-4 py-2.5 bg-gray-100 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-200 active:bg-gray-300 transition-all duration-200 flex items-center justify-center gap-2"
+                        aria-label={`Download excel for account ${account.accountName}`}
+                      >
+                        <Download size={16} />
+                        Export
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
       </main>
     </>
   );

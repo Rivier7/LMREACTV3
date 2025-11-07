@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { updateLane, updateLaneToDirectDrive, getTAT, getFlights, validateFlight } from '../api/api';
 import Header from '../components/Header';
+import { getSuggestedRoute } from '../api/api';
 
 const Edit = () => {
   const { laneId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+
   const lane = location.state?.lane;
 
   const serviceLevels = [
@@ -25,6 +27,10 @@ const Edit = () => {
       </div>
     );
   }
+  const [suggestedRoute, setSuggestedRoute] = useState(null);
+  const [showSuggestedRoute, setShowSuggestedRoute] = useState(false);
+  const [suggestError, setSuggestError] = useState(null);
+
 
   const [updatedLane, setUpdatedLane] = useState(lane);
   const [legs, setLegs] = useState([]);
@@ -51,7 +57,74 @@ const Edit = () => {
     setUpdatedLane((prevLane) => ({ ...prevLane, [name]: value }));
   };
 
-  const handleInputChange = (index, field, value) => {
+  const handleSuggestRoute = async () => {
+    try {
+      setSuggestError(null);
+
+      const payload = {
+        itemNumber: updatedLane.itemNumber,
+        originAirport: legs[0]?.originStation,
+        destinationAirport: legs[legs.length - 1]?.destinationStation,
+        collectionTime: updatedLane.pickUpTime,
+      };
+
+      const result = await getSuggestedRoute(payload);
+
+      setSuggestedRoute(result);
+      setShowSuggestedRoute(true);
+
+    } catch (error) {
+      // Extract error message from backend
+      let message = "Failed to suggest route.";
+      if (error.message) message = error.message;
+      else if (error.response) message = error.response.data?.error || message;
+
+      setSuggestedRoute(null);
+      setSuggestError(message);  // <-- Use setSuggestError here
+    }
+  };
+
+
+
+  const handleInputChange = (index, field, rawValue) => {
+    let value = rawValue.toUpperCase();
+
+    if ((field === "originStation" || field === "destinationStation") && value.length > 3) {
+      alert("Origin and destination must be max 3 letters.");
+      return;
+    }
+
+    if (field === "destinationStation") {
+      const origin = legs[index]?.originStation?.toUpperCase();
+      if (origin && value === origin) {
+        alert("Origin and destination cannot be the same.");
+        return;
+      }
+
+      const allOrigins = legs.map((leg) => leg?.originStation?.toUpperCase()).filter(Boolean);
+
+      if (allOrigins.includes(value)) {
+        alert(`Destination '${value}' was already used as a departure airport.`);
+        return;
+      }
+    }
+
+    if (field === "originStation") {
+      const newOrigin = value.toUpperCase();
+      const otherLegsOrigins = legs
+        .map((leg, i) => i !== index ? leg?.originStation?.toUpperCase() : null)
+        .filter(Boolean);
+
+      if (otherLegsOrigins.includes(newOrigin)) {
+        alert(`Origin '${newOrigin}' is already used in another leg.`);
+        return;
+      }
+    }
+
+    if (field === "flightNumber" && value.length >= 2) {
+      value = value.substring(0, 2).toUpperCase() + value.substring(2);
+    }
+
     const updatedLegs = [...legs];
     updatedLegs[index][field] = value;
     updatedLegs[index].valid = null;
@@ -59,29 +132,40 @@ const Edit = () => {
   };
 
   const handleServiceLevelChange = (legIndex, serviceLevel) => {
-    const updatedLegs = [...legs];
-    if (updatedLegs[legIndex]?.serviceLevel === serviceLevel) {
-      updatedLegs[legIndex].serviceLevel = '';
+    if (serviceLevel === 'DIRECT DRIVE') {
+      const clearedLeg = {
+        sequence: 1,
+        flightNumber: null,
+        departureTime: null,
+        originStation: null,
+        destinationStation: null,
+        arrivalTime: null,
+        flightOperatingdays: null,
+        valid: null,
+        serviceLevel: 'DIRECT DRIVE',
+        cutoffTime: null,
+        validMessage: [],
+      };
+      setLegs([clearedLeg]);
     } else {
-      if (serviceLevel === 'DIRECT DRIVE') {
-        const clearedLeg = {
-          sequence: 1,
-          flightNumber: null,
-          departureTime: null,
-          originStation: null,
-          destinationStation: null,
-          arrivalTime: null,
-          flightOperatingdays: null,
-          valid: null,
-          serviceLevel: 'DIRECT DRIVE',
-          cutoffTime: null,
-          validMessage: [],
-        };
-        setLegs([clearedLeg]);
-      } else {
-        updatedLegs[legIndex].serviceLevel = serviceLevel;
-        setLegs(updatedLegs);
+      let updatedLegs = [...legs];
+      // If there are no legs, or if the current one is DIRECT DRIVE, start fresh
+      if (updatedLegs.length === 0 || updatedLegs[0]?.serviceLevel === 'DIRECT DRIVE') {
+        updatedLegs = [{
+          sequence: 1, flightNumber: '', departureTime: '', originStation: '',
+          destinationStation: '', arrivalTime: '', flightOperatingdays: '',
+          valid: null, serviceLevel: '', cutoffTime: '', validMessage: [],
+        }];
       }
+
+      const currentServiceLevel = updatedLegs[legIndex]?.serviceLevel;
+      // Toggle off if same service is clicked, or if OTHER is clicked when custom is already entered
+      if ((serviceLevel === 'OTHER' && !serviceLevels.includes(currentServiceLevel)) || currentServiceLevel === serviceLevel) {
+        updatedLegs[legIndex].serviceLevel = '';
+      } else {
+        updatedLegs[legIndex].serviceLevel = serviceLevel === 'OTHER' ? '' : serviceLevel;
+      }
+      setLegs(updatedLegs);
     }
   };
 
@@ -107,7 +191,7 @@ const Edit = () => {
   };
 
   const handleRemoveLeg = () => {
-    setLegs((prevLegs) => prevLegs.slice(0, -1));
+    if (legs.length > 1) setLegs((prevLegs) => prevLegs.slice(0, -1));
   };
 
   const handleValidateButton = async () => {
@@ -118,7 +202,6 @@ const Edit = () => {
       leg.valid = result.valid;
       leg.validMessage = result.mismatchedFields;
       leg.flightOperatingdays = result.operatingDays;
-
     }
     setLegs(updatedLegs);
     setIsLoading(false);
@@ -129,8 +212,10 @@ const Edit = () => {
     const isDirectDrive = legs[0]?.serviceLevel === 'DIRECT DRIVE';
 
     try {
+      let result;
       if (isDirectDrive) {
-        await updateLaneToDirectDrive(updatedLane.id, updatedLane, []);
+        // Assuming updateLaneToDirectDrive doesn't return 304 scenario
+        result = await updateLaneToDirectDrive(updatedLane.id, updatedLane, []);
       } else {
         if (legs.some((f) => !f.flightNumber || !f.originStation || !f.destinationStation)) {
           alert('Please fill out all flight fields!');
@@ -142,14 +227,18 @@ const Edit = () => {
           setIsLoading(false);
           return;
         }
-        await updateLane(updatedLane.id, updatedLane, legs);
+        result = await updateLane(updatedLane.id, updatedLane, legs);
       }
 
-      setShowSuccess(true);
-      setTimeout(() => {
-        setShowSuccess(false);
-        navigate('/Lanes');
-      }, 3000);
+      if (result?.notModified) {
+        alert("No changes detected — lane was not updated.");
+      } else {
+        setShowSuccess(true);
+        setTimeout(() => {
+          setShowSuccess(false);
+          navigate('/Lanes');
+        }, 3000);
+      }
     } catch (error) {
       console.error('Error updating lane:', error.message);
       alert('Failed to update lane.');
@@ -158,14 +247,11 @@ const Edit = () => {
     }
   };
 
-
   const handleTATCalculation = async () => {
     setIsLoading(true);
     try {
       const tatTTime = await getTAT(updatedLane, legs);
       setUpdatedLane((prev) => ({ ...prev, tatToConsigneeDuration: tatTTime }));
-      setIsLoading(false);
-      console.log('TAT Time:', tatTTime);
     } catch (error) {
       console.error('Error calculating TAT:', error.message);
       alert('Failed to calculate TAT.');
@@ -175,13 +261,13 @@ const Edit = () => {
   };
 
   const isDirectDriveSelected = legs[0]?.serviceLevel === 'DIRECT DRIVE';
-  const hasServiceLevel = legs.length > 0 && legs[0]?.serviceLevel !== '' && !isDirectDriveSelected;
+  const hasFlightLegs = legs.length > 0 && legs[0]?.serviceLevel && !isDirectDriveSelected;
 
   return (
     <div className="min-h-screen bg-gray-50 text-sm">
       <Header />
 
-      {/* Success Message */}
+      {/* Success Msg */}
       {showSuccess && (
         <div className="fixed top-4 right-4 z-50 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg">
           <div className="flex items-center">
@@ -193,7 +279,7 @@ const Edit = () => {
         </div>
       )}
 
-      {/* Loading Overlay */}
+      {/* Loading */}
       {isLoading && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-xl">
@@ -203,9 +289,9 @@ const Edit = () => {
         </div>
       )}
 
-      <div className="w-full p-6 space-y-8"
-      >
-        {/* Header Card */}
+      <div className="w-full p-6 space-y-8">
+
+        {/* Account Name */}
         <div className="bg-white rounded shadow border-gray-300 p-4 mb-4">
           <div className="text-center">
             <span className="inline-block bg-gray-100 px-2 py-1 rounded text-xs font-semibold text-gray-800">
@@ -214,8 +300,10 @@ const Edit = () => {
           </div>
         </div>
 
+        {/* ORIGIN / DESTINATION / LANE DETAILS */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-          {/* Origin */}
+
+          {/* ---------- ORIGIN ---------- */}
           <div className="bg-white p-3 rounded shadow border-gray-300">
             <div className="flex items-center mb-3">
               <div className="bg-gray-600 text-white p-2 rounded">
@@ -225,20 +313,26 @@ const Edit = () => {
               </div>
               <h3 className="font-bold text-xs text-gray-700 ml-2">Origin</h3>
             </div>
-            {['City', 'State', 'Country'].map((field, idx) => (
-              <input
-                key={idx}
-                type="text"
-                name={`origin${field}`}
-                value={updatedLane[`origin${field}`] || ''}
-                onChange={handleChange}
-                className="w-full mb-2 px-2 py-1 border border-gray-300 rounded text-xs"
-                placeholder={field}
-              />
+
+            {['City', 'State', 'Country'].map((field) => (
+              <div key={field} className="mb-3">
+                <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                  Origin {field}
+                </label>
+                <input
+                  type="text"
+                  name={`origin${field}`}
+                  value={updatedLane[`origin${field}`] || ''}
+                  onChange={handleChange}
+                  className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                  placeholder={field}
+                />
+              </div>
             ))}
+
           </div>
 
-          {/* Destination */}
+          {/* ---------- DESTINATION ---------- */}
           <div className="bg-white p-3 rounded shadow border-gray-300">
             <div className="flex items-center mb-3">
               <div className="bg-gray-600 text-white p-2 rounded">
@@ -249,20 +343,25 @@ const Edit = () => {
               </div>
               <h3 className="font-bold text-xs text-gray-700 ml-2">Destination</h3>
             </div>
-            {['City', 'State', 'Country'].map((field, idx) => (
-              <input
-                key={idx}
-                type="text"
-                name={`destination${field}`}
-                value={updatedLane[`destination${field}`] || ''}
-                onChange={handleChange}
-                className="w-full mb-2 px-2 py-1 border border-gray-300 rounded text-xs"
-                placeholder={field}
-              />
+
+            {['City', 'State', 'Country'].map((field) => (
+              <div key={field} className="mb-3">
+                <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                  Destination {field}
+                </label>
+                <input
+                  type="text"
+                  name={`destination${field}`}
+                  value={updatedLane[`destination${field}`] || ''}
+                  onChange={handleChange}
+                  className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                  placeholder={field}
+                />
+              </div>
             ))}
           </div>
 
-          {/* Lane Details */}
+          {/* ---------- LANE DETAILS ---------- */}
           <div className="bg-white p-3 rounded shadow border-gray-300">
             <div className="flex items-center mb-3">
               <div className="bg-gray-600 text-white p-2 rounded">
@@ -272,44 +371,66 @@ const Edit = () => {
               </div>
               <h3 className="font-bold text-xs text-gray-700 ml-2">Lane Details</h3>
             </div>
+
+            {/* ITEM NUMBER */}
+            <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+              Item Number
+            </label>
             <input
               type="text"
               name="itemNumber"
               value={updatedLane.itemNumber || ''}
               onChange={handleChange}
-              className="w-full mb-2 px-2 py-1 border border-gray-300 rounded text-xs"
+              className="w-full mb-3 px-2 py-1 border border-gray-300 rounded text-xs"
               placeholder="Item #"
             />
+
+            {/* LANE OPTION */}
+            <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+              Lane Option
+            </label>
             <input
               type="text"
               name="laneOption"
               value={updatedLane.laneOption || ''}
               onChange={handleChange}
-              className="w-full mb-2 px-2 py-1 border border-gray-300 rounded text-xs"
+              className="w-full mb-3 px-2 py-1 border border-gray-300 rounded text-xs"
               placeholder="Option"
             />
+
+            {/* PICKUP TIME */}
+            <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+              Pickup Time
+            </label>
             <input
               type="text"
               name="pickUpTime"
               value={updatedLane.pickUpTime || ''}
               onChange={handleChange}
-              className="w-full mb-2 px-2 py-1 border border-gray-300 rounded text-xs"
+              className="w-full mb-3 px-2 py-1 border border-gray-300 rounded text-xs"
               placeholder="Pickup Time"
             />
-            {hasServiceLevel && (
-              <input
-                type="text"
-                name="cutoffTime"
-                value={legs[0].cutoffTime || ''}
-                onChange={(e) => handleInputChange(0, 'cutoffTime', e.target.value)}
-                className="w-full mb-2 px-2 py-1 border border-gray-300 rounded text-xs"
-                placeholder="Cutoff Time"
-              />
+
+            {/* CUTOFF TIME (ONLY IF SHOWN) */}
+            {hasFlightLegs && (
+              <>
+                <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                  Cutoff Time
+                </label>
+                <input
+                  type="text"
+                  name="cutoffTime"
+                  value={legs[0].cutoffTime || ''}
+                  readOnly
+                  className="w-full mb-2 px-2 py-1 border border-gray-300 rounded text-xs bg-gray-100 cursor-not-allowed"
+                  placeholder="Cutoff Time"
+                />
+              </>
             )}
           </div>
         </div>
 
-        { }
+        {/* ---------- SERVICE LEVEL SECTION (unchanged UI) ---------- */}
         <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-3">
           <h3 className="text-xs font-bold text-gray-800 mb-6 flex items-center">
             <div className="bg-gray-600 text-white p-2 rounded-lg mr-3">
@@ -319,40 +440,177 @@ const Edit = () => {
             </div>
             Service Level
           </h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {serviceLevels.map((service, index) => (
-              <label
-                key={index}
-                className={`flex items-center p-2 rounded-lg border cursor-pointer transition-all duration-200 hover:shadow-md ${legs[0]?.serviceLevel === service
-                  ? 'border-gray-600 bg-gray-100 shadow-sm'
-                  : 'border-gray-200 bg-white hover:border-gray-400 hover:bg-gray-50'
-                  }`}
-              >
-                <input
-                  type="radio"
-                  name="serviceLevel"
-                  value={service}
-                  checked={legs[0]?.serviceLevel === service}
-                  onChange={(e) => handleServiceLevelChange(0, e.target.value)}
-                  className="w-5 h-5 text-gray-600 sr-only"
-                />
-                <div className={`w-5 h-5 rounded-full border-2 mr-3 flex items-center justify-center ${legs[0]?.serviceLevel === service ? 'border-gray-600 bg-gray-600' : 'border-gray-300'
-                  }`}>
-                  {legs[0]?.serviceLevel === service && (
-                    <div className="w-2 h-2 rounded-full bg-white"></div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 items-start">
+            {serviceLevels.map((service, index) => {
+              const isOther = service === 'OTHER';
+              const currentService = legs[0]?.serviceLevel || '';
+              const isChecked = isOther
+                ? !serviceLevels.slice(0, -1).includes(currentService) && currentService !== ''
+                : currentService === service;
+
+              return (
+                <div key={index} className={`flex flex-col p-2 rounded-lg border transition-all duration-200 ${isChecked ? 'border-gray-600 bg-gray-100 shadow-sm' : 'border-gray-200 bg-white'}`}>
+                  <label
+                    className="flex items-center cursor-pointer w-full"
+                    onClick={() => handleServiceLevelChange(0, service)}
+                  >
+                    <div className={`w-5 h-5 rounded-full border-2 mr-3 flex items-center justify-center flex-shrink-0 ${isChecked ? 'border-gray-600 bg-gray-600' : 'border-gray-300'}`}>
+                      {isChecked && <div className="w-2 h-2 rounded-full bg-white"></div>}
+                    </div>
+                    <span className={`text-xs font-medium ${isChecked ? 'text-gray-700' : 'text-gray-600'}`}>
+                      {service}
+                    </span>
+                  </label>
+
+                  {isOther && isChecked && (
+                    <input
+                      type="text"
+                      value={currentService === 'OTHER' ? '' : currentService}
+                      onChange={(e) => {
+                        const updatedLegs = [...legs];
+                        updatedLegs[0].serviceLevel = e.target.value.toUpperCase();
+                        setLegs(updatedLegs);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      placeholder="Specify service level"
+                      className="mt-2 w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                    />
                   )}
                 </div>
-                <span className={`text-xs font-medium ${legs[0]?.serviceLevel === service ? 'text-gray-700' : 'text-gray-600'
-                  }`}>
-                  {service}
-                </span>
-              </label>
-            ))}
+              );
+            })}
           </div>
         </div>
 
-        {/* Flight Legs Card */}
-        {hasServiceLevel && (
+        {/* ---------- OVERALL ROUTE ---------- */}
+        {hasFlightLegs && (
+          <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-4 mb-4">
+            <h3 className="text-xs font-bold text-gray-800 mb-4 flex items-center">
+              <div className="bg-gray-600 text-white p-2 rounded-lg mr-3">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+              Overall Route
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+              {/* ORIGIN AIRPORT */}
+              <div>
+                <label className="block mb-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                  Origin Airport
+                </label>
+                <input
+                  type="text"
+                  value={legs[0]?.originStation || ''}
+                  onChange={(e) => handleInputChange(0, 'originStation', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                />
+              </div>
+
+              {/* DEST AIRPORT */}
+              <div>
+                <label className="block mb-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                  Destination Airport
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={legs[legs.length - 1]?.destinationStation || ''}
+                    onChange={(e) => handleInputChange(legs.length - 1, 'destinationStation', e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSuggestRoute}
+                    className="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-xs font-semibold"
+                  >
+                    Suggest Route by Frequency
+                  </button>
+
+
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {showSuggestedRoute && suggestedRoute && (
+          <div className="bg-blue-50 border border-blue-300 rounded-lg p-4 my-6">
+            <h3 className="text-sm font-bold text-blue-800 mb-3">Suggested Route Pattern</h3>
+
+            <p className="text-xs text-blue-700 mb-2">
+              <strong>Origin:</strong> {suggestedRoute.originStation} →
+              <strong> Destination:</strong> {suggestedRoute.destinationStation}
+            </p>
+
+            <div className="space-y-2">
+              {suggestedRoute.legs
+                .sort((a, b) => a.sequence - b.sequence)
+                .map((leg, i) => (
+                  <div key={i} className="p-2 bg-white border border-blue-200 rounded">
+                    <p className="text-xs"><strong>Leg {leg.sequence}</strong></p>
+                    <p className="text-xs">Flight: {leg.flightNumber}</p>
+                    <p className="text-xs">
+                      {leg.originStation} → {leg.destinationStation}
+                    </p>
+                    <p className="text-xs">
+                      Dep: {leg.departureTime} — Arr: {leg.arrivalTime}
+                    </p>
+                    <p className="text-xs">Days: {leg.flightOperatingdays}</p>
+                  </div>
+                ))}
+            </div>
+
+            {/* Ask user to apply route */}
+            <div className="flex gap-3 mt-4">
+              <button
+                className="px-4 py-2 bg-blue-600 text-white rounded text-xs"
+                onClick={() => {
+                  // Replace legs with suggestion
+                  const updated = suggestedRoute.legs
+                    .sort((a, b) => a.sequence - b.sequence)
+                    .map(leg => ({
+                      sequence: leg.sequence,
+                      flightNumber: leg.flightNumber,
+                      originStation: leg.originStation,
+                      destinationStation: leg.destinationStation,
+                      departureTime: leg.departureTime,
+                      arrivalTime: leg.arrivalTime,
+                      flightOperatingdays: leg.flightOperatingdays,
+                      serviceLevel: legs[0].serviceLevel, // keep service level
+                      cutoffTime: legs[0].cutoffTime, // keep cutoff time
+                      valid: null,
+                      validMessage: []
+                    }));
+                  setLegs(updated);
+                  setShowSuggestedRoute(false);
+                }}
+              >
+                Yes, Apply Route
+              </button>
+
+              <button
+                className="px-4 py-2 bg-gray-400 text-white rounded text-xs"
+                onClick={() => setShowSuggestedRoute(false)}
+              >
+                No
+              </button>
+            </div>
+          </div>
+        )}{suggestError && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mt-4" role="alert">
+            <strong className="font-bold">Error: </strong>
+            <span className="block sm:inline">{suggestError}</span>
+          </div>
+        )}
+
+
+        {/* ---------- FLIGHT LEGS ---------- */}
+        {hasFlightLegs && (
           <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-4">
             <h3 className="text-xs font-bold text-gray-800 mb-6 flex items-center">
               <div className="bg-gray-600 text-white p-2 rounded-lg mr-3">
@@ -362,125 +620,192 @@ const Edit = () => {
               </div>
               Flight Legs
             </h3>
+
             <div className="space-y-6">
-              {legs
-                .slice()
-                .sort((a, b) => a.sequence - b.sequence)
-                .map((leg, index) => (
-                  <div
-                    key={index}
-                    className="bg-gray-50 border border-gray-200 rounded-lg p-6 hover:shadow-sm transition-shadow duration-200"
-                  >
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 items-center">
+              {legs.slice().sort((a, b) => a.sequence - b.sequence).map((leg, index) => (
+                <div key={index} className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+
+                  {/* GRID FOR INPUTS */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 items-start">
+
+                    {/* FLIGHT # */}
+                    <div>
+                      <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        Flight Number
+                      </label>
                       <input
                         type="text"
-                        placeholder="Flight #"
                         value={leg.flightNumber}
                         onChange={(e) => handleInputChange(index, 'flightNumber', e.target.value)}
-                        className="text-xs px-3 py-2 border border-gray-300 rounded focus:border-gray-500 focus:outline-none transition-all duration-200"
+                        className="text-xs px-3 py-2 border border-gray-300 rounded"
+                        placeholder="Flight #"
                       />
+                    </div>
+
+                    {/* DEPARTURE */}
+                    <div>
+                      <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        Departure Time
+                      </label>
                       <input
                         type="text"
-                        placeholder="Departure"
                         value={leg.departureTime}
                         onChange={(e) => handleInputChange(index, 'departureTime', e.target.value)}
-                        className="text-xs px-3 py-2 border border-gray-300 rounded focus:border-gray-500 focus:outline-none transition-all duration-200"
+                        className="text-xs px-3 py-2 border border-gray-300 rounded"
+                        placeholder="Departure"
                       />
+                    </div>
+
+                    {/* ORIGIN */}
+                    <div>
+                      <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        Origin Airport
+                      </label>
                       <input
                         type="text"
-                        placeholder="Origin"
                         value={leg.originStation}
                         onChange={(e) => handleInputChange(index, 'originStation', e.target.value)}
-                        className="text-xs px-3 py-2 border border-gray-300 rounded focus:border-gray-500 focus:outline-none transition-all duration-200"
+                        className="text-xs px-3 py-2 border border-gray-300 rounded"
+                        placeholder="Origin"
                       />
-                      <div className="flex justify-center">
-                        <div className="bg-gray-200 p-2 rounded">
-                          <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                          </svg>
-                        </div>
+                    </div>
+
+                    <div className="flex justify-center pt-6">
+                      <div className="bg-gray-200 p-2 rounded">
+                        <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                        </svg>
                       </div>
+                    </div>
+
+                    {/* DESTINATION */}
+                    <div>
+                      <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        Destination Airport
+                      </label>
                       <input
                         type="text"
-                        placeholder="Destination"
                         value={leg.destinationStation}
                         onChange={(e) => handleInputChange(index, 'destinationStation', e.target.value)}
-                        className="text-xs px-3 py-2 border border-gray-300 rounded focus:border-gray-500 focus:outline-none transition-all duration-200"
+                        className="text-xs px-3 py-2 border border-gray-300 rounded"
+                        placeholder="Destination"
                       />
+                    </div>
+
+                    {/* ARRIVAL */}
+                    <div>
+                      <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        Arrival Time
+                      </label>
                       <input
                         type="text"
-                        placeholder="Arrival"
                         value={leg.arrivalTime}
                         onChange={(e) => handleInputChange(index, 'arrivalTime', e.target.value)}
-                        className="text-xs px-3 py-2 border border-gray-300 rounded focus:border-gray-500 focus:outline-none transition-all duration-200"
+                        className="text-xs px-3 py-2 border border-gray-300 rounded"
+                        placeholder="Arrival"
                       />
+                    </div>
+
+                    {/* DAYS */}
+                    <div>
+                      <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        Operating Days
+                      </label>
                       <input
                         type="text"
-                        placeholder="Days"
                         value={leg.flightOperatingdays || ''}
                         onChange={(e) => handleInputChange(index, 'flightOperatingdays', e.target.value)}
-                        className="text-xs px-3 py-2 border border-gray-300 rounded focus:border-gray-500 focus:outline-none transition-all duration-200"
+                        className="text-xs px-3 py-2 border border-gray-300 rounded"
+                        placeholder="Days"
                       />
-
                     </div>
-                    <div className="mt-4 flex items-center justify-between">
-                      <div className="flex items-center">
-                        {leg.valid === true && (
-                          <div className="flex items-center bg-green-100 px-3 py-1 rounded-full">
-                            <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-                            <span className="text-green-700 font-medium text-sm">Valid</span>
-                          </div>
-                        )}
-                        {leg.valid === false && (
-                          <div className="flex items-center bg-red-100 px-3 py-1 rounded-full">
-                            <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
-                            <span className="text-red-700 font-medium text-sm">Invalid</span>
-                          </div>
-                        )}
-                        {leg.valid === null && (
-                          <div className="flex items-center bg-gray-100 px-3 py-1 rounded-full">
-                            <div className="w-3 h-3 bg-gray-400 rounded-full mr-2"></div>
-                            <span className="text-gray-600 font-medium text-sm">Pending</span>
-                          </div>
-                        )}
-                      </div>
-                      {leg.validMessage && leg.validMessage.length > 0 && (
-                        <div className="text-sm text-red-600 bg-red-50 px-3 py-1 rounded">
-                          {leg.validMessage.map((msg, idx) => (
-                            <div key={idx}>{msg}</div>
-                          ))}
-                        </div>
+
+                    {/* CUTOFF ONLY FIRST LEG */}
+                    <div>
+                      {index === 0 && (
+                        <>
+                          <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                            Cutoff Time
+                          </label>
+                          <input
+                            type="text"
+                            value={leg.cutoffTime || ''}
+                            onChange={(e) => handleInputChange(index, 'cutoffTime', e.target.value)}
+                            className="text-xs px-3 py-2 border border-gray-300 rounded"
+                            placeholder="Cutoff"
+                          />
+                        </>
                       )}
                     </div>
                   </div>
-                ))}
 
+                  {/* VALIDATION BADGES */}
+                  <div className="mt-4 flex items-center justify-between">
+                    <div className="flex items-center">
+                      {leg.valid === true && (
+                        <div className="flex items-center bg-green-100 px-3 py-1 rounded-full">
+                          <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                          <span className="text-green-700 font-medium text-sm">Valid</span>
+                        </div>
+                      )}
+                      {leg.valid === false && (
+                        <div className="flex items-center bg-red-100 px-3 py-1 rounded-full">
+                          <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+                          <span className="text-red-700 font-medium text-sm">Invalid</span>
+                        </div>
+                      )}
+                      {leg.valid === null && (
+                        <div className="flex items-center bg-gray-100 px-3 py-1 rounded-full">
+                          <div className="w-3 h-3 bg-gray-400 rounded-full mr-2"></div>
+                          <span className="text-gray-600 font-medium text-sm">Pending</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {leg.validMessage && leg.validMessage.length > 0 && (
+                      <div className="text-sm text-red-600 bg-red-50 px-3 py-1 rounded">
+                        {leg.validMessage.map((msg, i) => (
+                          <div key={i}>{msg}</div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* BUTTONS: ADD / REMOVE / VALIDATE */}
               <div className="flex flex-wrap gap-4">
                 <button
                   onClick={handleRemoveLeg}
-                  className="px-3 py-2 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors duration-200 shadow hover:shadow-md flex items-center"
+                  disabled={legs.length <= 1}
+                  className="px-3 py-2 text-xs bg-gray-600 text-white rounded flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
                   Remove Leg
                 </button>
+
                 <button
                   onClick={handleAddLeg}
                   disabled={legs.length >= 3}
-                  className="px-6 py-3 text-xs bg-gray-800 text-white rounded hover:bg-gray-900 transition-colors duration-200 shadow hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                  className="px-6 py-3 text-xs bg-gray-800 text-white rounded disabled:opacity-50 flex items-center"
                 >
                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                   </svg>
                   Add Leg
                 </button>
+
                 <button
                   onClick={handleValidateButton}
-                  className="px-6 py-3 text-xs bg-gray-700 text-white rounded hover:bg-gray-800 transition-colors duration-200 shadow hover:shadow-md flex items-center"
+                  className="px-6 py-3 text-xs bg-gray-700 text-white rounded flex items-center"
                 >
                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   Validate Legs
                 </button>
@@ -489,18 +814,22 @@ const Edit = () => {
           </div>
         )}
 
-        {/* Additional Fields Card */}
-        <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-4">
+        {/* ---------- ADDITIONAL INFO ---------- */}
+        <div className={`bg-white rounded-lg shadow-lg border border-gray-200 p-4 ${isDirectDriveSelected ? 'mt-8' : ''}`}>
           <h3 className="text-xs font-bold text-gray-800 mb-6 flex items-center">
             <div className="bg-gray-600 text-white p-2 rounded-lg mr-3">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
             Additional Information
           </h3>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {hasServiceLevel && (
+
+            {/* CUSTOM CLEARANCE */}
+            {hasFlightLegs && (
               <div>
                 <label className="block mb-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
                   Custom Clearance
@@ -510,11 +839,13 @@ const Edit = () => {
                   name="customClearance"
                   value={updatedLane.customClearance || ''}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:border-gray-500 focus:outline-none transition-all duration-200"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
                   placeholder="Enter custom clearance"
                 />
               </div>
             )}
+
+            {/* DRIVE TIME */}
             <div>
               <label className="block mb-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
                 Drive to Destination
@@ -524,53 +855,52 @@ const Edit = () => {
                 name="driveToDestination"
                 value={updatedLane.driveToDestination || ''}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:border-gray-500 focus:outline-none transition-all duration-200"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg"
                 placeholder="Enter drive time"
               />
             </div>
+
+            {/* DELIVERY TIME */}
             <div>
               <label className="block mb-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                Delivery Time Based On Receiving
+                Delivery Time Based on Receiving
               </label>
               <input
                 type="text"
                 name="actualDeliveryTimeBasedOnReceiving"
                 value={updatedLane.actualDeliveryTimeBasedOnReceiving || ''}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:border-gray-500 focus:outline-none transition-all duration-200"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg"
                 placeholder="Enter delivery time"
               />
             </div>
+
+            {/* TAT DURATION */}
             <div className="flex flex-col space-y-3">
               <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
                 TAT to Consignee Duration
               </label>
-
               <input
                 type="text"
                 name="tatToConsigneeDuration"
                 value={updatedLane.tatToConsigneeDuration || ''}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none transition duration-200"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg"
                 placeholder="Enter TAT duration"
               />
 
-              <div>
-                <button
-                  type="button"
-                  className="px-6 py-3 bg-gray-700 text-white rounded hover:bg-gray-800 transition-colors duration-200 shadow hover:shadow-md flex items-center"
-                  onClick={handleTATCalculation}
-                >
-                  Calculate TAT
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleTATCalculation}
+                className="px-6 py-3 bg-gray-700 text-white rounded"
+              >
+                Calculate TAT
+              </button>
             </div>
-
-
           </div>
 
-          {/* Additional Notes */}
-          <div>
+          {/* NOTES */}
+          <div className="mt-6">
             <label className="block mb-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
               Additional Notes
             </label>
@@ -578,18 +908,18 @@ const Edit = () => {
               name="additionalNotes"
               value={updatedLane.additionalNotes || ''}
               onChange={handleChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:border-gray-500 focus:outline-none transition-all duration-200"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg"
               placeholder="Enter additional notes"
             />
           </div>
         </div>
 
-        {/* Submit Button */}
+        {/* ---------- SUBMIT ---------- */}
         <div className="flex justify-center">
           <button
             onClick={handleSubmit}
             disabled={isLoading}
-            className="px-8 py-2 bg-gray-800 text-white text-xs font-bold rounded hover:bg-gray-900 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            className="px-8 py-2 bg-gray-800 text-white text-xs font-bold rounded"
           >
             {isLoading ? (
               <>
@@ -606,6 +936,7 @@ const Edit = () => {
             )}
           </button>
         </div>
+
       </div>
     </div>
   );

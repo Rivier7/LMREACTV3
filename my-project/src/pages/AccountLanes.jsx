@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { getLaneByAccountId, updateLane, getAccountbyId } from '../api/api.js';
 import Header from '../components/Header';
 import { ChevronDown, ChevronRight, Plus, Trash2, Save } from 'lucide-react';
+import { validateFlight, updateAccountLanes, getTAT } from '../api/api.js';
 
 const AccountLanes = () => {
   const { accountId } = useParams();
@@ -41,6 +42,9 @@ const AccountLanes = () => {
     tatToConsigneeDuration: 'TAT Duration',
     additionalNotes: 'Notes'
   };
+
+  // ✅ Columns that are read-only (auto-updated from legs)
+  const readOnlyColumns = ['originStation', 'destinationStation'];
 
   const getUniqueValues = (field) => {
     const values = lanes.map(l => {
@@ -106,6 +110,49 @@ const AccountLanes = () => {
   };
 
   const handleLegChange = (laneId, legId, field, value) => {
+    // ✅ Prevent duplicate origins across legs in the same lane
+    if (field === 'originStation') {
+      const newOrigin = value.toUpperCase();
+      const lane = lanes.find(l => l.id === laneId);
+
+      if (lane && lane.legs) {
+        const otherLegsOrigins = lane.legs
+          .filter(leg => leg.id !== legId)
+          .map(leg => leg.originStation?.toUpperCase())
+          .filter(Boolean);
+
+        if (otherLegsOrigins.includes(newOrigin)) {
+          alert(`Origin '${newOrigin}' is already used as a departure airport in another leg. Each leg must have a unique origin.`);
+          return;
+        }
+      }
+    }
+
+    // ✅ Prevent same origin and destination in same leg
+    if (field === 'destinationStation') {
+      const lane = lanes.find(l => l.id === laneId);
+      const leg = lane?.legs?.find(l => l.id === legId);
+      const origin = leg?.originStation?.toUpperCase();
+      const newDestination = value.toUpperCase();
+
+      if (origin && newDestination === origin) {
+        alert("Origin and destination cannot be the same.");
+        return;
+      }
+
+      if (lane && lane.legs) {
+        const allOrigins = lane.legs
+          .map(l => l.originStation?.toUpperCase())
+          .filter(Boolean);
+
+        if (allOrigins.includes(newDestination)) {
+          alert(`Destination '${newDestination}' was already used as a departure airport. Cannot reuse departure airports as arrival airports.`);
+          return;
+        }
+      }
+    }
+
+    // ✅ Update the leg and auto-update lane origin/destination
     setLanes(current =>
       current.map(lane =>
         lane.id === laneId
@@ -115,7 +162,10 @@ const AccountLanes = () => {
             lastUpdate: new Date().toISOString(),
             legs: lane.legs.map(leg =>
               leg.id === legId ? { ...leg, [field]: value } : leg
-            )
+            ),
+            // ✅ Auto-update lane origin and destination from legs
+            originStation: lane.legs[0]?.originStation || '',
+            destinationStation: lane.legs[lane.legs.length - 1]?.destinationStation || ''
           }
           : lane
       )
@@ -162,7 +212,9 @@ const AccountLanes = () => {
             ...lane,
             hasBeenUpdated: true,
             lastUpdate: new Date().toISOString(),
-            legs: lane.legs.filter(leg => leg.id !== legId)
+            legs: lane.legs.filter(leg => leg.id !== legId),
+            originStation: lane.legs.filter(leg => leg.id !== legId)[0]?.originStation || '',
+            destinationStation: lane.legs.filter(leg => leg.id !== legId)[lane.legs.filter(leg => leg.id !== legId).length - 1]?.destinationStation || ''
           }
           : lane
       )
@@ -173,9 +225,11 @@ const AccountLanes = () => {
     setLoading(true);
     try {
       const updatedLanes = lanes.filter(lane => lane.hasBeenUpdated);
-      await Promise.all(updatedLanes.map(lane => updateLane(lane.id, lane)));
-      const freshData = await getLaneByAccountId(accountId);
-      setLanes(freshData);
+      if (updatedLanes.length > 0) {
+        await updateAccountLanes(accountId, updatedLanes);
+      }
+      const freshLanes = await getLaneByAccountId(accountId);
+      setLanes(freshLanes);
     } catch (error) {
       setError("Error saving changes");
       console.error(error);
@@ -184,76 +238,95 @@ const AccountLanes = () => {
     }
   };
 
-  const parseDate = (s) => {
-    if (!s) return null;
-    const d = new Date(s);
-    return isNaN(d.getTime()) ? null : d;
+  const validateLegs = async (laneId) => {
+    setLoading(true);
+    try {
+      const laneToValidate = lanes.find(l => l.id === laneId);
+      if (!laneToValidate || !laneToValidate.legs) return;
+
+      const validatedLegs = await Promise.all(
+        laneToValidate.legs.map(async (leg) => {
+          const result = await validateFlight(leg);
+          return {
+            ...leg,
+            valid: result.valid,
+            message: result.message,
+            validMessage: result.mismatchedFields,
+            flightOperatingdays: result.operatingDays,
+          };
+        })
+      );
+
+      const isLaneValid = validatedLegs.every(leg => leg.valid);
+
+      setLanes(current =>
+        current.map(lane =>
+          lane.id === laneId
+            ? { ...lane, legs: validatedLegs, valid: isLaneValid, hasBeenUpdated: true, lastUpdate: new Date().toISOString() }
+            : lane
+        )
+      );
+    } catch (err) {
+      setError("Error validating flight legs.");
+      console.error("Validation Error:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const formatDuration = (ms) => {
-    const totalHours = Math.floor(ms / (1000 * 60 * 60));
-    const days = Math.floor(totalHours / 24);
-    const hours = totalHours % 24;
-    if (days > 0) return `${days}d ${hours}h`;
-    return `${hours}h`;
+  const computeTATForLane = async (laneId) => {
+    setLoading(true);
+    try {
+      const laneToCalculate = lanes.find(l => l.id === laneId);
+      if (!laneToCalculate) return;
+
+      const tatTime = await getTAT(laneToCalculate, laneToCalculate.legs || []);
+
+      setLanes(current =>
+        current.map(lane =>
+          lane.id === laneId
+            ? { ...lane, tatToConsigneeDuration: tatTime, hasBeenUpdated: true, lastUpdate: new Date().toISOString() }
+            : lane
+        )
+      );
+    } catch (error) {
+      setError("Error calculating TAT.");
+      console.error("TAT Calculation Error:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const validateLegs = (laneId) => {
-    setLanes(current => current.map(lane => {
-      if (lane.id !== laneId) return lane;
-      const legs = lane.legs || [];
-      let valid = true;
-
-      if (legs.length === 0) valid = false;
-
-      for (const leg of legs) {
-        if (!leg.sequence || !leg.originStation || !leg.destinationStation || !leg.departureTime || !leg.arrivalTime) {
-          valid = false;
+  const validateAllLanes = async () => {
+    setLoading(true);
+    try {
+      const validatedLanesPromises = lanes.map(async (lane) => {
+        if (!lane.legs || lane.legs.length === 0) {
+          return { ...lane, valid: true };
         }
-        const dep = parseDate(leg.departureTime);
-        const arr = parseDate(leg.arrivalTime);
-        if (!dep || !arr || arr < dep) valid = false;
-      }
-
-      return {
-        ...lane,
-        legs,
-        valid,
-        hasBeenUpdated: true,
-        lastUpdate: new Date().toISOString()
-      };
-    }));
-  };
-
-  const computeTATForLane = (laneId) => {
-    setLanes(current => current.map(lane => {
-      if (lane.id !== laneId) return lane;
-      const legs = lane.legs || [];
-      let firstDep = null;
-      let lastArr = null;
-
-      for (const leg of legs) {
-        const dep = parseDate(leg.departureTime);
-        const arr = parseDate(leg.arrivalTime);
-        if (dep && (!firstDep || dep < firstDep)) firstDep = dep;
-        if (arr && (!lastArr || arr > lastArr)) lastArr = arr;
-      }
-
-      let tat = lane.tatToConsigneeDuration || '';
-      if (firstDep && lastArr && lastArr >= firstDep) {
-        tat = formatDuration(lastArr - firstDep);
-      } else {
-        tat = '';
-      }
-
-      return {
-        ...lane,
-        legs,
-        tatToConsigneeDuration: tat,
-        hasBeenUpdated: true,
-        lastUpdate: new Date().toISOString()
-      };
-    }));
+        const validatedLegs = await Promise.all(
+          lane.legs.map(async (leg) => {
+            const result = await validateFlight(leg);
+            return {
+              ...leg,
+              valid: result.valid,
+              message: result.message,
+              validMessage: result.mismatchedFields,
+              flightOperatingdays: result.operatingDays,
+            };
+          })
+        );
+        const isLaneValid = validatedLegs.every(leg => leg.valid);
+        return { ...lane, legs: validatedLegs, valid: isLaneValid, hasBeenUpdated: true, lastUpdate: new Date().toISOString() };
+      });
+      const newLanes = await Promise.all(validatedLanesPromises);
+      setLanes(newLanes);
+    } catch (err) {
+      setError("Error validating all flight legs.");
+      console.error("Bulk Validation Error:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const toggleLaneExpansion = (laneId) => {
@@ -303,7 +376,6 @@ const AccountLanes = () => {
   return (
     <div className="w-full h-screen flex flex-col bg-white">
       <Header />
-      {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4 shadow-lg">
         <div className="flex justify-between items-center">
           <div>
@@ -322,14 +394,12 @@ const AccountLanes = () => {
         </div>
       </div>
 
-      {/* Error Message */}
       {error && !loading && (
         <div className="bg-red-50 border-b border-red-200 px-6 py-3 text-red-700">
           {error}
         </div>
       )}
 
-      {/* Filter Row */}
       <div className="bg-gray-100 px-6 py-3 border-b border-gray-300 flex gap-3 overflow-x-auto">
         <input
           type="text"
@@ -354,9 +424,14 @@ const AccountLanes = () => {
         >
           Clear Filters
         </button>
+        <button
+          onClick={validateAllLanes}
+          className="px-3 py-1.5 bg-blue-500 text-white hover:bg-blue-600 rounded text-sm font-medium transition"
+        >
+          Validate All Flights
+        </button>
       </div>
 
-      {/* Spreadsheet Container */}
       <div className="flex-1 overflow-auto">
         <div className="inline-block min-w-full">
           <table className="w-full border-collapse bg-white">
@@ -369,13 +444,12 @@ const AccountLanes = () => {
                     className="px-3 py-2 border-r border-gray-300 bg-gray-200 font-bold text-xs text-gray-700 whitespace-nowrap text-left"
                     style={{ minWidth: '120px' }}
                   >
-                    {columnLabels[col]}
+                    {columnLabels[col]} {readOnlyColumns.includes(col) && <span className="text-gray-500 text-xs">(auto)</span>}
                   </th>
                 ))}
                 <th className="px-3 py-2 border-r border-gray-300 bg-gray-200 font-bold text-xs text-gray-700 whitespace-nowrap">Status</th>
                 <th className="px-3 py-2 bg-gray-200 font-bold text-xs text-gray-700 whitespace-nowrap">Actions</th>
               </tr>
-              {/* Filter inputs row */}
               <tr className="bg-gray-100">
                 <th className="px-2 py-1 border-r border-gray-300"></th>
                 {columns.map(col => (
@@ -422,13 +496,14 @@ const AccountLanes = () => {
                       {lane.legs?.length > 0 && (expandedLanes[lane.id] ? <ChevronDown size={16} /> : <ChevronRight size={16} />)}
                     </td>
                     {columns.map(col => (
-                      <td key={col} className="px-3 py-1 border-r border-gray-300" onClick={() => setSelectedCell({ laneId: lane.id, field: col })}>
+                      <td key={col} className="px-3 py-1 border-r border-gray-300" onClick={() => !readOnlyColumns.includes(col) && setSelectedCell({ laneId: lane.id, field: col })}>
                         <input
                           type="text"
                           value={lane[col] || ''}
                           onChange={(e) => handleLaneChange(lane.id, col, e.target.value)}
                           onKeyDown={(e) => handleKeyDown(e, lane.id, col)}
-                          className={`w-full px-2 py-1 text-sm border ${selectedCell?.laneId === lane.id && selectedCell?.field === col ? 'border-blue-500 ring-2 ring-blue-300' : 'border-gray-300'} rounded focus:outline-none focus:ring-2 focus:ring-blue-400`}
+                          disabled={readOnlyColumns.includes(col)}
+                          className={`w-full px-2 py-1 text-sm border ${selectedCell?.laneId === lane.id && selectedCell?.field === col ? 'border-blue-500 ring-2 ring-blue-300' : 'border-gray-300'} rounded focus:outline-none focus:ring-2 focus:ring-blue-400 ${readOnlyColumns.includes(col) ? 'bg-gray-200 cursor-not-allowed' : ''}`}
                           style={{ minWidth: '100px' }}
                         />
                       </td>
@@ -547,7 +622,6 @@ const AccountLanes = () => {
         </div>
       </div>
 
-      {/* Footer */}
       <div className="bg-gray-100 border-t border-gray-300 px-6 py-2 text-xs text-gray-600">
         Total Lanes: {filteredLanes.length} {lanes.length > 0 && lanes.length !== filteredLanes.length && `of ${lanes.length}`} | Ready to save
       </div>

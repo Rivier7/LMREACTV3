@@ -1,6 +1,6 @@
 const BASE_URL = 'http://localhost:8080/lanes';
 const BASE_URL2 = 'http://localhost:8080/Account';
-const BASE_URL3 = 'http://localhost:8080/api/flights/validate-flight';
+const BASE_URL3 = 'http://localhost:8080/api/flights/validate-leg';
 
 // ✅ Centralized headers function (always attaches JWT)
 const getAuthHeaders = (isFormData = false) => {
@@ -29,9 +29,20 @@ export const updateLane = async (id, updatedLane, flights) => {
     headers: getAuthHeaders(),
     body: JSON.stringify({ lane: updatedLane, flights }),
   });
-  if (!response.ok) throw new Error(`Failed to update lane with ID ${id}`);
-  return await response.json();
+
+  if (response.status === 304) {
+    return { notModified: true };
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to update lane with ID ${id}: ${errorText}`);
+  }
+
+  const data = await response.json();
+  return data;
 };
+
 
 
 // ✅ Get TAT for a lane
@@ -50,6 +61,19 @@ export const getTAT = async (updatedLane, flights) => {
   return text;
 };
 
+export const updateAccountLanes = async (id, updatedLanes) => {
+  const response = await fetch(`${BASE_URL2}/updateLanes/${id}`, {
+    method: 'PUT',
+    headers: {
+      ...getAuthHeaders(),
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(updatedLanes)
+  });
+
+  if (!response.ok) throw new Error(`Failed to update lanes for account with ID ${id}`);
+  return await response.json();
+};
 
 
 // ✅ Update a lane
@@ -223,4 +247,53 @@ export const validateFlight = async (flight) => {
   if (!response.ok) throw new Error("Flight validation failed.");
   return await response.json();
 };
+
+export const validateLanes = async (lanes) => {
+  const response = await fetch(`${BASE_URL}/validate-lanes`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(lanes),
+  });
+  if (!response.ok) throw new Error("Lane validation failed.");
+  return await response.json();
+};
+
+
+export const getSuggestedRoute = async (payload) => {
+  const response = await fetch(`${BASE_URL}/suggestRoute`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(localStorage.getItem('token') && {
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+      }),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    // Try to parse error message JSON from response body
+    let errorMessage = `Failed to fetch suggested route: ${response.status}`;
+    try {
+      const errorData = await response.json();
+      // If backend sends error message in 'error' or 'message' field
+      if (errorData.error) {
+        errorMessage = errorData.error;
+      } else if (errorData.message) {
+        errorMessage = errorData.message;
+      }
+    } catch (e) {
+      // Could not parse JSON, fallback to plain text or status code
+      try {
+        const errorText = await response.text();
+        if (errorText) errorMessage = errorText;
+      } catch { }
+    }
+    console.error("Failed to fetch suggested route:", errorMessage);
+    throw new Error(errorMessage);
+  }
+
+  return await response.json();
+};
+
 

@@ -17,6 +17,16 @@ function Lane({ lane }) {
     navigate('/edit', { state: { lane } });
   };
 
+  const formatDate = (date) => {
+    if (!date) return 'N/A';
+    try {
+      const d = new Date(date);
+      return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch {
+      return date;
+    }
+  };
+
   return (
     <div className="bg-gray-100 grid grid-cols-[1fr_2fr] rounded-xl border border-gray-300 min-w-[1100px] shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden">
       {/* Left Section */}
@@ -98,6 +108,21 @@ function Lane({ lane }) {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Last Update Section */}
+        <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 shadow-sm">
+          <h4 className="text-xs font-semibold text-gray-700 mb-2">Last Update</h4>
+          <div className="space-y-1 text-xs">
+            <div>
+              <span className="font-medium text-gray-700">Date:</span>
+              <span className="ml-1 text-gray-600">{formatDate(lane.lastUpdate)}</span>
+            </div>
+            <div>
+              <span className="font-medium text-gray-700">Updated By:</span>
+              <span className="ml-1 text-gray-600">{lane.lastUpdatedBy || 'N/A'}</span>
+            </div>
+          </div>
         </div>
       </div>
 

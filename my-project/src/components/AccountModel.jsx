@@ -1,18 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { getAccountbyId, deleteAccountbyId, getAccountExcel } from '../api/api';
-import { useNavigate } from 'react-router-dom';
+import { getAccountbyId, deleteAccountbyId } from '../api/api';
 
 const AccountModel = ({ accountId, onClose, onRemove }) => {
   const [account, setAccount] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const navigate = useNavigate();
 
   const handleConfirm = async () => {
     try {
       await deleteAccountbyId(accountId);
       onRemove(accountId);
-      navigate('/Accounts');
     } catch (error) {
       console.error("Error deleting account:", error);
       setError("Error deleting account");

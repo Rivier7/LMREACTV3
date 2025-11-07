@@ -57,7 +57,8 @@ export default function FileUploader() {
 
       {/* Download Template Button */}
       <button
-        className="px-4 py-2 border border-blue-500 text-blue-500 rounded-md bg-white hover:bg-blue-500 hover:text-white transition-colors"
+        className="px-4 py-2 border border-blue-500 text-blue-500 rounded-md bg-white hover:bg-blue-500 hover:text-white transition-colors
+"
         onClick={() => downloadExcelTemplate().catch(err => { console.error('Download template failed', err); alert('Failed to download template'); })}
       >
         Download Excel Template
