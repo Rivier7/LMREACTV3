@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { getLaneByAccountId, updateLane, getAccountbyId } from '../api/api.js';
 import Header from '../components/Header';
 import { ChevronDown, ChevronRight, Plus, Trash2, Save } from 'lucide-react';
-import { validateFlight, updateAccountLanes, getTAT } from '../api/api.js';
+import { getLaneByAccountId, updateLane, getAccountbyId, validateFlight, updateAccountLanes, getSuggestedRoute, getTAT } from '../api/api.js';
+
 
 const AccountLanes = () => {
   const { accountId } = useParams();
@@ -14,14 +14,59 @@ const AccountLanes = () => {
   const [expandedLanes, setExpandedLanes] = useState({});
   const [filters, setFilters] = useState({});
   const [selectedCell, setSelectedCell] = useState(null);
+  const [showSuggestedRoute, setShowSuggestedRoute] = useState(false);
+  const [suggestError, setSuggestError] = useState(null);
+  const [suggestedRoutes, setSuggestedRoutes] = useState([]);
+  const [selectedRouteIndex, setSelectedRouteIndex] = useState(null);
+  const [routeLaneId, setRouteLaneId] = useState(null);
+  const [savedLaneId, setSavedLaneId] = useState(null);
 
   const columns = [
     'originCity', 'originState', 'originCountry',
     'destinationCity', 'destinationState', 'destinationCountry', 'itemNumber',
     'laneOption', 'pickUpTime', 'driveToAirportDuration', 'originStation',
     'destinationStation', 'customClearance', 'driveToDestination',
-    'actualDeliveryTimeBasedOnReceiving', 'tatToConsigneeDuration', 'additionalNotes'
+    'actualDeliveryTimeBasedOnReceiving', 'tatToConsigneeDuration', 'additionalNotes',
+    'lastUpdate',
   ];
+
+  const handleSuggestRoute = async (laneId) => {
+    try {
+      setSuggestError(null);
+
+      const lane = lanes.find(l => l.id === laneId);
+      if (!lane || !lane.legs || lane.legs.length === 0) {
+        setSuggestError("Lane has no legs to suggest a route for.");
+        return;
+      }
+
+      const payload = {
+        itemNumber: lane.itemNumber,
+        originAirport: lane.legs[0]?.originStation,
+        destinationAirport: lane.legs[lane.legs.length - 1]?.destinationStation,
+        collectionTime: lane.pickUpTime,
+      };
+
+      if (!payload.originAirport || !payload.destinationAirport) {
+        setSuggestError("Origin and destination airports must be set in the legs.");
+        return;
+      }
+
+      const results = await getSuggestedRoute(payload);
+      setSuggestedRoutes(results);
+      setRouteLaneId(laneId);
+      setSelectedRouteIndex(null);
+      setShowSuggestedRoute(true);
+
+    } catch (error) {
+      let message = "Failed to suggest route.";
+      if (error.message) message = error.message;
+      else if (error.response?.data?.error) message = error.response.data.error;
+
+      setSuggestedRoutes([]);
+      setSuggestError(message);
+    }
+  };
 
   const columnLabels = {
     originCity: 'Origin City',
@@ -43,8 +88,7 @@ const AccountLanes = () => {
     additionalNotes: 'Notes'
   };
 
-  // ✅ Columns that are read-only (auto-updated from legs)
-  const readOnlyColumns = ['originStation', 'destinationStation'];
+  const readOnlyColumns = ['originStation', 'destinationStation', 'lastUpdate'];
 
   const getUniqueValues = (field) => {
     const values = lanes.map(l => {
@@ -55,7 +99,7 @@ const AccountLanes = () => {
     return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
   };
 
-  const legColumns = ['sequence', 'serviceLevel', 'flightNumber', 'originStation', 'departureTime', 'destinationStation', 'arrivalTime', 'flightOperatingdays', 'aircraft', 'aircraftType', 'cutoffTime'];
+  const legColumns = ['sequence', 'serviceLevel', 'flightNumber', 'originStation', 'departureTime', 'destinationStation', 'arrivalTime', 'flightOperatingdays', 'aircraft', 'aircraftType', 'cutoffTime', 'legValidationMessage'];
 
   const legColumnLabels = {
     sequence: 'Seq',
@@ -68,7 +112,8 @@ const AccountLanes = () => {
     flightOperatingdays: 'Operating Days',
     aircraft: 'Aircraft',
     aircraftType: 'Aircraft Type',
-    cutoffTime: 'Cutoff'
+    cutoffTime: 'Cutoff',
+    legValidationMessage: 'Leg Status'
   };
 
   useEffect(() => {
@@ -104,13 +149,12 @@ const AccountLanes = () => {
   const handleLaneChange = (laneId, field, value) => {
     setLanes(current =>
       current.map(lane =>
-        lane.id === laneId ? { ...lane, [field]: value, hasBeenUpdated: true, lastUpdate: new Date().toISOString() } : lane
+        lane.id === laneId ? { ...lane, [field]: value, hasBeenUpdated: true } : lane
       )
     );
   };
 
   const handleLegChange = (laneId, legId, field, value) => {
-    // ✅ Prevent duplicate origins across legs in the same lane
     if (field === 'originStation') {
       const newOrigin = value.toUpperCase();
       const lane = lanes.find(l => l.id === laneId);
@@ -128,7 +172,6 @@ const AccountLanes = () => {
       }
     }
 
-    // ✅ Prevent same origin and destination in same leg
     if (field === 'destinationStation') {
       const lane = lanes.find(l => l.id === laneId);
       const leg = lane?.legs?.find(l => l.id === legId);
@@ -152,18 +195,15 @@ const AccountLanes = () => {
       }
     }
 
-    // ✅ Update the leg and auto-update lane origin/destination
     setLanes(current =>
       current.map(lane =>
         lane.id === laneId
           ? {
             ...lane,
-            hasBeenUpdated: true,
-            lastUpdate: new Date().toISOString(),
             legs: lane.legs.map(leg =>
               leg.id === legId ? { ...leg, [field]: value } : leg
             ),
-            // ✅ Auto-update lane origin and destination from legs
+            hasBeenUpdated: true,
             originStation: lane.legs[0]?.originStation || '',
             destinationStation: lane.legs[lane.legs.length - 1]?.destinationStation || ''
           }
@@ -179,11 +219,9 @@ const AccountLanes = () => {
           ? {
             ...lane,
             hasBeenUpdated: true,
-            lastUpdate: new Date().toISOString(),
             legs: [
               ...(lane.legs || []),
               {
-                id: Date.now(),
                 sequence: (lane.legs?.length || 0) + 1,
                 serviceLevel: '',
                 flightNumber: '',
@@ -211,7 +249,6 @@ const AccountLanes = () => {
           ? {
             ...lane,
             hasBeenUpdated: true,
-            lastUpdate: new Date().toISOString(),
             legs: lane.legs.filter(leg => leg.id !== legId),
             originStation: lane.legs.filter(leg => leg.id !== legId)[0]?.originStation || '',
             destinationStation: lane.legs.filter(leg => leg.id !== legId)[lane.legs.filter(leg => leg.id !== legId).length - 1]?.destinationStation || ''
@@ -262,7 +299,7 @@ const AccountLanes = () => {
       setLanes(current =>
         current.map(lane =>
           lane.id === laneId
-            ? { ...lane, legs: validatedLegs, valid: isLaneValid, hasBeenUpdated: true, lastUpdate: new Date().toISOString() }
+            ? { ...lane, legs: validatedLegs, valid: isLaneValid }
             : lane
         )
       );
@@ -285,7 +322,7 @@ const AccountLanes = () => {
       setLanes(current =>
         current.map(lane =>
           lane.id === laneId
-            ? { ...lane, tatToConsigneeDuration: tatTime, hasBeenUpdated: true, lastUpdate: new Date().toISOString() }
+            ? { ...lane, tatToConsigneeDuration: tatTime }
             : lane
         )
       );
@@ -317,7 +354,7 @@ const AccountLanes = () => {
           })
         );
         const isLaneValid = validatedLegs.every(leg => leg.valid);
-        return { ...lane, legs: validatedLegs, valid: isLaneValid, hasBeenUpdated: true, lastUpdate: new Date().toISOString() };
+        return { ...lane, legs: validatedLegs, valid: isLaneValid, };
       });
       const newLanes = await Promise.all(validatedLanesPromises);
       setLanes(newLanes);
@@ -365,6 +402,46 @@ const AccountLanes = () => {
     setFilters({});
   };
 
+  const applyRoute = (routePattern) => {
+    if (!routeLaneId) return;
+
+    const updated = routePattern.legs
+      .sort((a, b) => a.sequence - b.sequence)
+      .map(leg => ({
+        id: leg.id || Date.now() + Math.random(),
+        sequence: leg.sequence,
+        flightNumber: leg.flightNumber,
+        originStation: leg.originStation,
+        destinationStation: leg.destinationStation,
+        departureTime: leg.departureTime,
+        arrivalTime: leg.arrivalTime,
+        flightOperatingdays: leg.flightOperatingdays,
+        serviceLevel: leg.serviceLevel || '',
+        cutoffTime: leg.cutoffTime || '',
+        aircraft: leg.aircraft || '',
+        aircraftType: leg.aircraftType || '',
+        valid: false,
+        validMessage: []
+      }));
+
+    setLanes(current =>
+      current.map(l =>
+        l.id === routeLaneId
+          ? {
+            ...l,
+            legs: updated,
+            hasBeenUpdated: true
+          }
+          : l
+      )
+    );
+
+    setSuggestedRoutes([]);
+    setShowSuggestedRoute(false);
+    setSelectedRouteIndex(null);
+    setRouteLaneId(null);
+  };
+
   if (loading && lanes.length === 0) {
     return (
       <div className="w-full h-screen flex items-center justify-center bg-white">
@@ -372,6 +449,30 @@ const AccountLanes = () => {
       </div>
     );
   }
+
+  const handleSubmit = async (id) => {
+    setLoading(true);
+    try {
+      const updatedLane = lanes.find(l => l.id === id);
+      if (!updatedLane) return;
+
+      await updateLane(updatedLane.id, updatedLane, updatedLane.legs || []);
+
+      const freshLane = await getLaneByAccountId(accountId, id);
+      if (freshLane && freshLane.length > 0) {
+        setLanes(current => current.map(l => l.id === id ? { ...freshLane[0], hasBeenUpdated: false } : l));
+      }
+
+      setSavedLaneId(id);
+      setTimeout(() => setSavedLaneId(null), 3000);
+
+    } catch (error) {
+      console.error('Error updating lane:', error.message);
+      alert(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="w-full h-screen flex flex-col bg-white">
@@ -400,7 +501,29 @@ const AccountLanes = () => {
         </div>
       )}
 
-      <div className="bg-gray-100 px-6 py-3 border-b border-gray-300 flex gap-3 overflow-x-auto">
+      {suggestError && (
+        <div className="bg-yellow-50 border-b border-yellow-200 px-6 py-3 text-yellow-800 flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 mt-0.5">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <div>
+              <p className="font-semibold">Route Suggestion Error</p>
+              <p className="text-sm mt-1">{suggestError}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setSuggestError(null)}
+            className="text-yellow-700 hover:text-yellow-900 flex-shrink-0 text-lg font-bold"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      <div className="bg-gray-100 px-6 py-3 border-b border-gray-300 flex gap-3 overflow-x-auto ">
         <input
           type="text"
           placeholder="Quick filter across all fields..."
@@ -432,10 +555,10 @@ const AccountLanes = () => {
         </button>
       </div>
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-x-scroll overflow-y-auto p-2 scroll-container">
         <div className="inline-block min-w-full">
           <table className="w-full border-collapse bg-white">
-            <thead className="sticky top-0 z-20 bg-gray-200 border-b-2 border-gray-400">
+            <thead className="bg-gray-200 border-b-2 border-gray-400">
               <tr>
                 <th className="w-8 px-2 py-2 text-center border-r border-gray-300 bg-gray-200"></th>
                 {columns.map(col => (
@@ -539,8 +662,8 @@ const AccountLanes = () => {
                         </button>
                         <button
                           className="p-1.5 hover:bg-purple-100 rounded transition text-purple-600"
-                          title="Get AI suggestions for optimal flight legs"
-                          onClick={() => alert('AI leg suggestions coming soon!')}
+                          title="Get suggestions for optimal flight legs"
+                          onClick={() => handleSuggestRoute(lane.id)}
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"></path>
@@ -548,6 +671,19 @@ const AccountLanes = () => {
                             <path d="M10 22h4"></path>
                           </svg>
                         </button>
+                        <button
+                          onClick={() => handleSubmit(lane.id)}
+                          disabled={!lane.hasBeenUpdated || loading}
+                          className="p-1.5 hover:bg-blue-100 rounded transition text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Save this lane"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline>
+                          </svg>
+                        </button>
+                        {savedLaneId === lane.id && (
+                          <span className="text-xs text-green-600 font-semibold ml-2">Saved!</span>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -557,7 +693,7 @@ const AccountLanes = () => {
                       <td colSpan={columns.length + 3} className="px-4 py-3 border-t-2 border-blue-300">
                         <div className="bg-blue-50 rounded border border-blue-200 overflow-auto">
                           <table className="w-full">
-                            <thead className="bg-blue-100 border-b border-blue-300">
+                            <thead className="sticky top-0 z-40 bg-blue-100 border-b border-blue-300">
                               <tr>
                                 {legColumns.map(col => (
                                   <th key={col} className="px-3 py-2 text-left text-xs font-semibold text-blue-900 border-r border-blue-200">
@@ -588,6 +724,16 @@ const AccountLanes = () => {
                                           onChange={(e) => handleLegChange(lane.id, leg.id, col, e.target.value)}
                                           className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
                                         />
+                                      ) : col === 'legValidationMessage' ? (
+                                        leg.valid === false && leg.validMessage && leg.validMessage.length > 0 ? (
+                                          <div className="text-red-600 text-xs">
+                                            {leg.validMessage.join('; ')}
+                                          </div>
+                                        ) : leg.valid === true ? (
+                                          <div className="text-green-600 text-xs">Valid</div>
+                                        ) : (
+                                          <div className="text-gray-500 text-xs">Pending</div>
+                                        )
                                       ) : (
                                         <input
                                           type="text"
@@ -610,6 +756,96 @@ const AccountLanes = () => {
                                 </tr>
                               ))}
                             </tbody>
+
+                            {/* SUGGESTED ROUTES (TOP 3) */}
+                            {showSuggestedRoute && suggestedRoutes.length > 0 && routeLaneId === lane.id && (
+                              <tbody>
+                                <tr>
+                                  <td colSpan={legColumns.length + 1} className="px-4 py-4 border-t-2 border-blue-300">
+                                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-lg p-4">
+                                      <div className="flex items-center justify-between mb-4">
+                                        <h3 className="text-sm font-bold text-gray-800">Suggested Route Patterns (Top 3)</h3>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setShowSuggestedRoute(false);
+                                            setSuggestedRoutes([]);
+                                            setSelectedRouteIndex(null);
+                                            setRouteLaneId(null);
+                                          }}
+                                          className="text-gray-500 hover:text-gray-700 text-lg font-bold"
+                                        >
+                                          ✕
+                                        </button>
+                                      </div>
+
+                                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        {suggestedRoutes.map((routePattern, routeIndex) => (
+                                          <div
+                                            key={routeIndex}
+                                            className={`border-2 rounded-lg p-3 transition-all cursor-pointer ${selectedRouteIndex === routeIndex
+                                              ? 'border-green-500 bg-green-50 shadow-md'
+                                              : 'border-blue-300 bg-white hover:border-blue-500'
+                                              }`}
+                                          >
+                                            <div className="mb-3">
+                                              <p className="text-xs font-bold text-blue-900 mb-1">Option {routeIndex + 1}</p>
+                                              <p className="text-xs text-blue-700 font-semibold">
+                                                {routePattern.originStation} → {routePattern.destinationStation}
+                                              </p>
+                                            </div>
+
+                                            <div className="space-y-2 mb-3 max-h-40 overflow-y-auto">
+                                              {routePattern.legs
+                                                .sort((a, b) => a.sequence - b.sequence)
+                                                .map((leg, i) => (
+                                                  <div key={i} className="bg-gray-50 border border-gray-200 rounded p-1.5 text-xs">
+                                                    <p className="font-semibold text-gray-700">Leg {leg.sequence}: {leg.flightNumber}</p>
+                                                    <p className="text-gray-600">{leg.originStation} → {leg.destinationStation}</p>
+                                                    <p className="text-gray-500 text-xs">
+                                                      {leg.departureTime} - {leg.arrivalTime}
+                                                    </p>
+                                                    <p className="text-gray-500 text-xs">Days: {leg.flightOperatingdays}</p>
+                                                  </div>
+                                                ))}
+                                            </div>
+
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                if (selectedRouteIndex === routeIndex) {
+                                                  applyRoute(routePattern);
+                                                } else {
+                                                  setSelectedRouteIndex(routeIndex);
+                                                }
+                                              }}
+                                              className={`w-full px-3 py-2 rounded text-xs font-semibold transition-colors ${selectedRouteIndex === routeIndex
+                                                ? 'bg-green-600 text-white hover:bg-green-700'
+                                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                                                }`}
+                                            >
+                                              {selectedRouteIndex === routeIndex ? '✓ Apply This Route' : 'Select'}
+                                            </button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              </tbody>
+                            )}
+
+                            {suggestError && routeLaneId === lane.id && (
+                              <tbody>
+                                <tr>
+                                  <td colSpan={legColumns.length + 1} className="px-4 py-4 border-t border-red-300">
+                                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                                      <strong>Error:</strong> {suggestError}
+                                    </div>
+                                  </td>
+                                </tr>
+                              </tbody>
+                            )}
                           </table>
                         </div>
                       </td>
@@ -620,10 +856,6 @@ const AccountLanes = () => {
             </tbody>
           </table>
         </div>
-      </div>
-
-      <div className="bg-gray-100 border-t border-gray-300 px-6 py-2 text-xs text-gray-600">
-        Total Lanes: {filteredLanes.length} {lanes.length > 0 && lanes.length !== filteredLanes.length && `of ${lanes.length}`} | Ready to save
       </div>
     </div>
   );

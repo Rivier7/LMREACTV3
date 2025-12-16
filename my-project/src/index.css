@@ -1,12 +1,25 @@
 @import "tailwindcss";
-body {
-}
+
+body {}
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-5px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-fadeIn {
   animation: fadeIn 0.3s ease-in-out;
+}
+
+.scroll-container {
+  overflow-x: scroll !important;
+  overflow-y: auto;
+  scrollbar-gutter: stable both-edges;
 }

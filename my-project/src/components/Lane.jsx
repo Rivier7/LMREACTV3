@@ -116,7 +116,7 @@ function Lane({ lane }) {
           <div className="space-y-1 text-xs">
             <div>
               <span className="font-medium text-gray-700">Date:</span>
-              <span className="ml-1 text-gray-600">{formatDate(lane.lastUpdate)}</span>
+              <span className="ml-1 text-gray-600">{lane.lastUpdate || 'N/A'}</span>
             </div>
             <div>
               <span className="font-medium text-gray-700">Updated By:</span>

@@ -31,6 +31,7 @@ export default function FileUploader() {
       }, 1500);
     } catch (error) {
       console.error("Upload failed", error);
+      alert("There was an error uploading the file: " + error.message);
       setUploadStatus("error");
       setLoading(false);
     }

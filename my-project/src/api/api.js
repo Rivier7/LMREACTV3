@@ -1,3 +1,5 @@
+import { FlipHorizontal } from "lucide-react";
+
 const BASE_URL = 'http://localhost:8080/lanes';
 const BASE_URL2 = 'http://localhost:8080/Account';
 const BASE_URL3 = 'http://localhost:8080/api/flights/validate-leg';
@@ -22,35 +24,67 @@ export const getLanes = async () => {
   return await response.json();
 };
 
-// ✅ Update a lane
-export const updateLane = async (id, updatedLane, flights) => {
-  const response = await fetch(`${BASE_URL}/updateLane/${id}`, {
-    method: 'PUT',
-    headers: getAuthHeaders(),
-    body: JSON.stringify({ lane: updatedLane, flights }),
-  });
+export const updateLane = async (id, updatedLane, legs) => {
+  console.log("lane: ", updatedLane, legs);
+  try {
+    const response = await fetch(`${BASE_URL}/updateLane/${id}`, {
+      method: 'PUT',
+      headers: {
+        ...getAuthHeaders(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ updatedLane, legs }),
+    });
 
-  if (response.status === 304) {
-    return { notModified: true };
+    // 304 Not Modified is uncommon for PUT, but handle if backend returns it
+    if (response.status === 304) {
+      return { notModified: true };
+    }
+
+    if (!response.ok) {
+      // Try to parse error JSON, fallback to text
+      let errorMessage;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || JSON.stringify(errorData);
+      } catch {
+        errorMessage = await response.text();
+      }
+      throw new Error(`Failed to update lane with ID ${id}: ${errorMessage}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    // Consider integrating with your app's logging or error reporting system here
+    console.error(`Error updating lane with ID ${id}:`, error);
+    throw error;
   }
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to update lane with ID ${id}: ${errorText}`);
-  }
-
-  const data = await response.json();
-  return data;
 };
 
+export const updateAllTatTime = async (id, updatedLane) => {
+
+  const response = await fetch(`${BASE_URL2}/updateAllTatTime/${id}`, {
+    method: 'PUT',
+    headers: {
+      ...getAuthHeaders(),
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ updatedLane })
+  });
+  if (!response.ok) throw new Error(`Failed to calculate TAT`);
+
+
+  return await response.json();
+}
 
 
 // ✅ Get TAT for a lane
-export const getTAT = async (updatedLane, flights) => {
+export const getTAT = async (updatedLane, legs) => {
   const response = await fetch(`${BASE_URL}/calculateTAT`, {
     method: 'POST',
     headers: getAuthHeaders(),
-    body: JSON.stringify({ lane: updatedLane, flights }),
+    body: JSON.stringify({ updatedLane, legs }),
   });
 
   if (!response.ok) throw new Error(`Failed to calculate TAT`);
@@ -96,9 +130,6 @@ export const getAllAccounts = async () => {
   if (!response.ok) throw new Error(`Failed to fetch accounts: ${response.status}`);
   return await response.json();
 };
-
-
-
 
 // ✅ fetch lane count
 export const allLaneCount = async (id) => {
@@ -171,18 +202,56 @@ export const downloadExcelTemplate = async () => {
 };
 
 // ✅ Upload Excel to create/update accounts
+/**
+ * Upload an Excel file to create or update accounts.
+ * @param {File|Blob} file - The Excel file to upload.
+ * @returns {Promise<Object>} Parsed JSON response from the server.
+ * @throws {Error} Throws if the upload fails or the server returns an error.
+ */
 export const postAccountExcel = async (file) => {
+  if (!(file instanceof File || file instanceof Blob)) {
+    throw new TypeError('Invalid file type. Expected File or Blob.');
+  }
+
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await fetch(`${BASE_URL2}/Post-Account_Excel`, {
-    method: 'POST',
-    headers: getAuthHeaders(true),
-    body: formData,
-  });
+  const headers = getAuthHeaders(true);
+  // Remove 'Content-Type' header if present, because fetch will set it automatically for FormData
+  if (headers['Content-Type']) {
+    delete headers['Content-Type'];
+  }
 
-  if (!response.ok) throw new Error(await response.text());
-  return await response.text();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
+  try {
+    const response = await fetch(`${BASE_URL2}/post-account_excel`, {
+      method: 'POST',
+      headers,
+      body: formData,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      let errorMessage;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || JSON.stringify(errorData);
+      } catch {
+        errorMessage = await response.text();
+      }
+      throw new Error(`\n${errorMessage}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error('Request timed out');
+    }
+    throw error;
+  }
 };
 
 // ✅ Get a single lane by ID
@@ -225,8 +294,6 @@ export const getLaneByAccountId = async (id) => {
   }
 };
 
-
-
 // ✅ Delete an account by ID
 export const deleteAccountbyId = async (id) => {
   const response = await fetch(`${BASE_URL2}/delete/${id}`, {
@@ -258,7 +325,6 @@ export const validateLanes = async (lanes) => {
   return await response.json();
 };
 
-
 export const getSuggestedRoute = async (payload) => {
   const response = await fetch(`${BASE_URL}/suggestRoute`, {
     method: 'POST',
@@ -273,24 +339,17 @@ export const getSuggestedRoute = async (payload) => {
 
   if (!response.ok) {
     // Try to parse error message JSON from response body
-    let errorMessage = `Failed to fetch suggested route: ${response.status}`;
+    let errorMessage;
     try {
       const errorData = await response.json();
-      // If backend sends error message in 'error' or 'message' field
-      if (errorData.error) {
-        errorMessage = errorData.error;
-      } else if (errorData.message) {
-        errorMessage = errorData.message;
-      }
-    } catch (e) {
-      // Could not parse JSON, fallback to plain text or status code
-      try {
-        const errorText = await response.text();
-        if (errorText) errorMessage = errorText;
-      } catch { }
+      console.log('Error data:', errorData);
+      errorMessage = errorData.message || JSON.stringify(errorData);
+
+    } catch {
+      errorMessage = await response.text();
     }
-    console.error("Failed to fetch suggested route:", errorMessage);
-    throw new Error(errorMessage);
+    console.error('Error response:', errorMessage);
+    throw new Error(` ${errorMessage}`);
   }
 
   return await response.json();

@@ -27,10 +27,12 @@ const Edit = () => {
       </div>
     );
   }
-  const [suggestedRoute, setSuggestedRoute] = useState(null);
+  const [suggestedRoutes, setSuggestedRoutes] = useState([]);
+  const [selectedRouteIndex, setSelectedRouteIndex] = useState(null);
+
+
   const [showSuggestedRoute, setShowSuggestedRoute] = useState(false);
   const [suggestError, setSuggestError] = useState(null);
-
 
   const [updatedLane, setUpdatedLane] = useState(lane);
   const [legs, setLegs] = useState([]);
@@ -68,23 +70,21 @@ const Edit = () => {
         collectionTime: updatedLane.pickUpTime,
       };
 
-      const result = await getSuggestedRoute(payload);
+      const results = await getSuggestedRoute(payload);
 
-      setSuggestedRoute(result);
+      setSuggestedRoutes(results);
+      setSelectedRouteIndex(null);
       setShowSuggestedRoute(true);
 
     } catch (error) {
-      // Extract error message from backend
       let message = "Failed to suggest route.";
       if (error.message) message = error.message;
       else if (error.response) message = error.response.data?.error || message;
 
-      setSuggestedRoute(null);
-      setSuggestError(message);  // <-- Use setSuggestError here
+      setSuggestedRoutes([]);
+      setSuggestError(message);
     }
   };
-
-
 
   const handleInputChange = (index, field, rawValue) => {
     let value = rawValue.toUpperCase();
@@ -149,7 +149,6 @@ const Edit = () => {
       setLegs([clearedLeg]);
     } else {
       let updatedLegs = [...legs];
-      // If there are no legs, or if the current one is DIRECT DRIVE, start fresh
       if (updatedLegs.length === 0 || updatedLegs[0]?.serviceLevel === 'DIRECT DRIVE') {
         updatedLegs = [{
           sequence: 1, flightNumber: '', departureTime: '', originStation: '',
@@ -159,7 +158,6 @@ const Edit = () => {
       }
 
       const currentServiceLevel = updatedLegs[legIndex]?.serviceLevel;
-      // Toggle off if same service is clicked, or if OTHER is clicked when custom is already entered
       if ((serviceLevel === 'OTHER' && !serviceLevels.includes(currentServiceLevel)) || currentServiceLevel === serviceLevel) {
         updatedLegs[legIndex].serviceLevel = '';
       } else {
@@ -214,7 +212,6 @@ const Edit = () => {
     try {
       let result;
       if (isDirectDrive) {
-        // Assuming updateLaneToDirectDrive doesn't return 304 scenario
         result = await updateLaneToDirectDrive(updatedLane.id, updatedLane, []);
       } else {
         if (legs.some((f) => !f.flightNumber || !f.originStation || !f.destinationStation)) {
@@ -227,6 +224,8 @@ const Edit = () => {
           setIsLoading(false);
           return;
         }
+        console.log('Submitting updated lane with legs:', updatedLane, legs);
+
         result = await updateLane(updatedLane.id, updatedLane, legs);
       }
 
@@ -241,7 +240,7 @@ const Edit = () => {
       }
     } catch (error) {
       console.error('Error updating lane:', error.message);
-      alert('Failed to update lane.');
+      alert(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -258,6 +257,28 @@ const Edit = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const applyRoute = (routePattern) => {
+    const updated = routePattern.legs
+      .sort((a, b) => a.sequence - b.sequence)
+      .map(leg => ({
+        sequence: leg.sequence,
+        flightNumber: leg.flightNumber,
+        originStation: leg.originStation,
+        destinationStation: leg.destinationStation,
+        departureTime: leg.departureTime,
+        arrivalTime: leg.arrivalTime,
+        flightOperatingdays: leg.flightOperatingdays,
+        serviceLevel: leg.serviceLevel || legs[0]?.serviceLevel || '',
+        cutoffTime: leg.cutoffTime || legs[0]?.cutoffTime || '',
+        valid: null,
+        validMessage: []
+      }));
+    setLegs(updated);
+    setShowSuggestedRoute(false);
+    setSuggestedRoutes([]);
+    setSelectedRouteIndex(null);
   };
 
   const isDirectDriveSelected = legs[0]?.serviceLevel === 'DIRECT DRIVE';
@@ -297,6 +318,11 @@ const Edit = () => {
             <span className="inline-block bg-gray-100 px-2 py-1 rounded text-xs font-semibold text-gray-800">
               {updatedLane.accountName}
             </span>
+            {updatedLane.lastUpdate && (
+              <p className="text-xs text-gray-500 mt-1">
+                Last Updated: {updatedLane.lastUpdate}
+              </p>
+            )}
           </div>
         </div>
 
@@ -329,7 +355,6 @@ const Edit = () => {
                 />
               </div>
             ))}
-
           </div>
 
           {/* ---------- DESTINATION ---------- */}
@@ -372,7 +397,6 @@ const Edit = () => {
               <h3 className="font-bold text-xs text-gray-700 ml-2">Lane Details</h3>
             </div>
 
-            {/* ITEM NUMBER */}
             <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
               Item Number
             </label>
@@ -385,7 +409,6 @@ const Edit = () => {
               placeholder="Item #"
             />
 
-            {/* LANE OPTION */}
             <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
               Lane Option
             </label>
@@ -398,7 +421,6 @@ const Edit = () => {
               placeholder="Option"
             />
 
-            {/* PICKUP TIME */}
             <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
               Pickup Time
             </label>
@@ -411,7 +433,6 @@ const Edit = () => {
               placeholder="Pickup Time"
             />
 
-            {/* CUTOFF TIME (ONLY IF SHOWN) */}
             {hasFlightLegs && (
               <>
                 <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
@@ -430,7 +451,7 @@ const Edit = () => {
           </div>
         </div>
 
-        {/* ---------- SERVICE LEVEL SECTION (unchanged UI) ---------- */}
+        {/* ---------- SERVICE LEVEL SECTION ---------- */}
         <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-3">
           <h3 className="text-xs font-bold text-gray-800 mb-6 flex items-center">
             <div className="bg-gray-600 text-white p-2 rounded-lg mr-3">
@@ -496,8 +517,6 @@ const Edit = () => {
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-              {/* ORIGIN AIRPORT */}
               <div>
                 <label className="block mb-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
                   Origin Airport
@@ -510,7 +529,6 @@ const Edit = () => {
                 />
               </div>
 
-              {/* DEST AIRPORT */}
               <div>
                 <label className="block mb-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
                   Destination Airport
@@ -525,89 +543,93 @@ const Edit = () => {
                   <button
                     type="button"
                     onClick={handleSuggestRoute}
-                    className="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-xs font-semibold"
+                    className="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-xs font-semibold whitespace-nowrap"
                   >
-                    Suggest Route by Frequency
+                    Suggest Route
                   </button>
-
-
                 </div>
               </div>
-
             </div>
           </div>
         )}
 
-        {showSuggestedRoute && suggestedRoute && (
-          <div className="bg-blue-50 border border-blue-300 rounded-lg p-4 my-6">
-            <h3 className="text-sm font-bold text-blue-800 mb-3">Suggested Route Pattern</h3>
-
-            <p className="text-xs text-blue-700 mb-2">
-              <strong>Origin:</strong> {suggestedRoute.originStation} →
-              <strong> Destination:</strong> {suggestedRoute.destinationStation}
-            </p>
-
-            <div className="space-y-2">
-              {suggestedRoute.legs
-                .sort((a, b) => a.sequence - b.sequence)
-                .map((leg, i) => (
-                  <div key={i} className="p-2 bg-white border border-blue-200 rounded">
-                    <p className="text-xs"><strong>Leg {leg.sequence}</strong></p>
-                    <p className="text-xs">Flight: {leg.flightNumber}</p>
-                    <p className="text-xs">
-                      {leg.originStation} → {leg.destinationStation}
-                    </p>
-                    <p className="text-xs">
-                      Dep: {leg.departureTime} — Arr: {leg.arrivalTime}
-                    </p>
-                    <p className="text-xs">Days: {leg.flightOperatingdays}</p>
-                  </div>
-                ))}
+        {/* ---------- SUGGESTED ROUTES (TOP 3) ---------- */}
+        {showSuggestedRoute && suggestedRoutes.length > 0 && (
+          <div className="space-y-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-200">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-gray-800">Suggested Route Patterns (Top 3)</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSuggestedRoute(false);
+                  setSuggestedRoutes([]);
+                  setSelectedRouteIndex(null);
+                }}
+                className="text-gray-500 hover:text-gray-700 text-lg"
+              >
+                ✕
+              </button>
             </div>
 
-            {/* Ask user to apply route */}
-            <div className="flex gap-3 mt-4">
-              <button
-                className="px-4 py-2 bg-blue-600 text-white rounded text-xs"
-                onClick={() => {
-                  // Replace legs with suggestion
-                  const updated = suggestedRoute.legs
-                    .sort((a, b) => a.sequence - b.sequence)
-                    .map(leg => ({
-                      sequence: leg.sequence,
-                      flightNumber: leg.flightNumber,
-                      originStation: leg.originStation,
-                      destinationStation: leg.destinationStation,
-                      departureTime: leg.departureTime,
-                      arrivalTime: leg.arrivalTime,
-                      flightOperatingdays: leg.flightOperatingdays,
-                      serviceLevel: legs[0].serviceLevel, // keep service level
-                      cutoffTime: legs[0].cutoffTime, // keep cutoff time
-                      valid: null,
-                      validMessage: []
-                    }));
-                  setLegs(updated);
-                  setShowSuggestedRoute(false);
-                }}
-              >
-                Yes, Apply Route
-              </button>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {suggestedRoutes.map((routePattern, routeIndex) => (
+                <div
+                  key={routeIndex}
+                  className={`border-2 rounded-lg p-4 transition-all cursor-pointer ${selectedRouteIndex === routeIndex
+                    ? 'border-green-500 bg-green-50 shadow-md'
+                    : 'border-blue-300 bg-white hover:border-blue-500'
+                    }`}
+                >
+                  <div className="mb-3">
+                    <p className="text-xs font-bold text-blue-900 mb-1">Option {routeIndex + 1}</p>
+                    <p className="text-xs text-blue-700 font-semibold">
+                      {routePattern.originStation} → {routePattern.destinationStation}
+                    </p>
+                  </div>
 
-              <button
-                className="px-4 py-2 bg-gray-400 text-white rounded text-xs"
-                onClick={() => setShowSuggestedRoute(false)}
-              >
-                No
-              </button>
+                  <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
+                    {routePattern.legs
+                      .sort((a, b) => a.sequence - b.sequence)
+                      .map((leg, i) => (
+                        <div key={i} className="bg-gray-50 border border-gray-200 rounded p-2 text-xs">
+                          <p className="font-semibold text-gray-700">Leg {leg.sequence}: {leg.flightNumber}</p>
+                          <p className="text-gray-600">{leg.originStation} → {leg.destinationStation}</p>
+                          <p className="text-gray-500 text-xs">
+                            {leg.departureTime} - {leg.arrivalTime}
+                          </p>
+                          <p className="text-gray-500 text-xs">Days: {leg.flightOperatingdays}</p>
+                        </div>
+                      ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedRouteIndex === routeIndex) {
+                        applyRoute(routePattern);
+                      } else {
+                        setSelectedRouteIndex(routeIndex);
+                      }
+                    }}
+                    className={`w-full px-3 py-2 rounded text-xs font-semibold transition-colors ${selectedRouteIndex === routeIndex
+                      ? 'bg-green-600 text-white hover:bg-green-700'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
+                  >
+                    {selectedRouteIndex === routeIndex ? '✓ Apply This Route' : 'Select'}
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
-        )}{suggestError && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mt-4" role="alert">
+        )}
+
+        {suggestError && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
             <strong className="font-bold">Error: </strong>
             <span className="block sm:inline">{suggestError}</span>
           </div>
         )}
-
 
         {/* ---------- FLIGHT LEGS ---------- */}
         {hasFlightLegs && (
@@ -623,12 +645,10 @@ const Edit = () => {
 
             <div className="space-y-6">
               {legs.slice().sort((a, b) => a.sequence - b.sequence).map((leg, index) => (
-                <div key={index} className="bg-gray-50 border border-gray-200 rounded-lg p-6">
 
-                  {/* GRID FOR INPUTS */}
+                <div key={index} className="bg-gray-50 border border-gray-200 rounded-lg p-6">
                   <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 items-start">
 
-                    {/* FLIGHT # */}
                     <div>
                       <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
                         Flight Number
@@ -637,12 +657,10 @@ const Edit = () => {
                         type="text"
                         value={leg.flightNumber}
                         onChange={(e) => handleInputChange(index, 'flightNumber', e.target.value)}
-                        className="text-xs px-3 py-2 border border-gray-300 rounded"
-                        placeholder="Flight #"
+                        className="text-xs px-3 py-2 border border-gray-300 rounded w-full"
+                        placeholder="Flight Number"
                       />
                     </div>
-
-                    {/* DEPARTURE */}
                     <div>
                       <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
                         Departure Time
@@ -651,12 +669,11 @@ const Edit = () => {
                         type="text"
                         value={leg.departureTime}
                         onChange={(e) => handleInputChange(index, 'departureTime', e.target.value)}
-                        className="text-xs px-3 py-2 border border-gray-300 rounded"
+                        className="text-xs px-3 py-2 border border-gray-300 rounded w-full"
                         placeholder="Departure"
                       />
                     </div>
 
-                    {/* ORIGIN */}
                     <div>
                       <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
                         Origin Airport
@@ -665,7 +682,7 @@ const Edit = () => {
                         type="text"
                         value={leg.originStation}
                         onChange={(e) => handleInputChange(index, 'originStation', e.target.value)}
-                        className="text-xs px-3 py-2 border border-gray-300 rounded"
+                        className="text-xs px-3 py-2 border border-gray-300 rounded w-full"
                         placeholder="Origin"
                       />
                     </div>
@@ -678,7 +695,6 @@ const Edit = () => {
                       </div>
                     </div>
 
-                    {/* DESTINATION */}
                     <div>
                       <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
                         Destination Airport
@@ -687,12 +703,11 @@ const Edit = () => {
                         type="text"
                         value={leg.destinationStation}
                         onChange={(e) => handleInputChange(index, 'destinationStation', e.target.value)}
-                        className="text-xs px-3 py-2 border border-gray-300 rounded"
+                        className="text-xs px-3 py-2 border border-gray-300 rounded w-full"
                         placeholder="Destination"
                       />
                     </div>
 
-                    {/* ARRIVAL */}
                     <div>
                       <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
                         Arrival Time
@@ -701,12 +716,11 @@ const Edit = () => {
                         type="text"
                         value={leg.arrivalTime}
                         onChange={(e) => handleInputChange(index, 'arrivalTime', e.target.value)}
-                        className="text-xs px-3 py-2 border border-gray-300 rounded"
+                        className="text-xs px-3 py-2 border border-gray-300 rounded w-full"
                         placeholder="Arrival"
                       />
                     </div>
 
-                    {/* DAYS */}
                     <div>
                       <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
                         Operating Days
@@ -715,12 +729,11 @@ const Edit = () => {
                         type="text"
                         value={leg.flightOperatingdays || ''}
                         onChange={(e) => handleInputChange(index, 'flightOperatingdays', e.target.value)}
-                        className="text-xs px-3 py-2 border border-gray-300 rounded"
+                        className="text-xs px-3 py-2 border border-gray-300 rounded w-full"
                         placeholder="Days"
                       />
                     </div>
 
-                    {/* CUTOFF ONLY FIRST LEG */}
                     <div>
                       {index === 0 && (
                         <>
@@ -731,7 +744,7 @@ const Edit = () => {
                             type="text"
                             value={leg.cutoffTime || ''}
                             onChange={(e) => handleInputChange(index, 'cutoffTime', e.target.value)}
-                            className="text-xs px-3 py-2 border border-gray-300 rounded"
+                            className="text-xs px-3 py-2 border border-gray-300 rounded w-full"
                             placeholder="Cutoff"
                           />
                         </>
@@ -919,7 +932,7 @@ const Edit = () => {
           <button
             onClick={handleSubmit}
             disabled={isLoading}
-            className="px-8 py-2 bg-gray-800 text-white text-xs font-bold rounded"
+            className="px-8 py-2 bg-gray-800 text-white text-xs font-bold rounded flex items-center"
           >
             {isLoading ? (
               <>
