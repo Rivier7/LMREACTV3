@@ -201,11 +201,10 @@ export const downloadExcelTemplate = async () => {
   window.URL.revokeObjectURL(url);
 };
 
-// ✅ Upload Excel to create/update accounts
 /**
  * Upload an Excel file to create or update accounts.
  * @param {File|Blob} file - The Excel file to upload.
- * @returns {Promise<Object>} Parsed JSON response from the server.
+ * @returns {Promise<Object>} Parsed response from the server.
  * @throws {Error} Throws if the upload fails or the server returns an error.
  */
 export const postAccountExcel = async (file) => {
@@ -214,10 +213,14 @@ export const postAccountExcel = async (file) => {
   }
 
   const formData = new FormData();
-  formData.append('file', file);
+
+  // Use original filename if available, otherwise provide a default
+  const filename = file.name || 'upload.xlsx';
+  formData.append('file', file, filename);
 
   const headers = getAuthHeaders(true);
-  // Remove 'Content-Type' header if present, because fetch will set it automatically for FormData
+
+  // IMPORTANT: Let fetch set Content-Type for FormData
   if (headers['Content-Type']) {
     delete headers['Content-Type'];
   }
@@ -230,29 +233,50 @@ export const postAccountExcel = async (file) => {
       method: 'POST',
       headers,
       body: formData,
-      signal: controller.signal,
+      signal: controller.signal
     });
+
     clearTimeout(timeoutId);
 
+    // 🔹 Handle non-2xx responses
     if (!response.ok) {
-      let errorMessage;
+      let errorMessage = 'Upload failed';
+
       try {
-        const errorData = await response.json();
-        errorMessage = errorData.message || JSON.stringify(errorData);
+        // Backend returns JSON error
+        const errorJson = await response.json();
+        errorMessage = errorJson.message || errorMessage;
       } catch {
-        errorMessage = await response.text();
+        // Fallback if response is plain text
+        const errorText = await response.text();
+        if (errorText) {
+          errorMessage = errorText;
+        }
       }
-      throw new Error(`\n${errorMessage}`);
+
+      throw new Error(errorMessage);
     }
 
-    return await response.json();
+    // 🔹 Success response (backend returns plain text)
+    const successText = await response.text();
+
+    return {
+      success: true,
+      message: successText
+    };
+
   } catch (error) {
+    clearTimeout(timeoutId);
+
     if (error.name === 'AbortError') {
-      throw new Error('Request timed out');
+      throw new Error('Upload timed out after 30 seconds');
     }
+
+    // Re-throw backend or network error
     throw error;
   }
 };
+
 
 // ✅ Get a single lane by ID
 export const getLanebyId = async (id) => {
