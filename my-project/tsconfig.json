@@ -1,0 +1,42 @@
+{
+  "compilerOptions": {
+    /* Language and Environment */
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+
+    /* Modules */
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+
+    /* Type Checking */
+    "strict": true,                           // Enable all strict type checking options
+    "noUnusedLocals": true,                   // Report errors on unused local variables
+    "noUnusedParameters": true,               // Report errors on unused parameters
+    "noFallthroughCasesInSwitch": true,       // Report errors for fallthrough cases in switch
+    "noUncheckedIndexedAccess": true,         // Add undefined to index signature results
+    "allowUnreachableCode": false,            // Report errors on unreachable code
+    "allowUnusedLabels": false,               // Report errors on unused labels
+
+    /* Emit */
+    "noEmit": true,                           // Don't emit (Vite handles this)
+    "sourceMap": true,                        // Generate source maps
+
+    /* Interop Constraints */
+    "isolatedModules": true,                  // Required for Vite
+    "esModuleInterop": true,                  // Better CommonJS/ES Module interop
+    "forceConsistentCasingInFileNames": true, // Ensure consistent file casing
+    "skipLibCheck": true,                     // Skip type checking of declaration files
+
+    /* Paths */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "build"],
+  "references": [{ "path": "./tsconfig.node.json" }]
+}

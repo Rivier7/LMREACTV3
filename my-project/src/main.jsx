@@ -3,6 +3,10 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext' // make sure this exists
+import { setupGlobalErrorHandlers } from './utils/errorLogger'
+
+// Set up global error handlers (unhandled promise rejections, etc.)
+setupGlobalErrorHandlers();
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

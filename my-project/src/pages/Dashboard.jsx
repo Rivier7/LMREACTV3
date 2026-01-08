@@ -3,16 +3,21 @@ import { useNavigate } from 'react-router-dom';
 import { TrendingUp, Download, ChevronRight } from 'lucide-react';
 import Header from '../components/Header';
 import FileUploader from '../components/FileUploader';
+import ErrorMessage from '../components/ErrorMessage';
 import { allLaneCount, getLaneCounts, getAccountExcel } from '../api/api';
+import { useErrorHandler } from '../hooks/useErrorHandler';
+import { ErrorCategory } from '../utils/errorLogger';
 
 function Dashboard() {
   const [accounts, setAccounts] = useState([]);
   const [counts, setCounts] = useState({ total: 0, valid: 0, invalid: 0 });
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const navigate = useNavigate();
+
+  // FAANG Best Practice: Use custom error handler hook
+  const { error, handleError, clearError } = useErrorHandler();
 
   const handleSelectAccount = (accountId) => {
     console.log(`Selected account ID: ${accountId}`);
@@ -30,27 +35,22 @@ function Dashboard() {
         setAccounts(accountsData || []);
         setCounts(countsData || { total: 0, valid: 0, invalid: 0 });
       } catch (err) {
-        console.error('API Error:', err);
-        setError('An error occurred while loading data.');
+        // FAANG Best Practice: Centralized error handling with context
+        handleError(err, {
+          category: ErrorCategory.API,
+          context: 'Loading dashboard data',
+          endpoint: '/api/lanes/count',
+        });
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, []);
+  }, [handleError]);
 
   if (loading) {
     return <div className="text-center py-12 text-lg text-gray-500">Loading dashboard...</div>;
-  }
-
-  if (error) {
-    return (
-      <>
-        <Header />
-        <div className="text-center text-red-600 py-6">{error}</div>
-      </>
-    );
   }
 
   const validPercentage = counts.total > 0 ? (counts.valid / counts.total) * 100 : 0;
@@ -72,6 +72,17 @@ function Dashboard() {
 
       <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         <div className="max-w-7xl mx-auto p-6 lg:p-8">
+          {/* FAANG Best Practice: Display error message with dismiss option */}
+          {error && (
+            <ErrorMessage
+              message={error.message}
+              title="Failed to Load Dashboard"
+              onDismiss={clearError}
+              severity="error"
+              className="mb-6"
+            />
+          )}
+
           {/* Top Section */}
           <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8 mb-10">
             {/* Left: Title & Upload */}

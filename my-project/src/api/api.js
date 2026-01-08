@@ -1,8 +1,11 @@
 import { FlipHorizontal } from "lucide-react";
 
-const BASE_URL = 'http://localhost:8080/lanes';
-const BASE_URL2 = 'http://localhost:8080/Account';
-const BASE_URL3 = 'http://localhost:8080/api/flights/validate-leg';
+// Use environment variable for API base URL
+const API_BASE = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:8080';
+
+const BASE_URL = `${API_BASE}/lanes`;
+const BASE_URL2 = `${API_BASE}/Account`;
+const BASE_URL3 = `${API_BASE}/api/flights/validate-leg`;
 
 // ✅ Centralized headers function (always attaches JWT)
 const getAuthHeaders = (isFormData = false) => {
