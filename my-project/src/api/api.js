@@ -13,9 +13,9 @@ const getAuthHeaders = (isFormData = false) => {
   return isFormData
     ? { ...(token && { Authorization: `Bearer ${token}` }) }
     : {
-        'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
-      };
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+    };
 };
 
 // ✅ Fetch all lanes
@@ -329,7 +329,19 @@ export const validateFlight = async flight => {
     headers: getAuthHeaders(),
     body: JSON.stringify(flight),
   });
-  if (!response.ok) throw new Error('Flight validation failed.');
+
+  if (!response.ok) {
+    // Try to parse error message from backend
+    let errorMessage;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.message || JSON.stringify(errorData);
+    } catch {
+      errorMessage = await response.text();
+    }
+    throw new Error(errorMessage || 'Flight validation failed.');
+  }
+
   return await response.json();
 };
 
@@ -345,6 +357,36 @@ export const validateLanes = async lanes => {
 
 export const getSuggestedRoute = async payload => {
   const response = await fetch(`${BASE_URL}/suggestRoute`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(localStorage.getItem('token') && {
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+      }),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    // Try to parse error message JSON from response body
+    let errorMessage;
+    try {
+      const errorData = await response.json();
+      console.log('Error data:', errorData);
+      errorMessage = errorData.message || JSON.stringify(errorData);
+    } catch {
+      errorMessage = await response.text();
+    }
+    console.error('Error response:', errorMessage);
+    throw new Error(` ${errorMessage}`);
+  }
+
+  return await response.json();
+};
+
+// ✅ NEW: Get suggested route by location (city/state/country)
+export const getSuggestedRouteByLocation = async payload => {
+  const response = await fetch(`${BASE_URL}/suggestRouteByLocation`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

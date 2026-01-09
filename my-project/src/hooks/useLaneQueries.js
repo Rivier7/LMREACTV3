@@ -11,6 +11,7 @@ import {
   validateLanes,
   validateFlight,
   getSuggestedRoute,
+  getSuggestedRouteByLocation,
   getTAT,
   updateAllTatTime,
 } from '../api/api';
@@ -188,11 +189,20 @@ export function useValidateFlight() {
 }
 
 /**
- * Get suggested route
+ * Get suggested route by airport
  */
 export function useGetSuggestedRoute() {
   return useMutation({
     mutationFn: getSuggestedRoute,
+  });
+}
+
+/**
+ * Get suggested route by location (city/state/country)
+ */
+export function useGetSuggestedRouteByLocation() {
+  return useMutation({
+    mutationFn: getSuggestedRouteByLocation,
   });
 }
 

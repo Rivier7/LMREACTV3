@@ -8,7 +8,7 @@ import {
   validateFlight,
 } from '../api/api';
 import Header from '../components/Header';
-import { getSuggestedRoute } from '../api/api';
+import { getSuggestedRoute, getSuggestedRouteByLocation } from '../api/api';
 
 const Edit = () => {
   const { laneId } = useParams();
@@ -90,6 +90,36 @@ const Edit = () => {
       setShowSuggestedRoute(true);
     } catch (error) {
       let message = 'Failed to suggest route.';
+      if (error.message) message = error.message;
+      else if (error.response) message = error.response.data?.error || message;
+
+      setSuggestedRoutes([]);
+      setSuggestError(message);
+    }
+  };
+
+  const handleSuggestRouteByLocation = async () => {
+    try {
+      setSuggestError(null);
+
+      const payload = {
+        itemNumber: updatedLane.itemNumber,
+        originCity: updatedLane.originCity,
+        originState: updatedLane.originState,
+        originCountry: updatedLane.originCountry,
+        destinationCity: updatedLane.destinationCity,
+        destinationState: updatedLane.destinationState,
+        destinationCountry: updatedLane.destinationCountry,
+        collectionTime: updatedLane.pickUpTime,
+      };
+
+      const results = await getSuggestedRouteByLocation(payload);
+
+      setSuggestedRoutes(results);
+      setSelectedRouteIndex(null);
+      setShowSuggestedRoute(true);
+    } catch (error) {
+      let message = 'Failed to suggest route by location.';
       if (error.message) message = error.message;
       else if (error.response) message = error.response.data?.error || message;
 
@@ -608,9 +638,18 @@ const Edit = () => {
                   <button
                     type="button"
                     onClick={handleSuggestRoute}
-                    className="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-xs font-semibold whitespace-nowrap"
+                    className="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-semibold whitespace-nowrap"
+                    title="Suggest route based on origin and destination airports"
                   >
-                    Suggest Route
+                    Suggest by Airport
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSuggestRouteByLocation}
+                    className="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-xs font-semibold whitespace-nowrap"
+                    title="Suggest route based on origin and destination city/state/country"
+                  >
+                    Suggest by Location
                   </button>
                 </div>
               </div>

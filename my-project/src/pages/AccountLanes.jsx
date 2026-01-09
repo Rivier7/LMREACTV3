@@ -9,6 +9,7 @@ import {
   validateFlight,
   updateAccountLanes,
   getSuggestedRoute,
+  getSuggestedRouteByLocation,
   getTAT,
 } from '../api/api.js';
 
@@ -78,6 +79,42 @@ const AccountLanes = () => {
       setShowSuggestedRoute(true);
     } catch (error) {
       let message = 'Failed to suggest route.';
+      if (error.message) message = error.message;
+      else if (error.response?.data?.error) message = error.response.data.error;
+
+      setSuggestedRoutes([]);
+      setSuggestError(message);
+    }
+  };
+
+  const handleSuggestRouteByLocation = async laneId => {
+    try {
+      setSuggestError(null);
+
+      const lane = lanes.find(l => l.id === laneId);
+      if (!lane) {
+        setSuggestError('Lane not found.');
+        return;
+      }
+
+      const payload = {
+        itemNumber: lane.itemNumber,
+        originCity: lane.originCity,
+        originState: lane.originState,
+        originCountry: lane.originCountry,
+        destinationCity: lane.destinationCity,
+        destinationState: lane.destinationState,
+        destinationCountry: lane.destinationCountry,
+        collectionTime: lane.pickUpTime,
+      };
+
+      const results = await getSuggestedRouteByLocation(payload);
+      setSuggestedRoutes(results);
+      setRouteLaneId(laneId);
+      setSelectedRouteIndex(null);
+      setShowSuggestedRoute(true);
+    } catch (error) {
+      let message = 'Failed to suggest route by location.';
       if (error.message) message = error.message;
       else if (error.response?.data?.error) message = error.response.data.error;
 
@@ -767,7 +804,7 @@ const AccountLanes = () => {
                         </button>
                         <button
                           className="p-1.5 hover:bg-purple-100 rounded transition text-purple-600"
-                          title="Get suggestions for optimal flight legs"
+                          title="Suggest route by airport codes"
                           onClick={() => handleSuggestRoute(lane.id)}
                         >
                           <svg
@@ -784,6 +821,26 @@ const AccountLanes = () => {
                             <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"></path>
                             <path d="M9 18h6"></path>
                             <path d="M10 22h4"></path>
+                          </svg>
+                        </button>
+                        <button
+                          className="p-1.5 hover:bg-green-100 rounded transition text-green-600"
+                          title="Suggest route by city/state/country"
+                          onClick={() => handleSuggestRouteByLocation(lane.id)}
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
+                            <circle cx="12" cy="10" r="3"></circle>
                           </svg>
                         </button>
                         <button

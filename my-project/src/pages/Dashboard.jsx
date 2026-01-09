@@ -157,28 +157,31 @@ function Dashboard() {
               <div className="flex gap-2">
                 <button
                   onClick={() => setStatusFilter('all')}
-                  className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${statusFilter === 'all'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                  className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
+                    statusFilter === 'all'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
                 >
                   All
                 </button>
                 <button
                   onClick={() => setStatusFilter('valid')}
-                  className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${statusFilter === 'valid'
-                    ? 'bg-green-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                  className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
+                    statusFilter === 'valid'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
                 >
                   Valid
                 </button>
                 <button
                   onClick={() => setStatusFilter('invalid')}
-                  className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${statusFilter === 'invalid'
-                    ? 'bg-red-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                  className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
+                    statusFilter === 'invalid'
+                      ? 'bg-red-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
                 >
                   Invalid
                 </button>
