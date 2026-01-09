@@ -9,7 +9,7 @@ function LoginForm() {
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const { login } = useAuth();
-  const handleSubmit = async (e) => {
+  const handleSubmit = async e => {
     e.preventDefault();
 
     try {
@@ -24,7 +24,6 @@ function LoginForm() {
 
       login(token);
       navigate('/dashboard');
-
     } catch (err) {
       console.error(err);
       setError('Invalid login credentials');
@@ -35,21 +34,18 @@ function LoginForm() {
     <form onSubmit={handleSubmit}>
       {error && <p style={{ color: 'red' }}>{error}</p>}
       <div>
-        <label>Email:</label><br />
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
+        <label>Email:</label>
+        <br />
+        <input type="email" value={email} onChange={e => setEmail(e.target.value)} required />
       </div>
 
       <div>
-        <label>Password:</label><br />
+        <label>Password:</label>
+        <br />
         <input
           type="password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={e => setPassword(e.target.value)}
           required
         />
       </div>

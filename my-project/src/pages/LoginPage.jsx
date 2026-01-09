@@ -40,7 +40,7 @@ function LoginPage() {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async e => {
     e.preventDefault();
     setError('');
     setInfoMessage('');
@@ -62,7 +62,7 @@ function LoginPage() {
     }
   };
 
-  const handleVerify = async (e) => {
+  const handleVerify = async e => {
     e.preventDefault();
     setError('');
     setInfoMessage('');
@@ -140,7 +140,7 @@ function LoginPage() {
                   <input
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={e => setEmail(e.target.value)}
                     placeholder="Email"
                     className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all duration-200"
                   />
@@ -155,7 +155,7 @@ function LoginPage() {
                   <input
                     type="password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={e => setPassword(e.target.value)}
                     placeholder="Password"
                     className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all duration-200"
                   />
@@ -190,8 +190,12 @@ function LoginPage() {
 
               <form onSubmit={handleVerify} className="space-y-5">
                 <div className="text-center mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Enter Verification Code</h3>
-                  <p className="text-sm text-gray-500">Please check your email for the 6-digit code</p>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    Enter Verification Code
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    Please check your email for the 6-digit code
+                  </p>
                 </div>
 
                 <div className="space-y-1">
@@ -199,7 +203,7 @@ function LoginPage() {
                   <input
                     type="text"
                     value={verificationCode}
-                    onChange={(e) => setVerificationCode(e.target.value)}
+                    onChange={e => setVerificationCode(e.target.value)}
                     placeholder="000000"
                     maxLength={6}
                     autoFocus
@@ -208,7 +212,8 @@ function LoginPage() {
                 </div>
 
                 <div className="text-sm text-gray-500 text-center mt-2">
-                  Code expires in <span className="font-medium text-gray-900">{formatTimeLeft()}</span>
+                  Code expires in{' '}
+                  <span className="font-medium text-gray-900">{formatTimeLeft()}</span>
                 </div>
 
                 <div className="flex gap-2">

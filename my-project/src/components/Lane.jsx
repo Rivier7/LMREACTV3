@@ -2,22 +2,22 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
 function Lane({ lane }) {
-
-  if (!lane) return (
-    <div className="bg-gray-100 grid grid-cols-[1fr_2fr] rounded-xl border border-gray-300 min-w-[1100px] shadow-sm">
-      <div className="p-4 flex items-center justify-center text-gray-500 text-sm">
-        No lane data provided.
+  if (!lane)
+    return (
+      <div className="bg-gray-100 grid grid-cols-[1fr_2fr] rounded-xl border border-gray-300 min-w-[1100px] shadow-sm">
+        <div className="p-4 flex items-center justify-center text-gray-500 text-sm">
+          No lane data provided.
+        </div>
       </div>
-    </div>
-  );
+    );
 
   const navigate = useNavigate();
 
-  const editLane = (lane) => {
+  const editLane = lane => {
     navigate('/edit', { state: { lane } });
   };
 
-  const formatDate = (date) => {
+  const formatDate = date => {
     if (!date) return 'N/A';
     try {
       const d = new Date(date);
@@ -75,7 +75,9 @@ function Lane({ lane }) {
           </div>
           <div className="bg-white rounded-lg p-2 shadow-sm border border-gray-200">
             <div className="text-xs text-gray-600 font-medium">Cutoff Time</div>
-            <div className="text-sm font-semibold text-gray-800">{lane.legs[0]?.cutoffTime || 'N/A'}</div>
+            <div className="text-sm font-semibold text-gray-800">
+              {lane.legs[0]?.cutoffTime || 'N/A'}
+            </div>
           </div>
         </div>
 
@@ -135,14 +137,16 @@ function Lane({ lane }) {
             <div className="space-y-3">
               {[...lane.legs]
                 .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
-                .map((leg) =>
-                  leg.serviceLevel === "DIRECT DRIVE" ? null : (
+                .map(leg =>
+                  leg.serviceLevel === 'DIRECT DRIVE' ? null : (
                     <div
                       className="grid grid-cols-7 items-center px-3 py-2 bg-gray-50 rounded-lg shadow-sm border border-gray-200 hover:bg-gray-100 transition-colors duration-200"
                       key={leg.sequence}
                     >
                       <div className="text-center">
-                        <div className="font-semibold text-gray-800 text-sm">{leg.flightNumber}</div>
+                        <div className="font-semibold text-gray-800 text-sm">
+                          {leg.flightNumber}
+                        </div>
                       </div>
                       <div className="text-center">
                         <div className="font-medium text-gray-800 text-sm">{leg.originStation}</div>
@@ -153,13 +157,14 @@ function Lane({ lane }) {
 
                       <div className="flex justify-center items-center">
                         <div className="w-6 h-6 rounded-full flex items-center justify-center">
-
                           <img src="/public/plane.png" alt="Plane" />
                         </div>
                       </div>
 
                       <div className="text-center">
-                        <div className="font-medium text-gray-800 text-sm">{leg.destinationStation}</div>
+                        <div className="font-medium text-gray-800 text-sm">
+                          {leg.destinationStation}
+                        </div>
                       </div>
                       <div className="text-center">
                         <div className="text-xs font-medium text-gray-700">{leg.arrivalTime}</div>
@@ -181,10 +186,19 @@ function Lane({ lane }) {
           ) : (
             <div className="flex items-center justify-center py-6 text-gray-500">
               <div className="text-center">
-                <svg className="mx-auto h-10 w-10 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <svg
+                  className="mx-auto h-10 w-10 text-gray-400 mb-3"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
                 </svg>
-
 
                 <h5 className="text-sm">No legs available</h5>
               </div>

@@ -18,7 +18,7 @@ function Lanes({ lanes }) {
   const [filteredLanes, setFilteredLanes] = useState(lanes);
 
   useEffect(() => {
-    const result = lanes.filter((lane) => {
+    const result = lanes.filter(lane => {
       return (
         (!filters.accountName || lane.accountName === filters.accountName) &&
         (!filters.originCountry || lane.originCountry === filters.originCountry) &&
@@ -37,7 +37,7 @@ function Lanes({ lanes }) {
     setFilteredLanes(result);
   }, [filters, lanes]);
 
-  const handleFilterChange = (e) => {
+  const handleFilterChange = e => {
     setFilters({ ...filters, [e.target.name]: e.target.value });
   };
 
@@ -80,11 +80,11 @@ function Lanes({ lanes }) {
         <form className="min-w-[1300px]">
           <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
             <div className="grid grid-cols-13 gap-6 items-end">
-              {fields.map((field) => {
+              {fields.map(field => {
                 const tempFilters = { ...filters };
                 delete tempFilters[field.name];
 
-                const tempFiltered = lanes.filter((lane) => {
+                const tempFiltered = lanes.filter(lane => {
                   return Object.entries(tempFilters).every(([key, val]) => {
                     if (key === 'valid') {
                       return !val || lane.valid === (val === 'true');
@@ -96,13 +96,10 @@ function Lanes({ lanes }) {
                 const options =
                   field.name === 'valid'
                     ? ['true', 'false']
-                    : [...new Set(tempFiltered.map((lane) => lane[field.name]))];
+                    : [...new Set(tempFiltered.map(lane => lane[field.name]))];
 
                 return (
-                  <div
-                    className="flex flex-col space-y-2 w-[120px]"
-                    key={field.name}
-                  >
+                  <div className="flex flex-col space-y-2 w-[120px]" key={field.name}>
                     <label className="text-gray-700 text-xs font-medium leading-tight">
                       {field.label}
                     </label>
@@ -112,14 +109,12 @@ function Lanes({ lanes }) {
                       onChange={handleFilterChange}
                       className="w-full text-xs border border-gray-300 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-400 transition-colors"
                     >
-                      <option value="" className="text-gray-500">All</option>
-                      {options.map((val) => (
+                      <option value="" className="text-gray-500">
+                        All
+                      </option>
+                      {options.map(val => (
                         <option key={val} value={val} className="text-gray-900">
-                          {field.name === 'valid'
-                            ? val === 'true'
-                              ? 'Valid'
-                              : 'Invalid'
-                            : val}
+                          {field.name === 'valid' ? (val === 'true' ? 'Valid' : 'Invalid') : val}
                         </option>
                       ))}
                     </select>

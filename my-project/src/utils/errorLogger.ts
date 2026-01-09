@@ -12,7 +12,13 @@
  * - UNEXPECTED: Uncaught runtime errors
  */
 
-import type { ErrorContext, ErrorInfo, ErrorSeverityType, ErrorCategoryType, ApiError } from '../types';
+import type {
+  ErrorContext,
+  ErrorInfo,
+  ErrorSeverityType,
+  ErrorCategoryType,
+  ApiError,
+} from '../types';
 
 export const ErrorSeverity = {
   LOW: 'low' as ErrorSeverityType,

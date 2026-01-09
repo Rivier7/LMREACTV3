@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  quality-checks:
+    name: Code Quality & Tests
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20.x]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: my-project/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./my-project
+        run: npm ci
+
+      - name: Check code formatting
+        working-directory: ./my-project
+        run: npm run format:check
+
+      - name: Run ESLint
+        working-directory: ./my-project
+        run: npm run lint
+
+      - name: TypeScript type check
+        working-directory: ./my-project
+        run: npm run type-check
+
+      - name: Run tests
+        working-directory: ./my-project
+        run: npm test -- --run
+
+      - name: Generate test coverage
+        working-directory: ./my-project
+        run: npm run test:coverage -- --run
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        if: success()
+        with:
+          files: ./my-project/coverage/coverage-final.json
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+  build:
+    name: Build Application
+    runs-on: ubuntu-latest
+    needs: quality-checks
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+          cache-dependency-path: my-project/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./my-project
+        run: npm ci
+
+      - name: Build application
+        working-directory: ./my-project
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || 'http://localhost:8080/api' }}
+          VITE_APP_NAME: 'Lane Management System'
+          VITE_APP_VERSION: '1.0.0'
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-files
+          path: my-project/dist/
+          retention-days: 7
+
+  # Optional: Deploy step (uncomment when ready)
+  # deploy:
+  #   name: Deploy to Production
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  #
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Download build artifacts
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: build-files
+  #         path: my-project/dist
+  #
+  #     - name: Deploy to hosting
+  #       run: |
+  #         echo "Add deployment commands here"
+  #         # Examples:
+  #         # - Vercel: npx vercel --prod
+  #         # - Netlify: npx netlify deploy --prod
+  #         # - AWS S3: aws s3 sync dist/ s3://your-bucket

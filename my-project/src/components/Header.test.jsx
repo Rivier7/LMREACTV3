@@ -14,7 +14,7 @@ import { useAuth } from '../context/AuthContext';
 
 // Mock jwt-decode
 vi.mock('jwt-decode', () => ({
-  jwtDecode: vi.fn((token) => ({
+  jwtDecode: vi.fn(token => ({
     sub: 'test@example.com',
     email: 'test@example.com',
   })),

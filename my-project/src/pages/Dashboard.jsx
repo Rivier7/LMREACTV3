@@ -1,55 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TrendingUp, Download, ChevronRight } from 'lucide-react';
 import Header from '../components/Header';
 import FileUploader from '../components/FileUploader';
 import ErrorMessage from '../components/ErrorMessage';
-import { allLaneCount, getLaneCounts, getAccountExcel } from '../api/api';
-import { useErrorHandler } from '../hooks/useErrorHandler';
-import { ErrorCategory } from '../utils/errorLogger';
+import { getAccountExcel } from '../api/api';
+import { useAccounts } from '../hooks/useAccountQueries';
+import { useLaneCounts } from '../hooks/useLaneQueries';
 
 function Dashboard() {
-  const [accounts, setAccounts] = useState([]);
-  const [counts, setCounts] = useState({ total: 0, valid: 0, invalid: 0 });
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const navigate = useNavigate();
 
-  // FAANG Best Practice: Use custom error handler hook
-  const { error, handleError, clearError } = useErrorHandler();
+  // React Query automatically handles loading, error, and caching!
+  // No more useState, useEffect, or manual error handling needed
+  const { data: accounts = [], isLoading: accountsLoading, error: accountsError } = useAccounts();
 
-  const handleSelectAccount = (accountId) => {
+  const {
+    data: counts = { total: 0, valid: 0, invalid: 0 },
+    isLoading: countsLoading,
+    error: countsError,
+  } = useLaneCounts();
+
+  const handleSelectAccount = accountId => {
     console.log(`Selected account ID: ${accountId}`);
     navigate(`/accountLanes/${accountId}`);
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [accountsData, countsData] = await Promise.all([
-          allLaneCount(),
-          getLaneCounts()
-        ]);
-        setAccounts(accountsData || []);
-        setCounts(countsData || { total: 0, valid: 0, invalid: 0 });
-      } catch (err) {
-        // FAANG Best Practice: Centralized error handling with context
-        handleError(err, {
-          category: ErrorCategory.API,
-          context: 'Loading dashboard data',
-          endpoint: '/api/lanes/count',
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Combined loading state
+  const isLoading = accountsLoading || countsLoading;
+  // Combined error state
+  const error = accountsError || countsError;
 
-    fetchData();
-  }, [handleError]);
-
-  if (loading) {
+  if (isLoading) {
     return <div className="text-center py-12 text-lg text-gray-500">Loading dashboard...</div>;
   }
 
@@ -57,7 +41,7 @@ function Dashboard() {
   const invalidPercentage = counts.total > 0 ? (counts.invalid / counts.total) * 100 : 0;
 
   // Filter accounts
-  const filteredAccounts = accounts.filter((account) => {
+  const filteredAccounts = accounts.filter(account => {
     const matchesSearch = account.accountName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus =
       statusFilter === 'all' ||
@@ -72,12 +56,11 @@ function Dashboard() {
 
       <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         <div className="max-w-7xl mx-auto p-6 lg:p-8">
-          {/* FAANG Best Practice: Display error message with dismiss option */}
+          {/* Display error message if any */}
           {error && (
             <ErrorMessage
-              message={error.message}
-              title="Failed to Load Dashboard"
-              onDismiss={clearError}
+              message={error.message || 'Failed to load dashboard data'}
+              title="Error Loading Dashboard"
               severity="error"
               className="mb-6"
             />
@@ -115,7 +98,9 @@ function Dashboard() {
                   <div>
                     <p className="text-sm font-medium text-gray-600 mb-1">Active</p>
                     <p className="text-3xl font-bold text-green-600">{counts.valid ?? 0}</p>
-                    <p className="text-xs text-gray-500 mt-2">{validPercentage.toFixed(0)}% healthy</p>
+                    <p className="text-xs text-gray-500 mt-2">
+                      {validPercentage.toFixed(0)}% healthy
+                    </p>
                   </div>
                   <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
                     <span className="text-green-600 font-bold text-lg">✓</span>
@@ -129,7 +114,9 @@ function Dashboard() {
                   <div>
                     <p className="text-sm font-medium text-gray-600 mb-1">Invalid</p>
                     <p className="text-3xl font-bold text-red-600">{counts.invalid ?? 0}</p>
-                    <p className="text-xs text-gray-500 mt-2">{invalidPercentage.toFixed(0)}% attention</p>
+                    <p className="text-xs text-gray-500 mt-2">
+                      {invalidPercentage.toFixed(0)}% attention
+                    </p>
                   </div>
                   <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
                     <span className="text-red-600 font-bold text-lg">!</span>
@@ -144,7 +131,9 @@ function Dashboard() {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">Accounts</h2>
-                <p className="text-gray-600 text-sm mt-1">{filteredAccounts.length} of {accounts.length} accounts</p>
+                <p className="text-gray-600 text-sm mt-1">
+                  {filteredAccounts.length} of {accounts.length} accounts
+                </p>
               </div>
               <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm font-semibold">
                 {accounts.length} Active
@@ -159,7 +148,7 @@ function Dashboard() {
                   type="text"
                   placeholder="Search by account name..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={e => setSearchQuery(e.target.value)}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 />
               </div>
@@ -204,7 +193,7 @@ function Dashboard() {
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredAccounts.map((account) => (
+              {filteredAccounts.map(account => (
                 <div
                   key={account.accountId}
                   className="group bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg hover:border-blue-200 transition-all duration-300"

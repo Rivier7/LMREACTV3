@@ -88,9 +88,7 @@ describe('Validation Utilities', () => {
     });
 
     it('should escape quotes and apostrophes', () => {
-      expect(sanitizeInput('O\'Reilly "Books"')).toBe(
-        'O&#x27;Reilly &quot;Books&quot;'
-      );
+      expect(sanitizeInput('O\'Reilly "Books"')).toBe('O&#x27;Reilly &quot;Books&quot;');
     });
 
     it('should handle empty or null inputs', () => {

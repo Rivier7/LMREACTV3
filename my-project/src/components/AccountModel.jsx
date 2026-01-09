@@ -11,8 +11,8 @@ const AccountModel = ({ accountId, onClose, onRemove }) => {
       await deleteAccountbyId(accountId);
       onRemove(accountId);
     } catch (error) {
-      console.error("Error deleting account:", error);
-      setError("Error deleting account");
+      console.error('Error deleting account:', error);
+      setError('Error deleting account');
     }
   };
 
@@ -21,13 +21,13 @@ const AccountModel = ({ accountId, onClose, onRemove }) => {
       try {
         const account = await getAccountbyId(accountId);
         if (!account || Object.keys(account).length === 0) {
-          setError("No data available");
+          setError('No data available');
         } else {
           setAccount(account);
         }
       } catch (error) {
-        setError("Error loading data");
-        console.error("API Error:", error);
+        setError('Error loading data');
+        console.error('API Error:', error);
       } finally {
         setLoading(false);
       }
@@ -45,16 +45,13 @@ const AccountModel = ({ accountId, onClose, onRemove }) => {
       <div className="fixed inset-0 bg-black bg-opacity-50 z-40"></div>
 
       {/* Modal Backdrop (for closing on click) */}
-      <div
-        className="fixed inset-0 bg-black bg-opacity-50 z-40"
-        onClick={onClose}
-      ></div>
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-40" onClick={onClose}></div>
 
       {/* Modal */}
       <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-lg p-6 w-80 text-center z-50">
         {account ? (
           <p className="text-lg mb-4">
-            Are you sure you want to remove this account{" "}
+            Are you sure you want to remove this account{' '}
             <span className="font-bold">{account.name}</span>?
           </p>
         ) : (

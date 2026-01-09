@@ -30,11 +30,8 @@ export const useErrorHandler = (): UseErrorHandlerReturn => {
       ...context,
     });
 
-    // Set error state for UI display
-    setError({
-      message: err.message || 'An unexpected error occurred',
-      ...errorInfo,
-    });
+    // Set error state for UI display (errorInfo already has message)
+    setError(errorInfo);
 
     return errorInfo;
   }, []);

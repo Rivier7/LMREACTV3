@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
-import { updateLane, updateLaneToDirectDrive, getTAT, getFlights, validateFlight } from '../api/api';
+import {
+  updateLane,
+  updateLaneToDirectDrive,
+  getTAT,
+  getFlights,
+  validateFlight,
+} from '../api/api';
 import Header from '../components/Header';
 import { getSuggestedRoute } from '../api/api';
 
@@ -12,9 +18,17 @@ const Edit = () => {
   const lane = location.state?.lane;
 
   const serviceLevels = [
-    'DIRECT DRIVE', 'LIFEGUARD', 'LIFEGUARDXL', 'QUICKPAK',
-    'DASH CRITICAL', 'DASH HEAVY', 'EXPRESS HEAVY',
-    'EK VITAL', 'PPS', 'EXPEDITEFS', 'OTHER',
+    'DIRECT DRIVE',
+    'LIFEGUARD',
+    'LIFEGUARDXL',
+    'QUICKPAK',
+    'DASH CRITICAL',
+    'DASH HEAVY',
+    'EXPRESS HEAVY',
+    'EK VITAL',
+    'PPS',
+    'EXPEDITEFS',
+    'OTHER',
   ];
 
   if (!lane) {
@@ -29,7 +43,6 @@ const Edit = () => {
   }
   const [suggestedRoutes, setSuggestedRoutes] = useState([]);
   const [selectedRouteIndex, setSelectedRouteIndex] = useState(null);
-
 
   const [showSuggestedRoute, setShowSuggestedRoute] = useState(false);
   const [suggestError, setSuggestError] = useState(null);
@@ -54,9 +67,9 @@ const Edit = () => {
     loadLegs();
   }, [lane.id]);
 
-  const handleChange = (e) => {
+  const handleChange = e => {
     const { name, value } = e.target;
-    setUpdatedLane((prevLane) => ({ ...prevLane, [name]: value }));
+    setUpdatedLane(prevLane => ({ ...prevLane, [name]: value }));
   };
 
   const handleSuggestRoute = async () => {
@@ -75,9 +88,8 @@ const Edit = () => {
       setSuggestedRoutes(results);
       setSelectedRouteIndex(null);
       setShowSuggestedRoute(true);
-
     } catch (error) {
-      let message = "Failed to suggest route.";
+      let message = 'Failed to suggest route.';
       if (error.message) message = error.message;
       else if (error.response) message = error.response.data?.error || message;
 
@@ -89,19 +101,19 @@ const Edit = () => {
   const handleInputChange = (index, field, rawValue) => {
     let value = rawValue.toUpperCase();
 
-    if ((field === "originStation" || field === "destinationStation") && value.length > 3) {
-      alert("Origin and destination must be max 3 letters.");
+    if ((field === 'originStation' || field === 'destinationStation') && value.length > 3) {
+      alert('Origin and destination must be max 3 letters.');
       return;
     }
 
-    if (field === "destinationStation") {
+    if (field === 'destinationStation') {
       const origin = legs[index]?.originStation?.toUpperCase();
       if (origin && value === origin) {
-        alert("Origin and destination cannot be the same.");
+        alert('Origin and destination cannot be the same.');
         return;
       }
 
-      const allOrigins = legs.map((leg) => leg?.originStation?.toUpperCase()).filter(Boolean);
+      const allOrigins = legs.map(leg => leg?.originStation?.toUpperCase()).filter(Boolean);
 
       if (allOrigins.includes(value)) {
         alert(`Destination '${value}' was already used as a departure airport.`);
@@ -109,10 +121,10 @@ const Edit = () => {
       }
     }
 
-    if (field === "originStation") {
+    if (field === 'originStation') {
       const newOrigin = value.toUpperCase();
       const otherLegsOrigins = legs
-        .map((leg, i) => i !== index ? leg?.originStation?.toUpperCase() : null)
+        .map((leg, i) => (i !== index ? leg?.originStation?.toUpperCase() : null))
         .filter(Boolean);
 
       if (otherLegsOrigins.includes(newOrigin)) {
@@ -121,7 +133,7 @@ const Edit = () => {
       }
     }
 
-    if (field === "flightNumber" && value.length >= 2) {
+    if (field === 'flightNumber' && value.length >= 2) {
       value = value.substring(0, 2).toUpperCase() + value.substring(2);
     }
 
@@ -150,15 +162,28 @@ const Edit = () => {
     } else {
       let updatedLegs = [...legs];
       if (updatedLegs.length === 0 || updatedLegs[0]?.serviceLevel === 'DIRECT DRIVE') {
-        updatedLegs = [{
-          sequence: 1, flightNumber: '', departureTime: '', originStation: '',
-          destinationStation: '', arrivalTime: '', flightOperatingdays: '',
-          valid: null, serviceLevel: '', cutoffTime: '', validMessage: [],
-        }];
+        updatedLegs = [
+          {
+            sequence: 1,
+            flightNumber: '',
+            departureTime: '',
+            originStation: '',
+            destinationStation: '',
+            arrivalTime: '',
+            flightOperatingdays: '',
+            valid: null,
+            serviceLevel: '',
+            cutoffTime: '',
+            validMessage: [],
+          },
+        ];
       }
 
       const currentServiceLevel = updatedLegs[legIndex]?.serviceLevel;
-      if ((serviceLevel === 'OTHER' && !serviceLevels.includes(currentServiceLevel)) || currentServiceLevel === serviceLevel) {
+      if (
+        (serviceLevel === 'OTHER' && !serviceLevels.includes(currentServiceLevel)) ||
+        currentServiceLevel === serviceLevel
+      ) {
         updatedLegs[legIndex].serviceLevel = '';
       } else {
         updatedLegs[legIndex].serviceLevel = serviceLevel === 'OTHER' ? '' : serviceLevel;
@@ -169,7 +194,7 @@ const Edit = () => {
 
   const handleAddLeg = () => {
     if (legs.length >= 3) return;
-    const maxSequence = legs.length > 0 ? Math.max(...legs.map((f) => f.sequence || 0)) : 0;
+    const maxSequence = legs.length > 0 ? Math.max(...legs.map(f => f.sequence || 0)) : 0;
     setLegs([
       ...legs,
       {
@@ -189,7 +214,7 @@ const Edit = () => {
   };
 
   const handleRemoveLeg = () => {
-    if (legs.length > 1) setLegs((prevLegs) => prevLegs.slice(0, -1));
+    if (legs.length > 1) setLegs(prevLegs => prevLegs.slice(0, -1));
   };
 
   const handleValidateButton = async () => {
@@ -214,12 +239,12 @@ const Edit = () => {
       if (isDirectDrive) {
         result = await updateLaneToDirectDrive(updatedLane.id, updatedLane, []);
       } else {
-        if (legs.some((f) => !f.flightNumber || !f.originStation || !f.destinationStation)) {
+        if (legs.some(f => !f.flightNumber || !f.originStation || !f.destinationStation)) {
           alert('Please fill out all flight fields!');
           setIsLoading(false);
           return;
         }
-        if (legs.some((f) => f.valid === false || f.valid === null)) {
+        if (legs.some(f => f.valid === false || f.valid === null)) {
           alert('Not all legs are valid');
           setIsLoading(false);
           return;
@@ -230,7 +255,7 @@ const Edit = () => {
       }
 
       if (result?.notModified) {
-        alert("No changes detected — lane was not updated.");
+        alert('No changes detected — lane was not updated.');
       } else {
         setShowSuccess(true);
         setTimeout(() => {
@@ -250,7 +275,7 @@ const Edit = () => {
     setIsLoading(true);
     try {
       const tatTTime = await getTAT(updatedLane, legs);
-      setUpdatedLane((prev) => ({ ...prev, tatToConsigneeDuration: tatTTime }));
+      setUpdatedLane(prev => ({ ...prev, tatToConsigneeDuration: tatTTime }));
     } catch (error) {
       console.error('Error calculating TAT:', error.message);
       alert('Failed to calculate TAT.');
@@ -259,7 +284,7 @@ const Edit = () => {
     }
   };
 
-  const applyRoute = (routePattern) => {
+  const applyRoute = routePattern => {
     const updated = routePattern.legs
       .sort((a, b) => a.sequence - b.sequence)
       .map(leg => ({
@@ -273,7 +298,7 @@ const Edit = () => {
         serviceLevel: leg.serviceLevel || legs[0]?.serviceLevel || '',
         cutoffTime: leg.cutoffTime || legs[0]?.cutoffTime || '',
         valid: null,
-        validMessage: []
+        validMessage: [],
       }));
     setLegs(updated);
     setShowSuggestedRoute(false);
@@ -311,7 +336,6 @@ const Edit = () => {
       )}
 
       <div className="w-full p-6 space-y-8">
-
         {/* Account Name */}
         <div className="bg-white rounded shadow border-gray-300 p-4 mb-4">
           <div className="text-center">
@@ -319,28 +343,30 @@ const Edit = () => {
               {updatedLane.accountName}
             </span>
             {updatedLane.lastUpdate && (
-              <p className="text-xs text-gray-500 mt-1">
-                Last Updated: {updatedLane.lastUpdate}
-              </p>
+              <p className="text-xs text-gray-500 mt-1">Last Updated: {updatedLane.lastUpdate}</p>
             )}
           </div>
         </div>
 
         {/* ORIGIN / DESTINATION / LANE DETAILS */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-
           {/* ---------- ORIGIN ---------- */}
           <div className="bg-white p-3 rounded shadow border-gray-300">
             <div className="flex items-center mb-3">
               <div className="bg-gray-600 text-white p-2 rounded">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                  />
                 </svg>
               </div>
               <h3 className="font-bold text-xs text-gray-700 ml-2">Origin</h3>
             </div>
 
-            {['City', 'State', 'Country'].map((field) => (
+            {['City', 'State', 'Country'].map(field => (
               <div key={field} className="mb-3">
                 <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
                   Origin {field}
@@ -362,14 +388,24 @@ const Edit = () => {
             <div className="flex items-center mb-3">
               <div className="bg-gray-600 text-white p-2 rounded">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
                 </svg>
               </div>
               <h3 className="font-bold text-xs text-gray-700 ml-2">Destination</h3>
             </div>
 
-            {['City', 'State', 'Country'].map((field) => (
+            {['City', 'State', 'Country'].map(field => (
               <div key={field} className="mb-3">
                 <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
                   Destination {field}
@@ -391,7 +427,12 @@ const Edit = () => {
             <div className="flex items-center mb-3">
               <div className="bg-gray-600 text-white p-2 rounded">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
                 </svg>
               </div>
               <h3 className="font-bold text-xs text-gray-700 ml-2">Lane Details</h3>
@@ -456,7 +497,12 @@ const Edit = () => {
           <h3 className="text-xs font-bold text-gray-800 mb-6 flex items-center">
             <div className="bg-gray-600 text-white p-2 rounded-lg mr-3">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 10V3L4 14h7v7l9-11h-7z"
+                />
               </svg>
             </div>
             Service Level
@@ -470,15 +516,22 @@ const Edit = () => {
                 : currentService === service;
 
               return (
-                <div key={index} className={`flex flex-col p-2 rounded-lg border transition-all duration-200 ${isChecked ? 'border-gray-600 bg-gray-100 shadow-sm' : 'border-gray-200 bg-white'}`}>
+                <div
+                  key={index}
+                  className={`flex flex-col p-2 rounded-lg border transition-all duration-200 ${isChecked ? 'border-gray-600 bg-gray-100 shadow-sm' : 'border-gray-200 bg-white'}`}
+                >
                   <label
                     className="flex items-center cursor-pointer w-full"
                     onClick={() => handleServiceLevelChange(0, service)}
                   >
-                    <div className={`w-5 h-5 rounded-full border-2 mr-3 flex items-center justify-center flex-shrink-0 ${isChecked ? 'border-gray-600 bg-gray-600' : 'border-gray-300'}`}>
+                    <div
+                      className={`w-5 h-5 rounded-full border-2 mr-3 flex items-center justify-center flex-shrink-0 ${isChecked ? 'border-gray-600 bg-gray-600' : 'border-gray-300'}`}
+                    >
                       {isChecked && <div className="w-2 h-2 rounded-full bg-white"></div>}
                     </div>
-                    <span className={`text-xs font-medium ${isChecked ? 'text-gray-700' : 'text-gray-600'}`}>
+                    <span
+                      className={`text-xs font-medium ${isChecked ? 'text-gray-700' : 'text-gray-600'}`}
+                    >
                       {service}
                     </span>
                   </label>
@@ -487,12 +540,12 @@ const Edit = () => {
                     <input
                       type="text"
                       value={currentService === 'OTHER' ? '' : currentService}
-                      onChange={(e) => {
+                      onChange={e => {
                         const updatedLegs = [...legs];
                         updatedLegs[0].serviceLevel = e.target.value.toUpperCase();
                         setLegs(updatedLegs);
                       }}
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={e => e.stopPropagation()}
                       placeholder="Specify service level"
                       className="mt-2 w-full px-2 py-1 border border-gray-300 rounded text-xs"
                     />
@@ -509,8 +562,18 @@ const Edit = () => {
             <h3 className="text-xs font-bold text-gray-800 mb-4 flex items-center">
               <div className="bg-gray-600 text-white p-2 rounded-lg mr-3">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
                 </svg>
               </div>
               Overall Route
@@ -524,7 +587,7 @@ const Edit = () => {
                 <input
                   type="text"
                   value={legs[0]?.originStation || ''}
-                  onChange={(e) => handleInputChange(0, 'originStation', e.target.value)}
+                  onChange={e => handleInputChange(0, 'originStation', e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg"
                 />
               </div>
@@ -537,7 +600,9 @@ const Edit = () => {
                   <input
                     type="text"
                     value={legs[legs.length - 1]?.destinationStation || ''}
-                    onChange={(e) => handleInputChange(legs.length - 1, 'destinationStation', e.target.value)}
+                    onChange={e =>
+                      handleInputChange(legs.length - 1, 'destinationStation', e.target.value)
+                    }
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg"
                   />
                   <button
@@ -575,10 +640,11 @@ const Edit = () => {
               {suggestedRoutes.map((routePattern, routeIndex) => (
                 <div
                   key={routeIndex}
-                  className={`border-2 rounded-lg p-4 transition-all cursor-pointer ${selectedRouteIndex === routeIndex
-                    ? 'border-green-500 bg-green-50 shadow-md'
-                    : 'border-blue-300 bg-white hover:border-blue-500'
-                    }`}
+                  className={`border-2 rounded-lg p-4 transition-all cursor-pointer ${
+                    selectedRouteIndex === routeIndex
+                      ? 'border-green-500 bg-green-50 shadow-md'
+                      : 'border-blue-300 bg-white hover:border-blue-500'
+                  }`}
                 >
                   <div className="mb-3">
                     <p className="text-xs font-bold text-blue-900 mb-1">Option {routeIndex + 1}</p>
@@ -591,9 +657,16 @@ const Edit = () => {
                     {routePattern.legs
                       .sort((a, b) => a.sequence - b.sequence)
                       .map((leg, i) => (
-                        <div key={i} className="bg-gray-50 border border-gray-200 rounded p-2 text-xs">
-                          <p className="font-semibold text-gray-700">Leg {leg.sequence}: {leg.flightNumber}</p>
-                          <p className="text-gray-600">{leg.originStation} → {leg.destinationStation}</p>
+                        <div
+                          key={i}
+                          className="bg-gray-50 border border-gray-200 rounded p-2 text-xs"
+                        >
+                          <p className="font-semibold text-gray-700">
+                            Leg {leg.sequence}: {leg.flightNumber}
+                          </p>
+                          <p className="text-gray-600">
+                            {leg.originStation} → {leg.destinationStation}
+                          </p>
                           <p className="text-gray-500 text-xs">
                             {leg.departureTime} - {leg.arrivalTime}
                           </p>
@@ -611,10 +684,11 @@ const Edit = () => {
                         setSelectedRouteIndex(routeIndex);
                       }
                     }}
-                    className={`w-full px-3 py-2 rounded text-xs font-semibold transition-colors ${selectedRouteIndex === routeIndex
-                      ? 'bg-green-600 text-white hover:bg-green-700'
-                      : 'bg-blue-600 text-white hover:bg-blue-700'
-                      }`}
+                    className={`w-full px-3 py-2 rounded text-xs font-semibold transition-colors ${
+                      selectedRouteIndex === routeIndex
+                        ? 'bg-green-600 text-white hover:bg-green-700'
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
                   >
                     {selectedRouteIndex === routeIndex ? '✓ Apply This Route' : 'Select'}
                   </button>
@@ -625,7 +699,10 @@ const Edit = () => {
         )}
 
         {suggestError && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <div
+            className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
+            role="alert"
+          >
             <strong className="font-bold">Error: </strong>
             <span className="block sm:inline">{suggestError}</span>
           </div>
@@ -637,154 +714,174 @@ const Edit = () => {
             <h3 className="text-xs font-bold text-gray-800 mb-6 flex items-center">
               <div className="bg-gray-600 text-white p-2 rounded-lg mr-3">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                  />
                 </svg>
               </div>
               Flight Legs
             </h3>
 
             <div className="space-y-6">
-              {legs.slice().sort((a, b) => a.sequence - b.sequence).map((leg, index) => (
+              {legs
+                .slice()
+                .sort((a, b) => a.sequence - b.sequence)
+                .map((leg, index) => (
+                  <div key={index} className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 items-start">
+                      <div>
+                        <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                          Flight Number
+                        </label>
+                        <input
+                          type="text"
+                          value={leg.flightNumber}
+                          onChange={e => handleInputChange(index, 'flightNumber', e.target.value)}
+                          className="text-xs px-3 py-2 border border-gray-300 rounded w-full"
+                          placeholder="Flight Number"
+                        />
+                      </div>
+                      <div>
+                        <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                          Departure Time
+                        </label>
+                        <input
+                          type="text"
+                          value={leg.departureTime}
+                          onChange={e => handleInputChange(index, 'departureTime', e.target.value)}
+                          className="text-xs px-3 py-2 border border-gray-300 rounded w-full"
+                          placeholder="Departure"
+                        />
+                      </div>
 
-                <div key={index} className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 items-start">
+                      <div>
+                        <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                          Origin Airport
+                        </label>
+                        <input
+                          type="text"
+                          value={leg.originStation}
+                          onChange={e => handleInputChange(index, 'originStation', e.target.value)}
+                          className="text-xs px-3 py-2 border border-gray-300 rounded w-full"
+                          placeholder="Origin"
+                        />
+                      </div>
 
-                    <div>
-                      <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                        Flight Number
-                      </label>
-                      <input
-                        type="text"
-                        value={leg.flightNumber}
-                        onChange={(e) => handleInputChange(index, 'flightNumber', e.target.value)}
-                        className="text-xs px-3 py-2 border border-gray-300 rounded w-full"
-                        placeholder="Flight Number"
-                      />
-                    </div>
-                    <div>
-                      <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                        Departure Time
-                      </label>
-                      <input
-                        type="text"
-                        value={leg.departureTime}
-                        onChange={(e) => handleInputChange(index, 'departureTime', e.target.value)}
-                        className="text-xs px-3 py-2 border border-gray-300 rounded w-full"
-                        placeholder="Departure"
-                      />
-                    </div>
+                      <div className="flex justify-center pt-6">
+                        <div className="bg-gray-200 p-2 rounded">
+                          <svg
+                            className="w-6 h-6 text-gray-600"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                            />
+                          </svg>
+                        </div>
+                      </div>
 
-                    <div>
-                      <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                        Origin Airport
-                      </label>
-                      <input
-                        type="text"
-                        value={leg.originStation}
-                        onChange={(e) => handleInputChange(index, 'originStation', e.target.value)}
-                        className="text-xs px-3 py-2 border border-gray-300 rounded w-full"
-                        placeholder="Origin"
-                      />
-                    </div>
+                      <div>
+                        <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                          Destination Airport
+                        </label>
+                        <input
+                          type="text"
+                          value={leg.destinationStation}
+                          onChange={e =>
+                            handleInputChange(index, 'destinationStation', e.target.value)
+                          }
+                          className="text-xs px-3 py-2 border border-gray-300 rounded w-full"
+                          placeholder="Destination"
+                        />
+                      </div>
 
-                    <div className="flex justify-center pt-6">
-                      <div className="bg-gray-200 p-2 rounded">
-                        <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                        </svg>
+                      <div>
+                        <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                          Arrival Time
+                        </label>
+                        <input
+                          type="text"
+                          value={leg.arrivalTime}
+                          onChange={e => handleInputChange(index, 'arrivalTime', e.target.value)}
+                          className="text-xs px-3 py-2 border border-gray-300 rounded w-full"
+                          placeholder="Arrival"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                          Operating Days
+                        </label>
+                        <input
+                          type="text"
+                          value={leg.flightOperatingdays || ''}
+                          onChange={e =>
+                            handleInputChange(index, 'flightOperatingdays', e.target.value)
+                          }
+                          className="text-xs px-3 py-2 border border-gray-300 rounded w-full"
+                          placeholder="Days"
+                        />
+                      </div>
+
+                      <div>
+                        {index === 0 && (
+                          <>
+                            <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                              Cutoff Time
+                            </label>
+                            <input
+                              type="text"
+                              value={leg.cutoffTime || ''}
+                              onChange={e => handleInputChange(index, 'cutoffTime', e.target.value)}
+                              className="text-xs px-3 py-2 border border-gray-300 rounded w-full"
+                              placeholder="Cutoff"
+                            />
+                          </>
+                        )}
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                        Destination Airport
-                      </label>
-                      <input
-                        type="text"
-                        value={leg.destinationStation}
-                        onChange={(e) => handleInputChange(index, 'destinationStation', e.target.value)}
-                        className="text-xs px-3 py-2 border border-gray-300 rounded w-full"
-                        placeholder="Destination"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                        Arrival Time
-                      </label>
-                      <input
-                        type="text"
-                        value={leg.arrivalTime}
-                        onChange={(e) => handleInputChange(index, 'arrivalTime', e.target.value)}
-                        className="text-xs px-3 py-2 border border-gray-300 rounded w-full"
-                        placeholder="Arrival"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                        Operating Days
-                      </label>
-                      <input
-                        type="text"
-                        value={leg.flightOperatingdays || ''}
-                        onChange={(e) => handleInputChange(index, 'flightOperatingdays', e.target.value)}
-                        className="text-xs px-3 py-2 border border-gray-300 rounded w-full"
-                        placeholder="Days"
-                      />
-                    </div>
-
-                    <div>
-                      {index === 0 && (
-                        <>
-                          <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                            Cutoff Time
-                          </label>
-                          <input
-                            type="text"
-                            value={leg.cutoffTime || ''}
-                            onChange={(e) => handleInputChange(index, 'cutoffTime', e.target.value)}
-                            className="text-xs px-3 py-2 border border-gray-300 rounded w-full"
-                            placeholder="Cutoff"
-                          />
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* VALIDATION BADGES */}
-                  <div className="mt-4 flex items-center justify-between">
-                    <div className="flex items-center">
-                      {leg.valid === true && (
-                        <div className="flex items-center bg-green-100 px-3 py-1 rounded-full">
-                          <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-                          <span className="text-green-700 font-medium text-sm">Valid</span>
-                        </div>
-                      )}
-                      {leg.valid === false && (
-                        <div className="flex items-center bg-red-100 px-3 py-1 rounded-full">
-                          <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
-                          <span className="text-red-700 font-medium text-sm">Invalid</span>
-                        </div>
-                      )}
-                      {leg.valid === null && (
-                        <div className="flex items-center bg-gray-100 px-3 py-1 rounded-full">
-                          <div className="w-3 h-3 bg-gray-400 rounded-full mr-2"></div>
-                          <span className="text-gray-600 font-medium text-sm">Pending</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {leg.validMessage && leg.validMessage.length > 0 && (
-                      <div className="text-sm text-red-600 bg-red-50 px-3 py-1 rounded">
-                        {leg.validMessage.map((msg, i) => (
-                          <div key={i}>{msg}</div>
-                        ))}
+                    {/* VALIDATION BADGES */}
+                    <div className="mt-4 flex items-center justify-between">
+                      <div className="flex items-center">
+                        {leg.valid === true && (
+                          <div className="flex items-center bg-green-100 px-3 py-1 rounded-full">
+                            <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                            <span className="text-green-700 font-medium text-sm">Valid</span>
+                          </div>
+                        )}
+                        {leg.valid === false && (
+                          <div className="flex items-center bg-red-100 px-3 py-1 rounded-full">
+                            <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+                            <span className="text-red-700 font-medium text-sm">Invalid</span>
+                          </div>
+                        )}
+                        {leg.valid === null && (
+                          <div className="flex items-center bg-gray-100 px-3 py-1 rounded-full">
+                            <div className="w-3 h-3 bg-gray-400 rounded-full mr-2"></div>
+                            <span className="text-gray-600 font-medium text-sm">Pending</span>
+                          </div>
+                        )}
                       </div>
-                    )}
+
+                      {leg.validMessage && leg.validMessage.length > 0 && (
+                        <div className="text-sm text-red-600 bg-red-50 px-3 py-1 rounded">
+                          {leg.validMessage.map((msg, i) => (
+                            <div key={i}>{msg}</div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
 
               {/* BUTTONS: ADD / REMOVE / VALIDATE */}
               <div className="flex flex-wrap gap-4">
@@ -793,9 +890,18 @@ const Edit = () => {
                   disabled={legs.length <= 1}
                   className="px-3 py-2 text-xs bg-gray-600 text-white rounded flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  <svg
+                    className="w-4 h-4 mr-2"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
                   </svg>
                   Remove Leg
                 </button>
@@ -805,9 +911,18 @@ const Edit = () => {
                   disabled={legs.length >= 3}
                   className="px-6 py-3 text-xs bg-gray-800 text-white rounded disabled:opacity-50 flex items-center"
                 >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                      d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  <svg
+                    className="w-4 h-4 mr-2"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                    />
                   </svg>
                   Add Leg
                 </button>
@@ -816,9 +931,18 @@ const Edit = () => {
                   onClick={handleValidateButton}
                   className="px-6 py-3 text-xs bg-gray-700 text-white rounded flex items-center"
                 >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg
+                    className="w-4 h-4 mr-2"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
                   </svg>
                   Validate Legs
                 </button>
@@ -828,19 +952,24 @@ const Edit = () => {
         )}
 
         {/* ---------- ADDITIONAL INFO ---------- */}
-        <div className={`bg-white rounded-lg shadow-lg border border-gray-200 p-4 ${isDirectDriveSelected ? 'mt-8' : ''}`}>
+        <div
+          className={`bg-white rounded-lg shadow-lg border border-gray-200 p-4 ${isDirectDriveSelected ? 'mt-8' : ''}`}
+        >
           <h3 className="text-xs font-bold text-gray-800 mb-6 flex items-center">
             <div className="bg-gray-600 text-white p-2 rounded-lg mr-3">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
             </div>
             Additional Information
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-
             {/* CUSTOM CLEARANCE */}
             {hasFlightLegs && (
               <div>
@@ -942,14 +1071,18 @@ const Edit = () => {
             ) : (
               <>
                 <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                  />
                 </svg>
                 Update Lane
               </>
             )}
           </button>
         </div>
-
       </div>
     </div>
   );

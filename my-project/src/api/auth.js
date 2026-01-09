@@ -8,15 +8,13 @@ export const initiateLogin = async (email, password) => {
   try {
     const response = await axios.post(`${BASE_URL}/login`, {
       email,
-      password
+      password,
     });
     return response.data; // Returns LoginInitiationResponse
   } catch (error) {
     throw error.response?.data || 'Login failed';
   }
 };
-
-
 
 // Verify 2FA code and get JWT token
 export const verify2FA = async (email, code) => {
@@ -40,7 +38,7 @@ export const verify2FA = async (email, code) => {
 };
 
 // Resend 2FA code
-export const resend2FACode = async (email) => {
+export const resend2FACode = async email => {
   try {
     const response = await axios.post(`${BASE_URL}/resend-2fa?email=${email}`);
     return response.data;
@@ -55,7 +53,7 @@ export const getAuthHeaders = () => {
   return {
     headers: {
       'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` })
-    }
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
   };
 };
