@@ -331,15 +331,21 @@ export const validateFlight = async flight => {
   });
 
   if (!response.ok) {
-    // Try to parse error message from backend
-    let errorMessage;
+    // Read body as text first (can only read once)
+    const errorText = await response.text();
+    let errorMessage = errorText || 'Flight validation failed.';
+
+    // Try to parse as JSON to extract message field
     try {
-      const errorData = await response.json();
-      errorMessage = errorData.message || JSON.stringify(errorData);
+      const errorData = JSON.parse(errorText);
+      errorMessage = errorData.message || errorData.error || errorText;
+      console.log('Error data:', errorData);
     } catch {
-      errorMessage = await response.text();
+      // Not JSON, use the raw text
+      console.log('Error text:', errorText);
     }
-    throw new Error(errorMessage || 'Flight validation failed.');
+
+    throw new Error(errorMessage);
   }
 
   return await response.json();

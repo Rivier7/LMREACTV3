@@ -271,12 +271,12 @@ const AccountLanes = () => {
       current.map(lane =>
         lane.id === laneId
           ? {
-              ...lane,
-              legs: lane.legs.map(leg => (leg.id === legId ? { ...leg, [field]: value } : leg)),
-              hasBeenUpdated: true,
-              originStation: lane.legs[0]?.originStation || '',
-              destinationStation: lane.legs[lane.legs.length - 1]?.destinationStation || '',
-            }
+            ...lane,
+            legs: lane.legs.map(leg => (leg.id === legId ? { ...leg, [field]: value } : leg)),
+            hasBeenUpdated: true,
+            originStation: lane.legs[0]?.originStation || '',
+            destinationStation: lane.legs[lane.legs.length - 1]?.destinationStation || '',
+          }
           : lane
       )
     );
@@ -287,26 +287,26 @@ const AccountLanes = () => {
       current.map(lane =>
         lane.id === laneId
           ? {
-              ...lane,
-              hasBeenUpdated: true,
-              legs: [
-                ...(lane.legs || []),
-                {
-                  sequence: (lane.legs?.length || 0) + 1,
-                  serviceLevel: '',
-                  flightNumber: '',
-                  originStation: '',
-                  departureTime: '',
-                  destinationStation: '',
-                  arrivalTime: '',
-                  flightOperatingdays: '',
-                  aircraft: '',
-                  aircraftType: '',
-                  cutoffTime: '',
-                  valid: false,
-                },
-              ],
-            }
+            ...lane,
+            hasBeenUpdated: true,
+            legs: [
+              ...(lane.legs || []),
+              {
+                sequence: (lane.legs?.length || 0) + 1,
+                serviceLevel: '',
+                flightNumber: '',
+                originStation: '',
+                departureTime: '',
+                destinationStation: '',
+                arrivalTime: '',
+                flightOperatingdays: '',
+                aircraft: '',
+                aircraftType: '',
+                cutoffTime: '',
+                valid: false,
+              },
+            ],
+          }
           : lane
       )
     );
@@ -317,15 +317,15 @@ const AccountLanes = () => {
       current.map(lane =>
         lane.id === laneId
           ? {
-              ...lane,
-              hasBeenUpdated: true,
-              legs: lane.legs.filter(leg => leg.id !== legId),
-              originStation: lane.legs.filter(leg => leg.id !== legId)[0]?.originStation || '',
-              destinationStation:
-                lane.legs.filter(leg => leg.id !== legId)[
-                  lane.legs.filter(leg => leg.id !== legId).length - 1
-                ]?.destinationStation || '',
-            }
+            ...lane,
+            hasBeenUpdated: true,
+            legs: lane.legs.filter(leg => leg.id !== legId),
+            originStation: lane.legs.filter(leg => leg.id !== legId)[0]?.originStation || '',
+            destinationStation:
+              lane.legs.filter(leg => leg.id !== legId)[
+                lane.legs.filter(leg => leg.id !== legId).length - 1
+              ]?.destinationStation || '',
+          }
           : lane
       )
     );
@@ -356,14 +356,22 @@ const AccountLanes = () => {
 
       const validatedLegs = await Promise.all(
         laneToValidate.legs.map(async leg => {
-          const result = await validateFlight(leg);
-          return {
-            ...leg,
-            valid: result.valid,
-            message: result.message,
-            validMessage: result.mismatchedFields,
-            flightOperatingdays: result.operatingDays,
-          };
+          try {
+            const result = await validateFlight(leg);
+            return {
+              ...leg,
+              valid: result.valid,
+              message: result.message,
+              validMessage: result.mismatchedFields || [],
+              flightOperatingdays: result.operatingDays,
+            };
+          } catch (error) {
+            return {
+              ...leg,
+              valid: false,
+              validMessage: [error.message || 'Validation failed'],
+            };
+          }
         })
       );
 
@@ -412,14 +420,22 @@ const AccountLanes = () => {
         }
         const validatedLegs = await Promise.all(
           lane.legs.map(async leg => {
-            const result = await validateFlight(leg);
-            return {
-              ...leg,
-              valid: result.valid,
-              message: result.message,
-              validMessage: result.mismatchedFields,
-              flightOperatingdays: result.operatingDays,
-            };
+            try {
+              const result = await validateFlight(leg);
+              return {
+                ...leg,
+                valid: result.valid,
+                message: result.message,
+                validMessage: result.mismatchedFields || [],
+                flightOperatingdays: result.operatingDays,
+              };
+            } catch (error) {
+              return {
+                ...leg,
+                valid: false,
+                validMessage: [error.message || 'Validation failed'],
+              };
+            }
           })
         );
         const isLaneValid = validatedLegs.every(leg => leg.valid);
@@ -503,10 +519,10 @@ const AccountLanes = () => {
       current.map(l =>
         l.id === routeLaneId
           ? {
-              ...l,
-              legs: updated,
-              hasBeenUpdated: true,
-            }
+            ...l,
+            legs: updated,
+            hasBeenUpdated: true,
+          }
           : l
       )
     );
@@ -921,8 +937,8 @@ const AccountLanes = () => {
                                         />
                                       ) : col === 'legValidationMessage' ? (
                                         leg.valid === false &&
-                                        leg.validMessage &&
-                                        leg.validMessage.length > 0 ? (
+                                          leg.validMessage &&
+                                          leg.validMessage.length > 0 ? (
                                           <div className="text-red-600 text-xs">
                                             {leg.validMessage.join('; ')}
                                           </div>
@@ -989,11 +1005,10 @@ const AccountLanes = () => {
                                           {suggestedRoutes.map((routePattern, routeIndex) => (
                                             <div
                                               key={routeIndex}
-                                              className={`border-2 rounded-lg p-3 transition-all cursor-pointer ${
-                                                selectedRouteIndex === routeIndex
-                                                  ? 'border-green-500 bg-green-50 shadow-md'
-                                                  : 'border-blue-300 bg-white hover:border-blue-500'
-                                              }`}
+                                              className={`border-2 rounded-lg p-3 transition-all cursor-pointer ${selectedRouteIndex === routeIndex
+                                                ? 'border-green-500 bg-green-50 shadow-md'
+                                                : 'border-blue-300 bg-white hover:border-blue-500'
+                                                }`}
                                             >
                                               <div className="mb-3">
                                                 <p className="text-xs font-bold text-blue-900 mb-1">
@@ -1039,11 +1054,10 @@ const AccountLanes = () => {
                                                     setSelectedRouteIndex(routeIndex);
                                                   }
                                                 }}
-                                                className={`w-full px-3 py-2 rounded text-xs font-semibold transition-colors ${
-                                                  selectedRouteIndex === routeIndex
-                                                    ? 'bg-green-600 text-white hover:bg-green-700'
-                                                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                                                }`}
+                                                className={`w-full px-3 py-2 rounded text-xs font-semibold transition-colors ${selectedRouteIndex === routeIndex
+                                                  ? 'bg-green-600 text-white hover:bg-green-700'
+                                                  : 'bg-blue-600 text-white hover:bg-blue-700'
+                                                  }`}
                                               >
                                                 {selectedRouteIndex === routeIndex
                                                   ? '✓ Apply This Route'

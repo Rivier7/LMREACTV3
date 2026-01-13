@@ -251,10 +251,15 @@ const Edit = () => {
     setIsLoading(true);
     const updatedLegs = [...legs];
     for (const leg of updatedLegs) {
-      const result = await validateFlight(leg);
-      leg.valid = result.valid;
-      leg.validMessage = result.mismatchedFields;
-      leg.flightOperatingdays = result.operatingDays;
+      try {
+        const result = await validateFlight(leg);
+        leg.valid = result.valid;
+        leg.validMessage = result.mismatchedFields || [];
+        leg.flightOperatingdays = result.operatingDays;
+      } catch (error) {
+        leg.valid = false;
+        leg.validMessage = [error.message || 'Validation failed'];
+      }
     }
     setLegs(updatedLegs);
     setIsLoading(false);
