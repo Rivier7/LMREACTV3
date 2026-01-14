@@ -31,6 +31,27 @@ const Edit = () => {
     'OTHER',
   ];
 
+  const dayAbbreviations = {
+    MONDAY: 'Mon',
+    TUESDAY: 'Tue',
+    WEDNESDAY: 'Wed',
+    THURSDAY: 'Thu',
+    FRIDAY: 'Fri',
+    SATURDAY: 'Sat',
+    SUNDAY: 'Sun',
+  };
+
+  const formatAircraftByDay = aircraftByDay => {
+    if (!aircraftByDay || typeof aircraftByDay !== 'object') return '-';
+    const entries = Object.entries(aircraftByDay);
+    if (entries.length === 0) return '-';
+    const uniqueAircraft = [...new Set(entries.map(([, aircraft]) => aircraft))];
+    if (uniqueAircraft.length === 1) return uniqueAircraft[0];
+    return entries
+      .map(([day, aircraft]) => `${dayAbbreviations[day] || day}: ${aircraft}`)
+      .join(', ');
+  };
+
   if (!lane) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -256,6 +277,7 @@ const Edit = () => {
         leg.valid = result.valid;
         leg.validMessage = result.mismatchedFields || [];
         leg.flightOperatingdays = result.operatingDays;
+        leg.aircraftByDay = result.aircraftByDay || null;
       } catch (error) {
         leg.valid = false;
         leg.validMessage = [error.message || 'Validation failed'];
@@ -892,6 +914,23 @@ const Edit = () => {
                         )}
                       </div>
                     </div>
+
+                    {/* Aircraft by Day */}
+                    {leg.aircraftByDay && Object.keys(leg.aircraftByDay).length > 0 && (
+                      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                        <label className="block mb-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                          Aircraft by Day
+                        </label>
+                        <div
+                          className="text-sm text-gray-700"
+                          title={Object.entries(leg.aircraftByDay)
+                            .map(([day, aircraft]) => `${day}: ${aircraft}`)
+                            .join('\n')}
+                        >
+                          {formatAircraftByDay(leg.aircraftByDay)}
+                        </div>
+                      </div>
+                    )}
 
                     {/* VALIDATION BADGES */}
                     <div className="mt-4 flex items-center justify-between">

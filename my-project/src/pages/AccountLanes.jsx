@@ -165,8 +165,7 @@ const AccountLanes = () => {
     'destinationStation',
     'arrivalTime',
     'flightOperatingdays',
-    'aircraft',
-    'aircraftType',
+    'aircraftByDay',
     'cutoffTime',
     'legValidationMessage',
   ];
@@ -180,10 +179,37 @@ const AccountLanes = () => {
     destinationStation: 'Destination',
     arrivalTime: 'Arrival',
     flightOperatingdays: 'Operating Days',
-    aircraft: 'Aircraft',
-    aircraftType: 'Aircraft Type',
+    aircraftByDay: 'Aircraft by Day',
     cutoffTime: 'Cutoff',
     legValidationMessage: 'Leg Status',
+  };
+
+  const dayAbbreviations = {
+    MONDAY: 'Mon',
+    TUESDAY: 'Tue',
+    WEDNESDAY: 'Wed',
+    THURSDAY: 'Thu',
+    FRIDAY: 'Fri',
+    SATURDAY: 'Sat',
+    SUNDAY: 'Sun',
+  };
+
+  const formatAircraftByDay = aircraftByDay => {
+    if (!aircraftByDay || typeof aircraftByDay !== 'object') return '-';
+
+    const entries = Object.entries(aircraftByDay);
+    if (entries.length === 0) return '-';
+
+    // Check if all aircraft are the same
+    const uniqueAircraft = [...new Set(entries.map(([, aircraft]) => aircraft))];
+    if (uniqueAircraft.length === 1) {
+      return uniqueAircraft[0];
+    }
+
+    // Show abbreviated day: aircraft pairs
+    return entries
+      .map(([day, aircraft]) => `${dayAbbreviations[day] || day}: ${aircraft}`)
+      .join(', ');
   };
 
   useEffect(() => {
@@ -364,6 +390,7 @@ const AccountLanes = () => {
               message: result.message,
               validMessage: result.mismatchedFields || [],
               flightOperatingdays: result.operatingDays,
+              aircraftByDay: result.aircraftByDay || null,
             };
           } catch (error) {
             return {
@@ -428,6 +455,7 @@ const AccountLanes = () => {
                 message: result.message,
                 validMessage: result.mismatchedFields || [],
                 flightOperatingdays: result.operatingDays,
+                aircraftByDay: result.aircraftByDay || null,
               };
             } catch (error) {
               return {
@@ -947,6 +975,16 @@ const AccountLanes = () => {
                                         ) : (
                                           <div className="text-gray-500 text-xs">Pending</div>
                                         )
+                                      ) : col === 'aircraftByDay' ? (
+                                        <div className="text-xs text-gray-700" title={
+                                          leg.aircraftByDay
+                                            ? Object.entries(leg.aircraftByDay)
+                                              .map(([day, aircraft]) => `${day}: ${aircraft}`)
+                                              .join('\n')
+                                            : ''
+                                        }>
+                                          {formatAircraftByDay(leg.aircraftByDay)}
+                                        </div>
                                       ) : (
                                         <input
                                           type="text"

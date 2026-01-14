@@ -1,21 +1,23 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TrendingUp, Download, ChevronRight } from 'lucide-react';
+import { TrendingUp, Download, ChevronRight, Trash2 } from 'lucide-react';
 import Header from '../components/Header';
 import FileUploader from '../components/FileUploader';
 import ErrorMessage from '../components/ErrorMessage';
-import { getAccountExcel } from '../api/api';
+import { getAccountExcel, deleteAccountbyId } from '../api/api';
 import { useAccounts } from '../hooks/useAccountQueries';
 import { useLaneCounts } from '../hooks/useLaneQueries';
 
 function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const navigate = useNavigate();
 
   // React Query automatically handles loading, error, and caching!
   // No more useState, useEffect, or manual error handling needed
-  const { data: accounts = [], isLoading: accountsLoading, error: accountsError } = useAccounts();
+  const { data: accounts = [], isLoading: accountsLoading, error: accountsError, refetch: refetchAccounts } = useAccounts();
 
   const {
     data: counts = { total: 0, valid: 0, invalid: 0 },
@@ -26,6 +28,24 @@ function Dashboard() {
   const handleSelectAccount = accountId => {
     console.log(`Selected account ID: ${accountId}`);
     navigate(`/accountLanes/${accountId}`);
+  };
+
+  const handleDeleteAccount = async (accountId, accountName) => {
+    if (deleteConfirm !== accountId) {
+      setDeleteConfirm(accountId);
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await deleteAccountbyId(accountId);
+      await refetchAccounts();
+      setDeleteConfirm(null);
+    } catch (error) {
+      alert(error.message || `Failed to delete account ${accountName}`);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // Combined loading state
@@ -259,6 +279,20 @@ function Dashboard() {
                       >
                         <Download size={16} />
                         Export
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteAccount(account.accountId, account.accountName)}
+                        disabled={isDeleting}
+                        className={`w-full px-4 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${
+                          deleteConfirm === account.accountId
+                            ? 'bg-red-600 text-white hover:bg-red-700'
+                            : 'bg-gray-100 text-red-600 hover:bg-red-50'
+                        } disabled:opacity-50`}
+                        aria-label={`Delete account ${account.accountName}`}
+                      >
+                        <Trash2 size={16} />
+                        {deleteConfirm === account.accountId ? 'Click to Confirm' : 'Delete'}
                       </button>
                     </div>
                   </div>
