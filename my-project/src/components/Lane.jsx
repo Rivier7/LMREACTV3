@@ -1,219 +1,183 @@
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Edit3, Plane, Truck, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+
+const dayAbbreviations = {
+  MONDAY: 'Mon',
+  TUESDAY: 'Tue',
+  WEDNESDAY: 'Wed',
+  THURSDAY: 'Thu',
+  FRIDAY: 'Fri',
+  SATURDAY: 'Sat',
+  SUNDAY: 'Sun',
+};
+
+const formatAircraftByDay = aircraftByDay => {
+  if (!aircraftByDay || typeof aircraftByDay !== 'object') return '-';
+  const entries = Object.entries(aircraftByDay);
+  if (entries.length === 0) return '-';
+  const uniqueAircraft = [...new Set(entries.map(([, aircraft]) => aircraft))];
+  if (uniqueAircraft.length === 1) return uniqueAircraft[0];
+  return entries.map(([day, aircraft]) => `${dayAbbreviations[day] || day}: ${aircraft}`).join(', ');
+};
 
 function Lane({ lane }) {
-  if (!lane)
+  const navigate = useNavigate();
+
+  if (!lane) {
     return (
-      <div className="bg-gray-100 grid grid-cols-[1fr_2fr] rounded-xl border border-gray-300 min-w-[1100px] shadow-sm">
-        <div className="p-4 flex items-center justify-center text-gray-500 text-sm">
-          No lane data provided.
-        </div>
+      <div className="bg-white rounded-lg border border-gray-200 p-4 text-center">
+        <p className="text-gray-500 text-sm">No lane data provided.</p>
       </div>
     );
-
-  const navigate = useNavigate();
+  }
 
   const editLane = lane => {
     navigate('/edit', { state: { lane } });
   };
 
-  const formatDate = date => {
-    if (!date) return 'N/A';
-    try {
-      const d = new Date(date);
-      return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-    } catch {
-      return date;
-    }
-  };
+  const isDirectDrive = lane.legs?.[0]?.serviceLevel === 'DIRECT DRIVE';
+  const isValid = lane.valid === true;
+  const hasLegs = lane.legs && lane.legs.length > 0;
 
   return (
-    <div className="bg-gray-100 grid grid-cols-[1fr_2fr] rounded-xl border border-gray-300 min-w-[1100px] shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden">
-      {/* Left Section */}
-      <div className="bg-gray-100 p-4 space-y-4">
-        {/* Header Section */}
-        <div className="grid grid-cols-[2fr_1fr_1fr] gap-3 items-center">
-          <h2 className="text-xs font-bold text-gray-800 truncate">{lane.accountName}</h2>
-          <div className="text-center">
-            <span className="inline-block bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs font-semibold">
-              {lane.laneOption}
-            </span>
-          </div>
-          <div className="text-center">
-            <span className="inline-block bg-green-100 text-green-800 px-2 py-0.5 rounded-full text-xs font-semibold">
-              {lane.legs[0]?.serviceLevel || 'N/A'}
-            </span>
-          </div>
-        </div>
-
-        {/* Route Section */}
-        <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
-          <div className="flex flex-row gap-2 justify-center items-center text-gray-700">
-            <div className="text-center">
-              <div className="font-semibold text-gray-800 text-sm">{lane.originCity}</div>
-              <div className="text-xs text-gray-600">{lane.originState}</div>
-              <div className="text-xs text-gray-500">{lane.originCountry}</div>
-            </div>
-            <div className="flex-1 flex justify-center items-center px-2">
-              <div className="w-full h-0.5 bg-gray-300 relative">
-                <div className="absolute right-0 top-1/2 transform -translate-y-1/2 w-0 h-0 border-l-[8px] border-l-gray-400 border-t-[4px] border-t-transparent border-b-[4px] border-b-transparent"></div>
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="font-semibold text-gray-800 text-sm">{lane.destinationCity}</div>
-              <div className="text-xs text-gray-600">{lane.destinationState}</div>
-              <div className="text-xs text-gray-500">{lane.destinationCountry}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Timing Section */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white rounded-lg p-2 shadow-sm border border-gray-200">
-            <div className="text-xs text-gray-600 font-medium">Pickup Time</div>
-            <div className="text-sm font-semibold text-gray-800">{lane.pickUpTime}</div>
-          </div>
-          <div className="bg-white rounded-lg p-2 shadow-sm border border-gray-200">
-            <div className="text-xs text-gray-600 font-medium">Cutoff Time</div>
-            <div className="text-sm font-semibold text-gray-800">
-              {lane.legs[0]?.cutoffTime || 'N/A'}
-            </div>
-          </div>
-        </div>
-
-        {/* Details Section */}
-        <div className="space-y-2">
-          <div className="grid grid-cols-2 gap-3 text-xs">
-            <div>
-              <span className="font-medium text-gray-700">Custom Clearance:</span>
-              <span className="ml-1 text-gray-600">{lane.customClearance}</span>
-            </div>
-            <div>
-              <span className="font-medium text-gray-700">Drive to Destination:</span>
-              <span className="ml-1 text-gray-600">{lane.driveToDestination}</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3 text-xs">
-            <div>
-              <span className="font-medium text-gray-700">Delivery Time:</span>
-              <span className="ml-1 text-gray-600">{lane.actualDeliveryTimeBasedOnReceiving}</span>
-            </div>
-            <div>
-              <span className="font-medium text-gray-700">TAT:</span>
-              <span className="ml-1 text-gray-600">{lane.tatToConsigneeDuration}</span>
-            </div>
-          </div>
-          {lane.additionalNotes && (
-            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-2 rounded-r-lg">
-              <div className="text-xs text-gray-700">
-                <span className="font-medium">Notes:</span> {lane.additionalNotes}
-              </div>
-            </div>
+    <div className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+      {/* Compact Header */}
+      <div className={`px-4 py-2.5 border-b flex items-center justify-between ${isValid ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
+        <div className="flex items-center gap-3">
+          {isValid ? (
+            <CheckCircle className="w-5 h-5 text-green-600" />
+          ) : (
+            <XCircle className="w-5 h-5 text-red-600" />
           )}
-        </div>
+          <span className="font-semibold text-gray-900">{lane.accountName}</span>
 
-        {/* Last Update Section */}
-        <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 shadow-sm">
-          <h4 className="text-xs font-semibold text-gray-700 mb-2">Last Update</h4>
-          <div className="space-y-1 text-xs">
-            <div>
-              <span className="font-medium text-gray-700">Date:</span>
-              <span className="ml-1 text-gray-600">{lane.lastUpdate || 'N/A'}</span>
-            </div>
-            <div>
-              <span className="font-medium text-gray-700">Updated By:</span>
-              <span className="ml-1 text-gray-600">{lane.lastUpdatedBy || 'N/A'}</span>
-            </div>
+          {/* Info Pills */}
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="text-gray-500">Item:</span>
+            <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">{lane.itemNumber}</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="text-gray-500">Option:</span>
+            <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-700 font-medium">{lane.laneOption}</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="text-gray-500">Service:</span>
+            <span className={`px-2 py-0.5 rounded font-medium ${isDirectDrive ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
+              {lane.legs?.[0]?.serviceLevel || 'N/A'}
+            </span>
           </div>
         </div>
+        <button
+          onClick={() => editLane(lane)}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          <Edit3 className="w-3.5 h-3.5" />
+          Edit
+        </button>
       </div>
 
-      {/* Right Section */}
-      <div className="bg-white flex flex-col p-4 space-y-3">
-        <div className="flex-1">
-          <h3 className="text-base font-semibold text-gray-800 mb-3 text-center">Flight Details</h3>
-
-          {lane.legs && lane.legs.length > 0 ? (
-            <div className="space-y-3">
-              {[...lane.legs]
-                .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
-                .map(leg =>
-                  leg.serviceLevel === 'DIRECT DRIVE' ? null : (
-                    <div
-                      className="grid grid-cols-7 items-center px-3 py-2 bg-gray-50 rounded-lg shadow-sm border border-gray-200 hover:bg-gray-100 transition-colors duration-200"
-                      key={leg.sequence}
-                    >
-                      <div className="text-center">
-                        <div className="font-semibold text-gray-800 text-sm">
-                          {leg.flightNumber}
-                        </div>
-                      </div>
-                      <div className="text-center">
-                        <div className="font-medium text-gray-800 text-sm">{leg.originStation}</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-xs font-medium text-gray-700">{leg.departureTime}</div>
-                      </div>
-
-                      <div className="flex justify-center items-center">
-                        <div className="w-6 h-6 rounded-full flex items-center justify-center">
-                          <img src="/public/plane.png" alt="Plane" />
-                        </div>
-                      </div>
-
-                      <div className="text-center">
-                        <div className="font-medium text-gray-800 text-sm">
-                          {leg.destinationStation}
-                        </div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-xs font-medium text-gray-700">{leg.arrivalTime}</div>
-                      </div>
-
-                      <div className="flex justify-center items-center">
-                        {leg.valid === true ? (
-                          <div className="bg-green-400 w-4 h-4 rounded-full shadow-sm border border-green-500"></div>
-                        ) : leg.valid === false ? (
-                          <div className="bg-red-400 w-4 h-4 rounded-full shadow-sm border border-red-500"></div>
-                        ) : (
-                          <div className="bg-yellow-400 w-4 h-4 rounded-full shadow-sm border border-yellow-500"></div>
-                        )}
-                      </div>
-                    </div>
-                  )
-                )}
+      <div className="p-4">
+        {/* Route & Info Row */}
+        <div className="flex items-center gap-6 mb-3">
+          {/* Route */}
+          <div className="flex items-center gap-2">
+            <div className="text-center">
+              <div className="font-bold text-gray-900">{lane.originStation || '---'}</div>
+              <div className="text-xs text-gray-500">{lane.originCity}, {lane.originState}</div>
+              <div className="text-xs text-gray-400">{lane.originCountry}</div>
             </div>
-          ) : (
-            <div className="flex items-center justify-center py-6 text-gray-500">
-              <div className="text-center">
-                <svg
-                  className="mx-auto h-10 w-10 text-gray-400 mb-3"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
+            <div className="flex items-center px-3">
+              <div className="w-8 h-px bg-gray-300"></div>
+              {isDirectDrive ? (
+                <Truck className="w-4 h-4 text-amber-600 mx-1" />
+              ) : (
+                <Plane className="w-4 h-4 text-blue-500 mx-1" />
+              )}
+              <div className="w-8 h-px bg-gray-300"></div>
+            </div>
+            <div className="text-center">
+              <div className="font-bold text-gray-900">{lane.destinationStation || '---'}</div>
+              <div className="text-xs text-gray-500">{lane.destinationCity}, {lane.destinationState}</div>
+              <div className="text-xs text-gray-400">{lane.destinationCountry}</div>
+            </div>
+          </div>
 
-                <h5 className="text-sm">No legs available</h5>
+          {/* Key Info */}
+          <div className="flex items-center gap-4 text-sm border-l border-gray-200 pl-6">
+            <div>
+              <span className="text-gray-500">Pickup:</span>
+              <span className="ml-1 font-medium">{lane.pickUpTime || 'N/A'}</span>
+            </div>
+            <div>
+              <span className="text-gray-500">Cutoff:</span>
+              <span className="ml-1 font-medium">{lane.legs?.[0]?.cutoffTime || 'N/A'}</span>
+            </div>
+            <div>
+              <span className="text-gray-500">TAT:</span>
+              <span className="ml-1 font-medium">{lane.tatToConsigneeDuration || 'N/A'}</span>
+            </div>
+            {lane.additionalNotes && (
+              <div className="text-xs px-2 py-1 bg-yellow-50 border border-yellow-200 rounded text-yellow-700 max-w-xs truncate">
+                {lane.additionalNotes}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
-        <div className="pt-3 border-t border-gray-200">
-          <button
-            className="w-full bg-white text-blue-600 border-2 border-blue-600 rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer transition-all duration-300 hover:bg-blue-600 hover:text-white hover:shadow-md transform hover:-translate-y-0.5 active:translate-y-0"
-            onClick={() => editLane(lane)}
-          >
-            Edit Lane
-          </button>
-        </div>
+        {/* Flight Legs - Compact Table */}
+        {hasLegs && !isDirectDrive && (
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">Flight</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">Route</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">Dep</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">Arr</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">Aircraft</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">Days</th>
+                  <th className="px-3 py-2 text-center text-xs font-medium text-gray-600">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...lane.legs]
+                  .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
+                  .filter(leg => leg.serviceLevel !== 'DIRECT DRIVE')
+                  .map((leg, idx) => (
+                    <tr key={leg.sequence || idx} className={`border-b border-gray-100 last:border-0 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                      <td className="px-3 py-2 font-medium text-gray-900">{leg.flightNumber}</td>
+                      <td className="px-3 py-2 text-gray-700">{leg.originStation} → {leg.destinationStation}</td>
+                      <td className="px-3 py-2 text-gray-600">{leg.departureTime}</td>
+                      <td className="px-3 py-2 text-gray-600">{leg.arrivalTime}</td>
+                      <td className="px-3 py-2 text-gray-600 text-xs" title={
+                        leg.aircraftByDay
+                          ? Object.entries(leg.aircraftByDay).map(([day, aircraft]) => `${day}: ${aircraft}`).join('\n')
+                          : ''
+                      }>{formatAircraftByDay(leg.aircraftByDay)}</td>
+                      <td className="px-3 py-2 text-xs text-gray-500">{leg.flightOperatingdays || 'N/A'}</td>
+                      <td className="px-3 py-2 text-center">
+                        {leg.valid === true ? (
+                          <CheckCircle className="w-4 h-4 text-green-500 inline-block" />
+                        ) : leg.valid === false ? (
+                          <XCircle className="w-4 h-4 text-red-500 inline-block" />
+                        ) : (
+                          <AlertCircle className="w-4 h-4 text-yellow-500 inline-block" />
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Direct Drive Notice - Compact */}
+        {isDirectDrive && (
+          <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <AlertCircle className="w-4 h-4" />
+            <span>Direct Drive - Ground transportation only</span>
+          </div>
+        )}
       </div>
     </div>
   );

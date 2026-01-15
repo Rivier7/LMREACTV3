@@ -70,6 +70,7 @@ const Edit = () => {
 
   const [updatedLane, setUpdatedLane] = useState(lane);
   const [legs, setLegs] = useState([]);
+  const [originalLegs, setOriginalLegs] = useState([]);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -79,6 +80,7 @@ const Edit = () => {
       try {
         const legData = await getFlights(lane.id);
         setLegs(legData);
+        setOriginalLegs(JSON.parse(JSON.stringify(legData))); // Deep copy for comparison
       } catch (err) {
         console.error('Error loading legs:', err.message);
       } finally {
@@ -87,6 +89,17 @@ const Edit = () => {
     };
     loadLegs();
   }, [lane.id]);
+
+  // Helper function to check if legs have changed
+  const hasLegsChanged = () => {
+    if (legs.length !== originalLegs.length) return true;
+    return JSON.stringify(legs) !== JSON.stringify(originalLegs);
+  };
+
+  // Helper function to check if lane data has changed
+  const hasLaneChanged = () => {
+    return JSON.stringify(updatedLane) !== JSON.stringify(lane);
+  };
 
   const handleChange = e => {
     const { name, value } = e.target;
@@ -288,6 +301,12 @@ const Edit = () => {
   };
 
   const handleSubmit = async () => {
+    // Check if any changes were made before submitting
+    if (!hasLaneChanged() && !hasLegsChanged()) {
+      alert('No changes detected. Please make changes before updating.');
+      return;
+    }
+
     setIsLoading(true);
     const isDirectDrive = legs[0]?.serviceLevel === 'DIRECT DRIVE';
 
@@ -564,52 +583,82 @@ const Edit = () => {
             </div>
             Service Level
           </h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 items-start">
-            {serviceLevels.map((service, index) => {
-              const isOther = service === 'OTHER';
-              const currentService = legs[0]?.serviceLevel || '';
-              const isChecked = isOther
-                ? !serviceLevels.slice(0, -1).includes(currentService) && currentService !== ''
-                : currentService === service;
+          <div className="flex flex-col md:flex-row gap-4 items-start">
+            {/* Direct Drive Option */}
+            <div
+              className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all duration-200 ${legs[0]?.serviceLevel === 'DIRECT DRIVE'
+                ? 'border-gray-600 bg-gray-100 shadow-sm'
+                : 'border-gray-200 bg-white hover:border-gray-400'
+                }`}
+              onClick={() => handleServiceLevelChange(0, 'DIRECT DRIVE')}
+            >
+              <div
+                className={`w-5 h-5 rounded-full border-2 mr-3 flex items-center justify-center flex-shrink-0 ${legs[0]?.serviceLevel === 'DIRECT DRIVE'
+                  ? 'border-gray-600 bg-gray-600'
+                  : 'border-gray-300'
+                  }`}
+              >
+                {legs[0]?.serviceLevel === 'DIRECT DRIVE' && (
+                  <div className="w-2 h-2 rounded-full bg-white"></div>
+                )}
+              </div>
+              <span
+                className={`text-xs font-medium ${legs[0]?.serviceLevel === 'DIRECT DRIVE' ? 'text-gray-700' : 'text-gray-600'
+                  }`}
+              >
+                DIRECT DRIVE
+              </span>
+            </div>
 
-              return (
+            {/* Custom Service Level Option */}
+            <div
+              className={`flex flex-col p-3 rounded-lg border transition-all duration-200 flex-1 ${legs[0]?.serviceLevel && legs[0]?.serviceLevel !== 'DIRECT DRIVE'
+                ? 'border-gray-600 bg-gray-100 shadow-sm'
+                : 'border-gray-200 bg-white'
+                }`}
+            >
+              <div
+                className="flex items-center cursor-pointer"
+                onClick={() => {
+                  if (legs[0]?.serviceLevel === 'DIRECT DRIVE' || !legs[0]?.serviceLevel) {
+                    handleServiceLevelChange(0, 'OTHER');
+                  }
+                }}
+              >
                 <div
-                  key={index}
-                  className={`flex flex-col p-2 rounded-lg border transition-all duration-200 ${isChecked ? 'border-gray-600 bg-gray-100 shadow-sm' : 'border-gray-200 bg-white'}`}
+                  className={`w-5 h-5 rounded-full border-2 mr-3 flex items-center justify-center flex-shrink-0 ${legs[0]?.serviceLevel && legs[0]?.serviceLevel !== 'DIRECT DRIVE'
+                    ? 'border-gray-600 bg-gray-600'
+                    : 'border-gray-300'
+                    }`}
                 >
-                  <label
-                    className="flex items-center cursor-pointer w-full"
-                    onClick={() => handleServiceLevelChange(0, service)}
-                  >
-                    <div
-                      className={`w-5 h-5 rounded-full border-2 mr-3 flex items-center justify-center flex-shrink-0 ${isChecked ? 'border-gray-600 bg-gray-600' : 'border-gray-300'}`}
-                    >
-                      {isChecked && <div className="w-2 h-2 rounded-full bg-white"></div>}
-                    </div>
-                    <span
-                      className={`text-xs font-medium ${isChecked ? 'text-gray-700' : 'text-gray-600'}`}
-                    >
-                      {service}
-                    </span>
-                  </label>
-
-                  {isOther && isChecked && (
-                    <input
-                      type="text"
-                      value={currentService === 'OTHER' ? '' : currentService}
-                      onChange={e => {
-                        const updatedLegs = [...legs];
-                        updatedLegs[0].serviceLevel = e.target.value.toUpperCase();
-                        setLegs(updatedLegs);
-                      }}
-                      onClick={e => e.stopPropagation()}
-                      placeholder="Specify service level"
-                      className="mt-2 w-full px-2 py-1 border border-gray-300 rounded text-xs"
-                    />
+                  {legs[0]?.serviceLevel && legs[0]?.serviceLevel !== 'DIRECT DRIVE' && (
+                    <div className="w-2 h-2 rounded-full bg-white"></div>
                   )}
                 </div>
-              );
-            })}
+                <span
+                  className={`text-xs font-medium ${legs[0]?.serviceLevel && legs[0]?.serviceLevel !== 'DIRECT DRIVE'
+                    ? 'text-gray-700'
+                    : 'text-gray-600'
+                    }`}
+                >
+                  Other Service Level
+                </span>
+              </div>
+              <input
+                type="text"
+                value={legs[0]?.serviceLevel === 'DIRECT DRIVE' ? '' : legs[0]?.serviceLevel || ''}
+                onChange={e => {
+                  const updatedLegs = [...legs];
+                  if (!updatedLegs[0]) {
+                    updatedLegs[0] = { serviceLevel: '' };
+                  }
+                  updatedLegs[0].serviceLevel = e.target.value.toUpperCase();
+                  setLegs(updatedLegs);
+                }}
+                placeholder="Enter service level (e.g., LIFEGUARD, QUICKPAK)"
+                className="mt-2 w-full px-3 py-2 border border-gray-300 rounded text-xs"
+              />
+            </div>
           </div>
         </div>
 
@@ -706,11 +755,10 @@ const Edit = () => {
               {suggestedRoutes.map((routePattern, routeIndex) => (
                 <div
                   key={routeIndex}
-                  className={`border-2 rounded-lg p-4 transition-all cursor-pointer ${
-                    selectedRouteIndex === routeIndex
-                      ? 'border-green-500 bg-green-50 shadow-md'
-                      : 'border-blue-300 bg-white hover:border-blue-500'
-                  }`}
+                  className={`border-2 rounded-lg p-4 transition-all cursor-pointer ${selectedRouteIndex === routeIndex
+                    ? 'border-green-500 bg-green-50 shadow-md'
+                    : 'border-blue-300 bg-white hover:border-blue-500'
+                    }`}
                 >
                   <div className="mb-3">
                     <p className="text-xs font-bold text-blue-900 mb-1">Option {routeIndex + 1}</p>
@@ -750,11 +798,10 @@ const Edit = () => {
                         setSelectedRouteIndex(routeIndex);
                       }
                     }}
-                    className={`w-full px-3 py-2 rounded text-xs font-semibold transition-colors ${
-                      selectedRouteIndex === routeIndex
-                        ? 'bg-green-600 text-white hover:bg-green-700'
-                        : 'bg-blue-600 text-white hover:bg-blue-700'
-                    }`}
+                    className={`w-full px-3 py-2 rounded text-xs font-semibold transition-colors ${selectedRouteIndex === routeIndex
+                      ? 'bg-green-600 text-white hover:bg-green-700'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
                   >
                     {selectedRouteIndex === routeIndex ? '✓ Apply This Route' : 'Select'}
                   </button>
