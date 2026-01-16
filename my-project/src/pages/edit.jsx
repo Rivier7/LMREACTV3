@@ -106,6 +106,20 @@ const Edit = () => {
     setUpdatedLane(prevLane => ({ ...prevLane, [name]: value }));
   };
 
+  // Handler for hour format fields (e.g., "3hr")
+  const handleHourChange = e => {
+    const { name, value } = e.target;
+    // Remove everything except digits
+    let cleaned = value.replace(/[^\d]/g, '');
+
+    // Add "hr" suffix if there's a number
+    if (cleaned) {
+      cleaned = cleaned + 'hr';
+    }
+
+    setUpdatedLane(prevLane => ({ ...prevLane, [name]: cleaned }));
+  };
+
   const handleSuggestRoute = async () => {
     try {
       setSuggestError(null);
@@ -552,6 +566,18 @@ const Edit = () => {
 
             {hasFlightLegs && (
               <>
+                <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                  Drive to Airport
+                </label>
+                <input
+                  type="text"
+                  name="driveToAirportDuration"
+                  value={updatedLane.driveToAirportDuration || ''}
+                  onChange={handleHourChange}
+                  className="w-full mb-3 px-2 py-1 border border-gray-300 rounded text-xs"
+                  placeholder="e.g. 3hr"
+                />
+
                 <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
                   Cutoff Time
                 </label>
@@ -1110,14 +1136,14 @@ const Edit = () => {
                   type="text"
                   name="customClearance"
                   value={updatedLane.customClearance || ''}
-                  onChange={handleChange}
+                  onChange={handleHourChange}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg"
-                  placeholder="Enter custom clearance"
+                  placeholder="e.g. 3hr"
                 />
               </div>
             )}
 
-            {/* DRIVE TIME */}
+            {/* DRIVE TO DESTINATION */}
             <div>
               <label className="block mb-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
                 Drive to Destination
@@ -1126,9 +1152,9 @@ const Edit = () => {
                 type="text"
                 name="driveToDestination"
                 value={updatedLane.driveToDestination || ''}
-                onChange={handleChange}
+                onChange={handleHourChange}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg"
-                placeholder="Enter drive time"
+                placeholder="e.g. 3hr"
               />
             </div>
 
@@ -1156,9 +1182,9 @@ const Edit = () => {
                 type="text"
                 name="tatToConsigneeDuration"
                 value={updatedLane.tatToConsigneeDuration || ''}
-                onChange={handleChange}
+                onChange={handleHourChange}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg"
-                placeholder="Enter TAT duration"
+                placeholder="e.g. 3hr"
               />
 
               <button

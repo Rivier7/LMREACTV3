@@ -242,10 +242,33 @@ const AccountLanes = () => {
     fetchAccount();
   }, [accountId]);
 
+  // Columns that require hour format (e.g., "3hr")
+  const hourColumns = [
+    'driveToAirportDuration',
+    'customClearance',
+    'driveToDestination',
+    'tatToConsigneeDuration',
+  ];
+
+  // Format value for hour format (e.g., "3hr", "12hr")
+  const formatHourValue = value => {
+    // Remove everything except digits
+    let cleaned = value.replace(/[^\d]/g, '');
+
+    // Add "hr" suffix if there's a number
+    if (cleaned) {
+      return cleaned + 'hr';
+    }
+    return '';
+  };
+
   const handleLaneChange = (laneId, field, value) => {
+    // Apply hour formatting for hour columns
+    const finalValue = hourColumns.includes(field) ? formatHourValue(value) : value;
+
     setLanes(current =>
       current.map(lane =>
-        lane.id === laneId ? { ...lane, [field]: value, hasBeenUpdated: true } : lane
+        lane.id === laneId ? { ...lane, [field]: finalValue, hasBeenUpdated: true } : lane
       )
     );
   };
@@ -782,6 +805,7 @@ const AccountLanes = () => {
                           onChange={e => handleLaneChange(lane.id, col, e.target.value)}
                           onKeyDown={e => handleKeyDown(e, lane.id, col)}
                           disabled={readOnlyColumns.includes(col)}
+                          placeholder={hourColumns.includes(col) ? 'e.g. 3hr' : ''}
                           className={`w-full px-2 py-1 text-sm border ${selectedCell?.laneId === lane.id && selectedCell?.field === col ? 'border-blue-500 ring-2 ring-blue-300' : 'border-gray-300'} rounded focus:outline-none focus:ring-2 focus:ring-blue-400 ${readOnlyColumns.includes(col) ? 'bg-gray-200 cursor-not-allowed' : ''}`}
                           style={{ minWidth: '100px' }}
                         />
