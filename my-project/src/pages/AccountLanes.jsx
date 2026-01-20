@@ -1,7 +1,22 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import Header from '../components/Header';
-import { ChevronDown, ChevronRight, Plus, Trash2, Save } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronRight,
+  Plus,
+  Trash2,
+  Save,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Lightbulb,
+  MapPin,
+  Plane,
+  Filter,
+  X,
+  FileText,
+} from 'lucide-react';
 import {
   getLaneByAccountId,
   updateLane,
@@ -11,6 +26,7 @@ import {
   getSuggestedRoute,
   getSuggestedRouteByLocation,
   getTAT,
+  deleteLaneById,
 } from '../api/api.js';
 
 const AccountLanes = () => {
@@ -21,7 +37,7 @@ const AccountLanes = () => {
   const [error, setError] = useState(null);
   const [expandedLanes, setExpandedLanes] = useState({});
   const [filters, setFilters] = useState({});
-  const [selectedCell, setSelectedCell] = useState(null);
+  const [showColumnFilters, setShowColumnFilters] = useState(false);
   const [showSuggestedRoute, setShowSuggestedRoute] = useState(false);
   const [suggestError, setSuggestError] = useState(null);
   const [suggestedRoutes, setSuggestedRoutes] = useState([]);
@@ -29,31 +45,9 @@ const AccountLanes = () => {
   const [routeLaneId, setRouteLaneId] = useState(null);
   const [savedLaneId, setSavedLaneId] = useState(null);
 
-  const columns = [
-    'originCity',
-    'originState',
-    'originCountry',
-    'destinationCity',
-    'destinationState',
-    'destinationCountry',
-    'itemNumber',
-    'laneOption',
-    'pickUpTime',
-    'driveToAirportDuration',
-    'originStation',
-    'destinationStation',
-    'customClearance',
-    'driveToDestination',
-    'actualDeliveryTimeBasedOnReceiving',
-    'tatToConsigneeDuration',
-    'additionalNotes',
-    'lastUpdate',
-  ];
-
   const handleSuggestRoute = async laneId => {
     try {
       setSuggestError(null);
-
       const lane = lanes.find(l => l.id === laneId);
       if (!lane || !lane.legs || lane.legs.length === 0) {
         setSuggestError('Lane has no legs to suggest a route for.');
@@ -81,7 +75,6 @@ const AccountLanes = () => {
       let message = 'Failed to suggest route.';
       if (error.message) message = error.message;
       else if (error.response?.data?.error) message = error.response.data.error;
-
       setSuggestedRoutes([]);
       setSuggestError(message);
     }
@@ -90,7 +83,6 @@ const AccountLanes = () => {
   const handleSuggestRouteByLocation = async laneId => {
     try {
       setSuggestError(null);
-
       const lane = lanes.find(l => l.id === laneId);
       if (!lane) {
         setSuggestError('Lane not found.');
@@ -117,7 +109,6 @@ const AccountLanes = () => {
       let message = 'Failed to suggest route by location.';
       if (error.message) message = error.message;
       else if (error.response?.data?.error) message = error.response.data.error;
-
       setSuggestedRoutes([]);
       setSuggestError(message);
     }
@@ -141,9 +132,8 @@ const AccountLanes = () => {
     actualDeliveryTimeBasedOnReceiving: 'Delivery Time',
     tatToConsigneeDuration: 'TAT Duration',
     additionalNotes: 'Notes',
+    lastUpdate: 'Last Update',
   };
-
-  const readOnlyColumns = ['originStation', 'destinationStation', 'lastUpdate'];
 
   const getUniqueValues = field => {
     const values = lanes
@@ -196,17 +186,10 @@ const AccountLanes = () => {
 
   const formatAircraftByDay = aircraftByDay => {
     if (!aircraftByDay || typeof aircraftByDay !== 'object') return '-';
-
     const entries = Object.entries(aircraftByDay);
     if (entries.length === 0) return '-';
-
-    // Check if all aircraft are the same
     const uniqueAircraft = [...new Set(entries.map(([, aircraft]) => aircraft))];
-    if (uniqueAircraft.length === 1) {
-      return uniqueAircraft[0];
-    }
-
-    // Show abbreviated day: aircraft pairs
+    if (uniqueAircraft.length === 1) return uniqueAircraft[0];
     return entries
       .map(([day, aircraft]) => `${dayAbbreviations[day] || day}: ${aircraft}`)
       .join(', ');
@@ -242,7 +225,6 @@ const AccountLanes = () => {
     fetchAccount();
   }, [accountId]);
 
-  // Columns that require hour format (e.g., "3hr")
   const hourColumns = [
     'driveToAirportDuration',
     'customClearance',
@@ -250,22 +232,14 @@ const AccountLanes = () => {
     'tatToConsigneeDuration',
   ];
 
-  // Format value for hour format (e.g., "3hr", "12hr")
   const formatHourValue = value => {
-    // Remove everything except digits
     let cleaned = value.replace(/[^\d]/g, '');
-
-    // Add "hr" suffix if there's a number
-    if (cleaned) {
-      return cleaned + 'hr';
-    }
+    if (cleaned) return cleaned + 'hr';
     return '';
   };
 
   const handleLaneChange = (laneId, field, value) => {
-    // Apply hour formatting for hour columns
     const finalValue = hourColumns.includes(field) ? formatHourValue(value) : value;
-
     setLanes(current =>
       current.map(lane =>
         lane.id === laneId ? { ...lane, [field]: finalValue, hasBeenUpdated: true } : lane
@@ -277,17 +251,13 @@ const AccountLanes = () => {
     if (field === 'originStation') {
       const newOrigin = value.toUpperCase();
       const lane = lanes.find(l => l.id === laneId);
-
       if (lane && lane.legs) {
         const otherLegsOrigins = lane.legs
           .filter(leg => leg.id !== legId)
           .map(leg => leg.originStation?.toUpperCase())
           .filter(Boolean);
-
         if (otherLegsOrigins.includes(newOrigin)) {
-          alert(
-            `Origin '${newOrigin}' is already used as a departure airport in another leg. Each leg must have a unique origin.`
-          );
+          alert(`Origin '${newOrigin}' is already used as a departure airport in another leg.`);
           return;
         }
       }
@@ -298,19 +268,14 @@ const AccountLanes = () => {
       const leg = lane?.legs?.find(l => l.id === legId);
       const origin = leg?.originStation?.toUpperCase();
       const newDestination = value.toUpperCase();
-
       if (origin && newDestination === origin) {
         alert('Origin and destination cannot be the same.');
         return;
       }
-
       if (lane && lane.legs) {
         const allOrigins = lane.legs.map(l => l.originStation?.toUpperCase()).filter(Boolean);
-
         if (allOrigins.includes(newDestination)) {
-          alert(
-            `Destination '${newDestination}' was already used as a departure airport. Cannot reuse departure airports as arrival airports.`
-          );
+          alert(`Destination '${newDestination}' was already used as a departure airport.`);
           return;
         }
       }
@@ -341,6 +306,7 @@ const AccountLanes = () => {
             legs: [
               ...(lane.legs || []),
               {
+                id: Date.now(),
                 sequence: (lane.legs?.length || 0) + 1,
                 serviceLevel: '',
                 flightNumber: '',
@@ -426,7 +392,6 @@ const AccountLanes = () => {
       );
 
       const isLaneValid = validatedLegs.every(leg => leg.valid);
-
       setLanes(current =>
         current.map(lane =>
           lane.id === laneId ? { ...lane, legs: validatedLegs, valid: isLaneValid } : lane
@@ -445,9 +410,7 @@ const AccountLanes = () => {
     try {
       const laneToCalculate = lanes.find(l => l.id === laneId);
       if (!laneToCalculate) return;
-
       const tatTime = await getTAT(laneToCalculate, laneToCalculate.legs || []);
-
       setLanes(current =>
         current.map(lane =>
           lane.id === laneId ? { ...lane, tatToConsigneeDuration: tatTime } : lane
@@ -465,9 +428,7 @@ const AccountLanes = () => {
     setLoading(true);
     try {
       const validatedLanesPromises = lanes.map(async lane => {
-        if (!lane.legs || lane.legs.length === 0) {
-          return { ...lane, valid: true };
-        }
+        if (!lane.legs || lane.legs.length === 0) return { ...lane, valid: true };
         const validatedLegs = await Promise.all(
           lane.legs.map(async leg => {
             try {
@@ -506,6 +467,11 @@ const AccountLanes = () => {
     setExpandedLanes(prev => ({ ...prev, [laneId]: !prev[laneId] }));
   };
 
+  // Count active column filters
+  const activeFilterCount = Object.entries(filters).filter(
+    ([key, value]) => value && key !== 'quickFilter'
+  ).length;
+
   const filteredLanes = lanes.filter(lane => {
     if (filters.quickFilter) {
       const searchValue = filters.quickFilter.toLowerCase();
@@ -518,6 +484,8 @@ const AccountLanes = () => {
         'destinationCountry',
         'itemNumber',
         'laneOption',
+        'originStation',
+        'destinationStation',
       ];
       const matchesQuickFilter = searchableColumns.some(field =>
         lane[field]?.toString().toLowerCase().includes(searchValue)
@@ -527,18 +495,12 @@ const AccountLanes = () => {
 
     return Object.entries(filters).every(([field, value]) => {
       if (!value || field === 'quickFilter') return true;
+      if (field === 'valid') {
+        return lane.valid?.toString() === value;
+      }
       return lane[field]?.toString().toLowerCase().includes(value.toLowerCase());
     });
   });
-
-  const handleKeyDown = (e, laneId, field) => {
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const currentIndex = columns.indexOf(field);
-      const nextField = e.shiftKey ? columns[currentIndex - 1] : columns[currentIndex + 1];
-      if (nextField) setSelectedCell({ laneId, field: nextField });
-    }
-  };
 
   const handleClearFilters = () => {
     setFilters({});
@@ -568,13 +530,7 @@ const AccountLanes = () => {
 
     setLanes(current =>
       current.map(l =>
-        l.id === routeLaneId
-          ? {
-            ...l,
-            legs: updated,
-            hasBeenUpdated: true,
-          }
-          : l
+        l.id === routeLaneId ? { ...l, legs: updated, hasBeenUpdated: true } : l
       )
     );
 
@@ -583,14 +539,6 @@ const AccountLanes = () => {
     setSelectedRouteIndex(null);
     setRouteLaneId(null);
   };
-
-  if (loading && lanes.length === 0) {
-    return (
-      <div className="w-full h-screen flex items-center justify-center bg-white">
-        <p className="text-gray-600 text-lg">Loading lanes…</p>
-      </div>
-    );
-  }
 
   const handleSubmit = async id => {
     setLoading(true);
@@ -617,546 +565,721 @@ const AccountLanes = () => {
     }
   };
 
+  const handleDeleteLane = async id => {
+    if (!window.confirm('Are you sure you want to delete this lane? This action cannot be undone.')) {
+      return;
+    }
+    setLoading(true);
+    try {
+      await deleteLaneById(id);
+      setLanes(current => current.filter(lane => lane.id !== id));
+    } catch (error) {
+      console.error('Error deleting lane:', error.message);
+      alert(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading && lanes.length === 0) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center bg-white">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-gray-600 text-lg">Loading lanes...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="w-full h-screen flex flex-col bg-white">
+    <div className="w-full min-h-screen flex flex-col bg-gray-50">
       <Header />
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4 shadow-lg">
-        <div className="flex justify-between items-center">
+
+      {/* Hero Section */}
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-5 shadow-lg">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold">Account {account?.name}</h1>
+            <h1 className="text-2xl font-bold">{account?.name || 'Account'} Lanes</h1>
             <p className="text-blue-100 text-sm mt-1">
-              {filteredLanes.length} lane(s) displayed{' '}
-              {lanes.length > 0 && lanes.length !== filteredLanes.length && `of ${lanes.length}`}
+              {filteredLanes.length} lane{filteredLanes.length !== 1 ? 's' : ''} displayed
+              {lanes.length > 0 && lanes.length !== filteredLanes.length && ` of ${lanes.length} total`}
             </p>
           </div>
           <button
             onClick={handleSaveChanges}
-            disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition disabled:opacity-50"
+            disabled={loading || !lanes.some(l => l.hasBeenUpdated)}
+            className="flex items-center gap-2 px-5 py-2.5 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
-            <Save size={18} /> Save Changes
+            <Save size={18} />
+            Save All Changes
           </button>
         </div>
       </div>
 
+      {/* Error Display */}
       {error && !loading && (
-        <div className="bg-red-50 border-b border-red-200 px-6 py-3 text-red-700">{error}</div>
-      )}
-
-      {suggestError && (
-        <div className="bg-yellow-50 border-b border-yellow-200 px-6 py-3 text-yellow-800 flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="flex-shrink-0 mt-0.5"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-            <div>
-              <p className="font-semibold">Route Suggestion Error</p>
-              <p className="text-sm mt-1">{suggestError}</p>
-            </div>
+        <div className="bg-red-50 border-b border-red-200 px-6 py-3">
+          <div className="max-w-7xl mx-auto flex items-center gap-2 text-red-700">
+            <XCircle size={18} />
+            {error}
           </div>
-          <button
-            onClick={() => setSuggestError(null)}
-            className="text-yellow-700 hover:text-yellow-900 flex-shrink-0 text-lg font-bold"
-          >
-            ✕
-          </button>
         </div>
       )}
 
-      <div className="bg-gray-100 px-6 py-3 border-b border-gray-300 flex gap-3 overflow-x-auto ">
-        <input
-          type="text"
-          placeholder="Quick filter across all fields..."
-          value={filters.quickFilter || ''}
-          onChange={e => setFilters({ ...filters, quickFilter: e.target.value })}
-          className="px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <select
-          value={filters.sheet || ''}
-          onChange={e => setFilters({ ...filters, sheet: e.target.value })}
-          className="px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">All Sheets</option>
-          {getUniqueValues('sheet').map(v => (
-            <option key={v} value={v}>
-              {v}
-            </option>
-          ))}
-        </select>
-        <button
-          onClick={handleClearFilters}
-          className="px-3 py-1.5 bg-gray-300 hover:bg-gray-400 rounded text-sm font-medium transition"
-        >
-          Clear Filters
-        </button>
-        <button
-          onClick={validateAllLanes}
-          className="px-3 py-1.5 bg-blue-500 text-white hover:bg-blue-600 rounded text-sm font-medium transition"
-        >
-          Validate All Flights
-        </button>
-      </div>
+      {/* Suggest Error Display */}
+      {suggestError && (
+        <div className="bg-yellow-50 border-b border-yellow-200 px-6 py-3">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3 text-yellow-800">
+              <Lightbulb size={18} />
+              <div>
+                <p className="font-semibold">Route Suggestion Error</p>
+                <p className="text-sm">{suggestError}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setSuggestError(null)}
+              className="text-yellow-700 hover:text-yellow-900 p-1"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+      )}
 
-      <div className="flex-1 overflow-x-scroll overflow-y-auto p-2 scroll-container">
-        <div className="inline-block min-w-full">
-          <table className="w-full border-collapse bg-white">
-            <thead className="bg-gray-200 border-b-2 border-gray-400">
-              <tr>
-                <th className="w-8 px-2 py-2 text-center border-r border-gray-300 bg-gray-200"></th>
-                {columns.map(col => (
-                  <th
-                    key={col}
-                    className="px-3 py-2 border-r border-gray-300 bg-gray-200 font-bold text-xs text-gray-700 whitespace-nowrap text-left"
-                    style={{ minWidth: '120px' }}
-                  >
-                    {columnLabels[col]}{' '}
-                    {readOnlyColumns.includes(col) && (
-                      <span className="text-gray-500 text-xs">(auto)</span>
-                    )}
-                  </th>
-                ))}
-                <th className="px-3 py-2 border-r border-gray-300 bg-gray-200 font-bold text-xs text-gray-700 whitespace-nowrap">
-                  Status
-                </th>
-                <th className="px-3 py-2 bg-gray-200 font-bold text-xs text-gray-700 whitespace-nowrap">
-                  Actions
-                </th>
-              </tr>
-              <tr className="bg-gray-100">
-                <th className="px-2 py-1 border-r border-gray-300"></th>
-                {columns.map(col => (
-                  <th key={`filter-${col}`} className="px-2 py-1 border-r border-gray-300">
-                    <select
-                      value={filters[col] || ''}
-                      onChange={e => setFilters(prev => ({ ...prev, [col]: e.target.value }))}
-                      className="w-full px-2 py-1 text-xs border rounded bg-white"
-                    >
-                      <option value="">All</option>
-                      {getUniqueValues(col).map(v => (
-                        <option key={v} value={v}>
-                          {v}
-                        </option>
-                      ))}
-                    </select>
-                  </th>
-                ))}
-                <th className="px-2 py-1 border-r border-gray-300">
+      {/* Filter Bar */}
+      <div className="bg-white border-b border-gray-200 px-6 py-3 shadow-sm">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center gap-3 flex-wrap">
+            <input
+              type="text"
+              placeholder="Search lanes..."
+              value={filters.quickFilter || ''}
+              onChange={e => setFilters({ ...filters, quickFilter: e.target.value })}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"
+            />
+            <select
+              value={filters.valid || ''}
+              onChange={e => setFilters(prev => ({ ...prev, valid: e.target.value }))}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+              <option value="">All Status</option>
+              <option value="true">Valid</option>
+              <option value="false">Invalid</option>
+            </select>
+            <button
+              onClick={() => setShowColumnFilters(!showColumnFilters)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${showColumnFilters || activeFilterCount > 0
+                ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                }`}
+            >
+              <Filter size={16} />
+              Column Filters
+              {activeFilterCount > 0 && (
+                <span className="bg-blue-600 text-white text-xs px-1.5 py-0.5 rounded-full">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={validateAllLanes}
+              disabled={loading}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition disabled:opacity-50"
+            >
+              Validate All
+            </button>
+            {(filters.quickFilter || activeFilterCount > 0) && (
+              <button
+                onClick={handleClearFilters}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition flex items-center gap-1"
+              >
+                <X size={14} />
+                Clear
+              </button>
+            )}
+          </div>
+
+          {/* Collapsible Column Filters */}
+          {showColumnFilters && (
+            <div className="mt-3 pt-3 border-t border-gray-200 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              {['originCity', 'originState', 'originCountry', 'destinationCity', 'destinationState', 'destinationCountry', 'itemNumber', 'laneOption'].map(col => (
+                <div key={col}>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                    {columnLabels[col]}
+                  </label>
                   <select
-                    value={filters['valid'] || ''}
-                    onChange={e => setFilters(prev => ({ ...prev, valid: e.target.value }))}
-                    className="w-full px-2 py-1 text-xs border rounded-md bg-white shadow-sm focus:ring-1 focus:ring-blue-300"
+                    value={filters[col] || ''}
+                    onChange={e => setFilters(prev => ({ ...prev, [col]: e.target.value }))}
+                    className={`w-full px-3 py-1.5 text-sm border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${filters[col] ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+                      }`}
                   >
                     <option value="">All</option>
-                    <option value="true">Valid</option>
-                    <option value="false">Invalid</option>
-                  </select>
-                </th>
-                <th className="px-2 py-1">
-                  <button
-                    onClick={handleClearFilters}
-                    className="w-full px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded"
-                    title="Clear column filters"
-                  >
-                    Clear
-                  </button>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredLanes.map((lane, idx) => (
-                <React.Fragment key={lane.id}>
-                  <tr className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td
-                      className="w-8 px-2 py-2 text-center border-r border-gray-300 bg-gray-50 cursor-pointer hover:bg-gray-100"
-                      onClick={() => toggleLaneExpansion(lane.id)}
-                    >
-                      {lane.legs?.length > 0 &&
-                        (expandedLanes[lane.id] ? (
-                          <ChevronDown size={16} />
-                        ) : (
-                          <ChevronRight size={16} />
-                        ))}
-                    </td>
-                    {columns.map(col => (
-                      <td
-                        key={col}
-                        className="px-3 py-1 border-r border-gray-300"
-                        onClick={() =>
-                          !readOnlyColumns.includes(col) &&
-                          setSelectedCell({ laneId: lane.id, field: col })
-                        }
-                      >
-                        <input
-                          type="text"
-                          value={lane[col] || ''}
-                          onChange={e => handleLaneChange(lane.id, col, e.target.value)}
-                          onKeyDown={e => handleKeyDown(e, lane.id, col)}
-                          disabled={readOnlyColumns.includes(col)}
-                          placeholder={hourColumns.includes(col) ? 'e.g. 3hr' : ''}
-                          className={`w-full px-2 py-1 text-sm border ${selectedCell?.laneId === lane.id && selectedCell?.field === col ? 'border-blue-500 ring-2 ring-blue-300' : 'border-gray-300'} rounded focus:outline-none focus:ring-2 focus:ring-blue-400 ${readOnlyColumns.includes(col) ? 'bg-gray-200 cursor-not-allowed' : ''}`}
-                          style={{ minWidth: '100px' }}
-                        />
-                      </td>
+                    {getUniqueValues(col).map(v => (
+                      <option key={v} value={v}>{v}</option>
                     ))}
-                    <td className="px-3 py-2 border-r border-gray-300 text-center">
-                      <span
-                        className={`inline-block px-2 py-1 rounded text-xs font-semibold ${lane.valid ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'}`}
-                      >
-                        {lane.valid ? '✓ Valid' : '✗ Invalid'}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      <div className="flex gap-2 justify-center">
-                        <button
-                          onClick={() => toggleLaneExpansion(lane.id)}
-                          className="p-1.5 hover:bg-gray-200 rounded transition"
-                          title="Toggle details"
-                        >
-                          {expandedLanes[lane.id] ? (
-                            <ChevronDown size={16} />
-                          ) : (
-                            <ChevronRight size={16} />
-                          )}
-                        </button>
-                        <button
-                          className="p-1.5 hover:bg-green-100 rounded transition text-green-600"
-                          title="Validate legs"
-                          onClick={() => validateLegs(lane.id)}
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M20 6L9 17l-5-5" />
-                          </svg>
-                        </button>
-                        <button
-                          className="p-1.5 hover:bg-blue-100 rounded transition text-blue-600"
-                          title="Calculate TAT (turnaround) for this lane"
-                          onClick={() => computeTATForLane(lane.id)}
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <circle cx="12" cy="12" r="10" />
-                            <path d="M12 6v6l4 2" />
-                          </svg>
-                        </button>
-                        <button
-                          className="p-1.5 hover:bg-purple-100 rounded transition text-purple-600"
-                          title="Suggest route by airport codes"
-                          onClick={() => handleSuggestRoute(lane.id)}
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"></path>
-                            <path d="M9 18h6"></path>
-                            <path d="M10 22h4"></path>
-                          </svg>
-                        </button>
-                        <button
-                          className="p-1.5 hover:bg-green-100 rounded transition text-green-600"
-                          title="Suggest route by city/state/country"
-                          onClick={() => handleSuggestRouteByLocation(lane.id)}
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
-                            <circle cx="12" cy="10" r="3"></circle>
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => handleSubmit(lane.id)}
-                          disabled={!lane.hasBeenUpdated || loading}
-                          className="p-1.5 hover:bg-blue-100 rounded transition text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="Save this lane"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                            <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                            <polyline points="7 3 7 8 15 8"></polyline>
-                          </svg>
-                        </button>
-                        {savedLaneId === lane.id && (
-                          <span className="text-xs text-green-600 font-semibold ml-2">Saved!</span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                  </select>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
-                  {expandedLanes[lane.id] && lane.legs && (
-                    <tr className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                      <td
-                        colSpan={columns.length + 3}
-                        className="px-4 py-3 border-t-2 border-blue-300"
+      {/* Lanes List */}
+      <div className="flex-1 px-6 py-4">
+        <div className="max-w-7xl mx-auto space-y-3">
+          {filteredLanes.map(lane => (
+            <div
+              key={lane.id}
+              className={`bg-white rounded-xl border shadow-sm transition-all ${lane.hasBeenUpdated ? 'border-amber-300 ring-1 ring-amber-200' : 'border-gray-200'
+                } ${expandedLanes[lane.id] ? 'shadow-md' : 'hover:shadow-md'}`}
+            >
+              {/* Summary Row */}
+              <div
+                className="px-4 py-3 flex items-center gap-4 cursor-pointer"
+                onClick={() => toggleLaneExpansion(lane.id)}
+              >
+                {/* Expand Toggle */}
+                <button className="p-1 hover:bg-gray-100 rounded transition-colors">
+                  {expandedLanes[lane.id] ? (
+                    <ChevronDown size={20} className="text-gray-500" />
+                  ) : (
+                    <ChevronRight size={20} className="text-gray-500" />
+                  )}
+                </button>
+
+                {/* Route Display */}
+                <div className="flex items-center gap-3 min-w-[280px]">
+                  <div className="text-center">
+                    <div className="font-bold text-gray-900">{lane.originStation || '---'}</div>
+                    <div className="text-xs text-gray-500">{lane.originCity}</div>
+                  </div>
+                  <div className="flex items-center px-2">
+                    <div className="w-6 h-px bg-gray-300"></div>
+                    <Plane size={16} className="text-blue-500 mx-1" />
+                    <div className="w-6 h-px bg-gray-300"></div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-bold text-gray-900">{lane.destinationStation || '---'}</div>
+                    <div className="text-xs text-gray-500">{lane.destinationCity}</div>
+                  </div>
+                </div>
+
+                {/* Info Pills */}
+                <div className="flex items-center gap-2 flex-1">
+                  <span className="px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-medium">
+                    Item: {lane.itemNumber || '-'}
+                  </span>
+                  <span className="px-2.5 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-medium">
+                    Opt: {lane.laneOption || '-'}
+                  </span>
+                  <span className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-medium">
+                    Pickup: {lane.pickUpTime || '-'}
+                  </span>
+                  <span className="px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700 text-xs font-medium">
+                    TAT: {lane.tatToConsigneeDuration || '-'}
+                  </span>
+                  {lane.legs?.length > 0 && (
+                    <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">
+                      {lane.legs.length} leg{lane.legs.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+
+                {/* Status Badge */}
+                <div className="flex items-center gap-2">
+                  {lane.hasBeenUpdated && (
+                    <span className="px-2 py-1 rounded bg-amber-100 text-amber-700 text-xs font-medium">
+                      Unsaved
+                    </span>
+                  )}
+                  {savedLaneId === lane.id && (
+                    <span className="px-2 py-1 rounded bg-green-100 text-green-700 text-xs font-medium animate-pulse">
+                      Saved!
+                    </span>
+                  )}
+                  {lane.valid ? (
+                    <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
+                      <CheckCircle size={14} />
+                      Valid
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold">
+                      <XCircle size={14} />
+                      Invalid
+                    </span>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                  <button
+                    onClick={() => validateLegs(lane.id)}
+                    disabled={loading}
+                    className="p-2 hover:bg-green-100 rounded-lg transition-colors text-green-600 disabled:opacity-50"
+                    title="Validate Legs"
+                  >
+                    <CheckCircle size={16} />
+                  </button>
+                  <button
+                    onClick={() => computeTATForLane(lane.id)}
+                    disabled={loading}
+                    className="p-2 hover:bg-blue-100 rounded-lg transition-colors text-blue-600 disabled:opacity-50"
+                    title="Calculate TAT"
+                  >
+                    <Clock size={16} />
+                  </button>
+                  <button
+                    onClick={() => handleSuggestRoute(lane.id)}
+                    disabled={loading}
+                    className="p-2 hover:bg-purple-100 rounded-lg transition-colors text-purple-600 disabled:opacity-50"
+                    title="Suggest Route (Airport)"
+                  >
+                    <Lightbulb size={16} />
+                  </button>
+                  <button
+                    onClick={() => handleSuggestRouteByLocation(lane.id)}
+                    disabled={loading}
+                    className="p-2 hover:bg-teal-100 rounded-lg transition-colors text-teal-600 disabled:opacity-50"
+                    title="Suggest Route (Location)"
+                  >
+                    <MapPin size={16} />
+                  </button>
+                  <button
+                    onClick={() => handleSubmit(lane.id)}
+                    disabled={!lane.hasBeenUpdated || loading}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition ${lane.hasBeenUpdated
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      }`}
+                    title="Save this lane"
+                  >
+                    <Save size={14} />
+                    Save
+                  </button>
+                  <button
+                    onClick={() => handleDeleteLane(lane.id)}
+                    disabled={loading}
+                    className="p-2 hover:bg-red-100 rounded-lg transition-colors text-red-600 disabled:opacity-50"
+                    title="Delete Lane"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Expanded Detail Panel */}
+              {expandedLanes[lane.id] && (
+                <div className="border-t border-gray-200 bg-gray-50 px-6 py-5">
+                  {/* Location Details */}
+                  <div className="mb-6">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                      <MapPin size={16} className="text-gray-500" />
+                      Location Details
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-white rounded-lg border border-gray-200 p-3">
+                        <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Origin</h4>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">City</label>
+                            <input
+                              type="text"
+                              value={lane.originCity || ''}
+                              onChange={e => handleLaneChange(lane.id, 'originCity', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">State</label>
+                            <input
+                              type="text"
+                              value={lane.originState || ''}
+                              onChange={e => handleLaneChange(lane.id, 'originState', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">Country</label>
+                            <input
+                              type="text"
+                              value={lane.originCountry || ''}
+                              onChange={e => handleLaneChange(lane.id, 'originCountry', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="bg-white rounded-lg border border-gray-200 p-3">
+                        <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Destination</h4>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">City</label>
+                            <input
+                              type="text"
+                              value={lane.destinationCity || ''}
+                              onChange={e => handleLaneChange(lane.id, 'destinationCity', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">State</label>
+                            <input
+                              type="text"
+                              value={lane.destinationState || ''}
+                              onChange={e => handleLaneChange(lane.id, 'destinationState', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">Country</label>
+                            <input
+                              type="text"
+                              value={lane.destinationCountry || ''}
+                              onChange={e => handleLaneChange(lane.id, 'destinationCountry', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Pre-Route Details */}
+                  <div className="mb-6">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                      <Clock size={16} className="text-gray-500" />
+                      Pre-Route Details
+                    </h3>
+                    <div className="bg-white rounded-lg border border-gray-200 p-3">
+                      <div className="grid grid-cols-4 gap-3">
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Item Number</label>
+                          <input
+                            type="text"
+                            value={lane.itemNumber || ''}
+                            onChange={e => handleLaneChange(lane.id, 'itemNumber', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Lane Option</label>
+                          <input
+                            type="text"
+                            value={lane.laneOption || ''}
+                            onChange={e => handleLaneChange(lane.id, 'laneOption', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Pick Up Time</label>
+                          <input
+                            type="text"
+                            value={lane.pickUpTime || ''}
+                            onChange={e => handleLaneChange(lane.id, 'pickUpTime', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Drive to Airport</label>
+                          <input
+                            type="text"
+                            value={lane.driveToAirportDuration || ''}
+                            onChange={e => handleLaneChange(lane.id, 'driveToAirportDuration', e.target.value)}
+                            placeholder="e.g. 3hr"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Flight Legs */}
+                  <div className="mb-6">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <Plane size={16} className="text-gray-500" />
+                        Flight Legs
+                      </span>
+                      <button
+                        onClick={() => handleAddLeg(lane.id)}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition"
                       >
-                        <div className="bg-blue-50 rounded border border-blue-200 overflow-auto">
-                          <table className="w-full">
-                            <thead className="sticky top-0 z-40 bg-blue-100 border-b border-blue-300">
-                              <tr>
-                                {legColumns.map(col => (
-                                  <th
-                                    key={col}
-                                    className="px-3 py-2 text-left text-xs font-semibold text-blue-900 border-r border-blue-200"
-                                  >
-                                    {legColumnLabels[col]}
-                                  </th>
-                                ))}
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-blue-900">
-                                  Actions
-                                  <button
-                                    onClick={() => handleAddLeg(lane.id)}
-                                    className="ml-3 inline-flex items-center p-1 hover:bg-blue-100 rounded transition text-blue-600"
-                                    title="Add leg"
-                                  >
-                                    <Plus size={14} />
-                                  </button>
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {lane.legs.map((leg, legIdx) => (
-                                <tr
-                                  key={leg.id}
-                                  className={legIdx % 2 === 0 ? 'bg-white' : 'bg-blue-50'}
+                        <Plus size={14} />
+                        Add Leg
+                      </button>
+                    </h3>
+                    {lane.legs && lane.legs.length > 0 ? (
+                      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="bg-gray-50 border-b border-gray-200">
+                              {legColumns.map(col => (
+                                <th
+                                  key={col}
+                                  className="px-3 py-2.5 text-left text-xs font-semibold text-gray-600"
                                 >
-                                  {legColumns.map(col => (
-                                    <td key={col} className="px-3 py-2 border-r border-blue-200">
-                                      {col === 'sequence' ? (
-                                        <input
-                                          type="number"
-                                          value={leg[col]}
-                                          onChange={e =>
-                                            handleLegChange(lane.id, leg.id, col, e.target.value)
-                                          }
-                                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                        />
-                                      ) : col === 'legValidationMessage' ? (
-                                        leg.valid === false &&
-                                          leg.validMessage &&
-                                          leg.validMessage.length > 0 ? (
-                                          <div className="text-red-600 text-xs">
-                                            {leg.validMessage.join('; ')}
-                                          </div>
-                                        ) : leg.valid === true ? (
-                                          <div className="text-green-600 text-xs">Valid</div>
-                                        ) : (
-                                          <div className="text-gray-500 text-xs">Pending</div>
-                                        )
-                                      ) : col === 'aircraftByDay' ? (
-                                        <div className="text-xs text-gray-700" title={
+                                  {legColumnLabels[col]}
+                                </th>
+                              ))}
+                              <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-600 w-16">
+                                Actions
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {lane.legs.map((leg, legIdx) => (
+                              <tr
+                                key={leg.id || legIdx}
+                                className={`border-b border-gray-100 last:border-0 ${legIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
+                                  }`}
+                              >
+                                {legColumns.map(col => (
+                                  <td key={col} className="px-3 py-2">
+                                    {col === 'sequence' ? (
+                                      <input
+                                        type="number"
+                                        value={leg[col] || ''}
+                                        onChange={e => handleLegChange(lane.id, leg.id, col, e.target.value)}
+                                        className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                      />
+                                    ) : col === 'legValidationMessage' ? (
+                                      leg.valid === false && leg.validMessage?.length > 0 ? (
+                                        <div className="text-red-600 text-xs max-w-[150px] truncate" title={leg.validMessage.join('; ')}>
+                                          {leg.validMessage.join('; ')}
+                                        </div>
+                                      ) : leg.valid === true ? (
+                                        <CheckCircle size={16} className="text-green-500" />
+                                      ) : (
+                                        <span className="text-gray-400 text-xs">Pending</span>
+                                      )
+                                    ) : col === 'aircraftByDay' ? (
+                                      <div
+                                        className="text-xs text-gray-700 max-w-[100px] truncate"
+                                        title={
                                           leg.aircraftByDay
                                             ? Object.entries(leg.aircraftByDay)
                                               .map(([day, aircraft]) => `${day}: ${aircraft}`)
                                               .join('\n')
                                             : ''
-                                        }>
-                                          {formatAircraftByDay(leg.aircraftByDay)}
-                                        </div>
-                                      ) : (
-                                        <input
-                                          type="text"
-                                          value={leg[col] || ''}
-                                          onChange={e =>
-                                            handleLegChange(lane.id, leg.id, col, e.target.value)
-                                          }
-                                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                        />
-                                      )}
-                                    </td>
-                                  ))}
-                                  <td className="px-3 py-2">
-                                    <button
-                                      onClick={() => handleRemoveLeg(lane.id, leg.id)}
-                                      className="p-1 hover:bg-red-100 text-red-600 rounded transition"
-                                      title="Remove leg"
-                                    >
-                                      <Trash2 size={16} />
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-
-                            {/* SUGGESTED ROUTES (TOP 3) */}
-                            {showSuggestedRoute &&
-                              suggestedRoutes.length > 0 &&
-                              routeLaneId === lane.id && (
-                                <tbody>
-                                  <tr>
-                                    <td
-                                      colSpan={legColumns.length + 1}
-                                      className="px-4 py-4 border-t-2 border-blue-300"
-                                    >
-                                      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-lg p-4">
-                                        <div className="flex items-center justify-between mb-4">
-                                          <h3 className="text-sm font-bold text-gray-800">
-                                            Suggested Route Patterns (Top 3)
-                                          </h3>
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              setShowSuggestedRoute(false);
-                                              setSuggestedRoutes([]);
-                                              setSelectedRouteIndex(null);
-                                              setRouteLaneId(null);
-                                            }}
-                                            className="text-gray-500 hover:text-gray-700 text-lg font-bold"
-                                          >
-                                            ✕
-                                          </button>
-                                        </div>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                          {suggestedRoutes.map((routePattern, routeIndex) => (
-                                            <div
-                                              key={routeIndex}
-                                              className={`border-2 rounded-lg p-3 transition-all cursor-pointer ${selectedRouteIndex === routeIndex
-                                                ? 'border-green-500 bg-green-50 shadow-md'
-                                                : 'border-blue-300 bg-white hover:border-blue-500'
-                                                }`}
-                                            >
-                                              <div className="mb-3">
-                                                <p className="text-xs font-bold text-blue-900 mb-1">
-                                                  Option {routeIndex + 1}
-                                                </p>
-                                                <p className="text-xs text-blue-700 font-semibold">
-                                                  {routePattern.originStation} →{' '}
-                                                  {routePattern.destinationStation}
-                                                </p>
-                                              </div>
-
-                                              <div className="space-y-2 mb-3 max-h-40 overflow-y-auto">
-                                                {routePattern.legs
-                                                  .sort((a, b) => a.sequence - b.sequence)
-                                                  .map((leg, i) => (
-                                                    <div
-                                                      key={i}
-                                                      className="bg-gray-50 border border-gray-200 rounded p-1.5 text-xs"
-                                                    >
-                                                      <p className="font-semibold text-gray-700">
-                                                        Leg {leg.sequence}: {leg.flightNumber}
-                                                      </p>
-                                                      <p className="text-gray-600">
-                                                        {leg.originStation} →{' '}
-                                                        {leg.destinationStation}
-                                                      </p>
-                                                      <p className="text-gray-500 text-xs">
-                                                        {leg.departureTime} - {leg.arrivalTime}
-                                                      </p>
-                                                      <p className="text-gray-500 text-xs">
-                                                        Days: {leg.flightOperatingdays}
-                                                      </p>
-                                                    </div>
-                                                  ))}
-                                              </div>
-
-                                              <button
-                                                type="button"
-                                                onClick={() => {
-                                                  if (selectedRouteIndex === routeIndex) {
-                                                    applyRoute(routePattern);
-                                                  } else {
-                                                    setSelectedRouteIndex(routeIndex);
-                                                  }
-                                                }}
-                                                className={`w-full px-3 py-2 rounded text-xs font-semibold transition-colors ${selectedRouteIndex === routeIndex
-                                                  ? 'bg-green-600 text-white hover:bg-green-700'
-                                                  : 'bg-blue-600 text-white hover:bg-blue-700'
-                                                  }`}
-                                              >
-                                                {selectedRouteIndex === routeIndex
-                                                  ? '✓ Apply This Route'
-                                                  : 'Select'}
-                                              </button>
-                                            </div>
-                                          ))}
-                                        </div>
+                                        }
+                                      >
+                                        {formatAircraftByDay(leg.aircraftByDay)}
                                       </div>
-                                    </td>
-                                  </tr>
-                                </tbody>
-                              )}
-
-                            {suggestError && routeLaneId === lane.id && (
-                              <tbody>
-                                <tr>
-                                  <td
-                                    colSpan={legColumns.length + 1}
-                                    className="px-4 py-4 border-t border-red-300"
-                                  >
-                                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-                                      <strong>Error:</strong> {suggestError}
-                                    </div>
+                                    ) : (
+                                      <input
+                                        type="text"
+                                        value={leg[col] || ''}
+                                        onChange={e => handleLegChange(lane.id, leg.id, col, e.target.value)}
+                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                      />
+                                    )}
                                   </td>
-                                </tr>
-                              </tbody>
-                            )}
-                          </table>
+                                ))}
+                                <td className="px-3 py-2">
+                                  <button
+                                    onClick={() => handleRemoveLeg(lane.id, leg.id)}
+                                    className="p-1.5 hover:bg-red-100 text-red-600 rounded transition"
+                                    title="Remove leg"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+                        <Plane size={32} className="text-gray-300 mx-auto mb-2" />
+                        <p className="text-gray-500 text-sm">No flight legs defined</p>
+                        <button
+                          onClick={() => handleAddLeg(lane.id)}
+                          className="mt-3 text-blue-600 text-sm font-medium hover:text-blue-700"
+                        >
+                          Add your first leg
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Post-Route Details */}
+                  <div className="mb-6">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                      <Clock size={16} className="text-gray-500" />
+                      Post-Route Details
+                    </h3>
+                    <div className="bg-white rounded-lg border border-gray-200 p-3">
+                      <div className="grid grid-cols-4 gap-3">
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Custom Clearance</label>
+                          <input
+                            type="text"
+                            value={lane.customClearance || ''}
+                            onChange={e => handleLaneChange(lane.id, 'customClearance', e.target.value)}
+                            placeholder="e.g. 3hr"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
                         </div>
-                      </td>
-                    </tr>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Drive to Destination</label>
+                          <input
+                            type="text"
+                            value={lane.driveToDestination || ''}
+                            onChange={e => handleLaneChange(lane.id, 'driveToDestination', e.target.value)}
+                            placeholder="e.g. 3hr"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Delivery Time</label>
+                          <input
+                            type="text"
+                            value={lane.actualDeliveryTimeBasedOnReceiving || ''}
+                            onChange={e => handleLaneChange(lane.id, 'actualDeliveryTimeBasedOnReceiving', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">TAT Duration</label>
+                          <input
+                            type="text"
+                            value={lane.tatToConsigneeDuration || ''}
+                            onChange={e => handleLaneChange(lane.id, 'tatToConsigneeDuration', e.target.value)}
+                            placeholder="e.g. 3hr"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Additional Notes */}
+                  <div className="mb-6">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                      <FileText size={16} className="text-gray-500" />
+                      Additional Notes
+                    </h3>
+                    <textarea
+                      value={lane.additionalNotes || ''}
+                      onChange={e => handleLaneChange(lane.id, 'additionalNotes', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
+                      placeholder="Enter any additional notes here..."
+                    />
+                  </div>
+
+                  {/* Suggested Routes */}
+                  {showSuggestedRoute && suggestedRoutes.length > 0 && routeLaneId === lane.id && (
+                    <div className="mb-6">
+                      <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center justify-between">
+                        <span className="flex items-center gap-2">
+                          <Lightbulb size={16} className="text-purple-500" />
+                          Suggested Routes
+                        </span>
+                        <button
+                          onClick={() => {
+                            setShowSuggestedRoute(false);
+                            setSuggestedRoutes([]);
+                            setSelectedRouteIndex(null);
+                            setRouteLaneId(null);
+                          }}
+                          className="text-gray-500 hover:text-gray-700"
+                        >
+                          <X size={18} />
+                        </button>
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {suggestedRoutes.map((routePattern, routeIndex) => (
+                          <div
+                            key={routeIndex}
+                            className={`border-2 rounded-xl p-4 transition-all cursor-pointer ${selectedRouteIndex === routeIndex
+                              ? 'border-green-500 bg-green-50 shadow-md'
+                              : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-sm'
+                              }`}
+                            onClick={() => setSelectedRouteIndex(routeIndex)}
+                          >
+                            <div className="mb-3">
+                              <p className="text-sm font-bold text-gray-800">Option {routeIndex + 1}</p>
+                              <p className="text-xs text-gray-600 mt-1">
+                                {routePattern.originStation} → {routePattern.destinationStation}
+                              </p>
+                            </div>
+
+                            <div className="space-y-2 mb-4 max-h-40 overflow-y-auto">
+                              {routePattern.legs
+                                .sort((a, b) => a.sequence - b.sequence)
+                                .map((leg, i) => (
+                                  <div
+                                    key={i}
+                                    className="bg-gray-50 border border-gray-200 rounded-lg p-2 text-xs"
+                                  >
+                                    <p className="font-semibold text-gray-700">
+                                      Leg {leg.sequence}: {leg.flightNumber}
+                                    </p>
+                                    <p className="text-gray-600">
+                                      {leg.originStation} → {leg.destinationStation}
+                                    </p>
+                                    <p className="text-gray-500">
+                                      {leg.departureTime} - {leg.arrivalTime}
+                                    </p>
+                                  </div>
+                                ))}
+                            </div>
+
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (selectedRouteIndex === routeIndex) {
+                                  applyRoute(routePattern);
+                                } else {
+                                  setSelectedRouteIndex(routeIndex);
+                                }
+                              }}
+                              className={`w-full px-4 py-2 rounded-lg text-sm font-semibold transition ${selectedRouteIndex === routeIndex
+                                ? 'bg-green-600 text-white hover:bg-green-700'
+                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                                }`}
+                            >
+                              {selectedRouteIndex === routeIndex ? 'Apply This Route' : 'Select'}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
+
+                  {suggestError && routeLaneId === lane.id && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">
+                      <strong>Error:</strong> {suggestError}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+
+          {filteredLanes.length === 0 && !loading && (
+            <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+              <Plane size={48} className="text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-700 mb-2">No lanes found</h3>
+              <p className="text-gray-500 text-sm">
+                {filters.quickFilter || activeFilterCount > 0
+                  ? 'Try adjusting your filters to see more results.'
+                  : 'This account has no lanes configured.'}
+              </p>
+              {(filters.quickFilter || activeFilterCount > 0) && (
+                <button
+                  onClick={handleClearFilters}
+                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

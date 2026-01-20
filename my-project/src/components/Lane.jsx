@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Edit3, Plane, Truck, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Edit3, Plane, Truck, CheckCircle, XCircle, AlertCircle, Trash2 } from 'lucide-react';
 
 const dayAbbreviations = {
   MONDAY: 'Mon',
@@ -20,7 +20,7 @@ const formatAircraftByDay = aircraftByDay => {
   return entries.map(([day, aircraft]) => `${dayAbbreviations[day] || day}: ${aircraft}`).join(', ');
 };
 
-function Lane({ lane }) {
+function Lane({ lane, onDelete }) {
   const navigate = useNavigate();
 
   if (!lane) {
@@ -67,13 +67,25 @@ function Lane({ lane }) {
             </span>
           </div>
         </div>
-        <button
-          onClick={() => editLane(lane)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Edit3 className="w-3.5 h-3.5" />
-          Edit
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => editLane(lane)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Edit3 className="w-3.5 h-3.5" />
+            Edit
+          </button>
+          {onDelete && (
+            <button
+              onClick={() => onDelete(lane.id)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors"
+              title="Delete this lane"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="p-4">

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState, useEffect } from 'react';
-import { getLanes } from '../api/api.js';
+import { getLanes, deleteLaneById } from '../api/api.js';
 import Lanes from '../components/Lanes.jsx';
 import Header from '../components/Header.jsx';
 
@@ -8,6 +8,19 @@ function AllLanes() {
   const [lanes, setLanes] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const handleDeleteLane = async id => {
+    if (!window.confirm('Are you sure you want to delete this lane? This action cannot be undone.')) {
+      return;
+    }
+    try {
+      await deleteLaneById(id);
+      setLanes(current => current.filter(lane => lane.id !== id));
+    } catch (error) {
+      console.error('Error deleting lane:', error.message);
+      alert(error.message);
+    }
+  };
 
   useEffect(() => {
     const loadLanes = async () => {
@@ -76,7 +89,7 @@ function AllLanes() {
           </div>
 
           {/* Lanes Component */}
-          <Lanes lanes={lanes} />
+          <Lanes lanes={lanes} onDelete={handleDeleteLane} />
         </div>
       </main>
     </div>

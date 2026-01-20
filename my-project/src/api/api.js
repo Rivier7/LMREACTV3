@@ -322,6 +322,17 @@ export const deleteAccountbyId = async id => {
   return await response.json();
 };
 
+
+export const deleteLaneById = async id => {
+  const response = await fetch(`${BASE_URL}/delete/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error(`Failed to delete lane with ID ${id}`);
+  return await response.json();
+}
+
+
 // ✅ Validate a flight
 export const validateFlight = async flight => {
   const response = await fetch(BASE_URL3, {

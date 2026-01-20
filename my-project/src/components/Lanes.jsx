@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Filter, X } from 'lucide-react';
 import Lane from './Lane';
 
-function Lanes({ lanes }) {
+function Lanes({ lanes, onDelete }) {
   const [filters, setFilters] = useState({
     accountName: '',
     originCountry: '',
@@ -200,7 +200,7 @@ function Lanes({ lanes }) {
       ) : (
         <div className="space-y-4">
           {filteredLanes.map((lane, idx) => (
-            <Lane key={lane.id + '-' + idx} lane={lane} />
+            <Lane key={lane.id + '-' + idx} lane={lane} onDelete={onDelete} />
           ))}
         </div>
       )}
