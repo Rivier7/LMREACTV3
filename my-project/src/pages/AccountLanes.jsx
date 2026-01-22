@@ -148,13 +148,12 @@ const AccountLanes = () => {
 
   const legColumns = [
     'sequence',
-    'serviceLevel',
     'flightNumber',
     'originStation',
     'departureTime',
     'destinationStation',
     'arrivalTime',
-    'flightOperatingdays',
+    'flightOperatingDays',
     'aircraftByDay',
     'cutoffTime',
     'legValidationMessage',
@@ -162,13 +161,12 @@ const AccountLanes = () => {
 
   const legColumnLabels = {
     sequence: 'Seq',
-    serviceLevel: 'Service Level',
     flightNumber: 'Flight #',
     originStation: 'Origin',
     departureTime: 'Departure',
     destinationStation: 'Destination',
     arrivalTime: 'Arrival',
-    flightOperatingdays: 'Operating Days',
+    flightOperatingDays: 'Operating Days',
     aircraftByDay: 'Aircraft by Day',
     cutoffTime: 'Cutoff',
     legValidationMessage: 'Leg Status',
@@ -308,13 +306,12 @@ const AccountLanes = () => {
               {
                 id: Date.now(),
                 sequence: (lane.legs?.length || 0) + 1,
-                serviceLevel: '',
                 flightNumber: '',
                 originStation: '',
                 departureTime: '',
                 destinationStation: '',
                 arrivalTime: '',
-                flightOperatingdays: '',
+                flightOperatingDays: '',
                 aircraft: '',
                 aircraftType: '',
                 cutoffTime: '',
@@ -373,14 +370,18 @@ const AccountLanes = () => {
         laneToValidate.legs.map(async leg => {
           try {
             const result = await validateFlight(leg);
-            return {
+            console.log('Validation result:', result);
+            console.log('Operating days from result:', result.operatingDays);
+            const updatedLeg = {
               ...leg,
               valid: result.valid,
               message: result.message,
               validMessage: result.mismatchedFields || [],
-              flightOperatingdays: result.operatingDays,
+              flightOperatingDays: result.operatingDays,
               aircraftByDay: result.aircraftByDay || null,
             };
+            console.log('Updated leg with flightOperatingDays:', updatedLeg);
+            return updatedLeg;
           } catch (error) {
             return {
               ...leg,
@@ -394,7 +395,7 @@ const AccountLanes = () => {
       const isLaneValid = validatedLegs.every(leg => leg.valid);
       setLanes(current =>
         current.map(lane =>
-          lane.id === laneId ? { ...lane, legs: validatedLegs, valid: isLaneValid } : lane
+          lane.id === laneId ? { ...lane, legs: validatedLegs, valid: isLaneValid, hasBeenUpdated: true } : lane
         )
       );
     } catch (err) {
@@ -438,7 +439,7 @@ const AccountLanes = () => {
                 valid: result.valid,
                 message: result.message,
                 validMessage: result.mismatchedFields || [],
-                flightOperatingdays: result.operatingDays,
+                flightOperatingDays: result.operatingDays,
                 aircraftByDay: result.aircraftByDay || null,
               };
             } catch (error) {
@@ -451,7 +452,7 @@ const AccountLanes = () => {
           })
         );
         const isLaneValid = validatedLegs.every(leg => leg.valid);
-        return { ...lane, legs: validatedLegs, valid: isLaneValid };
+        return { ...lane, legs: validatedLegs, valid: isLaneValid, hasBeenUpdated: true };
       });
       const newLanes = await Promise.all(validatedLanesPromises);
       setLanes(newLanes);
@@ -519,8 +520,7 @@ const AccountLanes = () => {
         destinationStation: leg.destinationStation,
         departureTime: leg.departureTime,
         arrivalTime: leg.arrivalTime,
-        flightOperatingdays: leg.flightOperatingdays,
-        serviceLevel: leg.serviceLevel || '',
+        flightOperatingDays: leg.flightOperatingDays,
         cutoffTime: leg.cutoffTime || '',
         aircraft: leg.aircraft || '',
         aircraftType: leg.aircraftType || '',
@@ -545,6 +545,10 @@ const AccountLanes = () => {
     try {
       const updatedLane = lanes.find(l => l.id === id);
       if (!updatedLane) return;
+
+      console.log('Saving lane:', updatedLane);
+      console.log('Saving legs:', updatedLane.legs);
+      console.log('First leg flightOperatingDays:', updatedLane.legs?.[0]?.flightOperatingDays);
 
       await updateLane(updatedLane.id, updatedLane, updatedLane.legs || []);
 
@@ -954,7 +958,7 @@ const AccountLanes = () => {
                       Pre-Route Details
                     </h3>
                     <div className="bg-white rounded-lg border border-gray-200 p-3">
-                      <div className="grid grid-cols-4 gap-3">
+                      <div className="grid grid-cols-5 gap-3">
                         <div>
                           <label className="block text-xs text-gray-500 mb-1">Item Number</label>
                           <input
@@ -989,6 +993,16 @@ const AccountLanes = () => {
                             value={lane.driveToAirportDuration || ''}
                             onChange={e => handleLaneChange(lane.id, 'driveToAirportDuration', e.target.value)}
                             placeholder="e.g. 3hr"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Service Level</label>
+                          <input
+                            type="text"
+                            value={lane.serviceLevel || ''}
+                            onChange={e => handleLaneChange(lane.id, 'serviceLevel', e.target.value)}
+                            placeholder="e.g. NFO, DIRECT DRIVE"
                             className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>

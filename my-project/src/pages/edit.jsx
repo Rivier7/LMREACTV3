@@ -221,26 +221,26 @@ const Edit = () => {
     setLegs(updatedLegs);
   };
 
-  const handleServiceLevelChange = (legIndex, serviceLevel) => {
+  const handleServiceLevelChange = (serviceLevel) => {
     if (serviceLevel === 'DIRECT DRIVE') {
-      const clearedLeg = {
-        sequence: 1,
-        flightNumber: null,
-        departureTime: null,
-        originStation: null,
-        destinationStation: null,
-        arrivalTime: null,
-        flightOperatingdays: null,
-        valid: null,
-        serviceLevel: 'DIRECT DRIVE',
-        cutoffTime: null,
-        validMessage: [],
-      };
-      setLegs([clearedLeg]);
+      // Set service level on lane and clear legs for direct drive
+      setUpdatedLane(prev => ({ ...prev, serviceLevel: 'DIRECT DRIVE' }));
+      setLegs([]);
     } else {
-      let updatedLegs = [...legs];
-      if (updatedLegs.length === 0 || updatedLegs[0]?.serviceLevel === 'DIRECT DRIVE') {
-        updatedLegs = [
+      // Set service level on lane
+      const currentServiceLevel = updatedLane.serviceLevel;
+      if (
+        (serviceLevel === 'OTHER' && !serviceLevels.includes(currentServiceLevel)) ||
+        currentServiceLevel === serviceLevel
+      ) {
+        setUpdatedLane(prev => ({ ...prev, serviceLevel: '' }));
+      } else {
+        setUpdatedLane(prev => ({ ...prev, serviceLevel: serviceLevel === 'OTHER' ? '' : serviceLevel }));
+      }
+
+      // Ensure at least one leg exists for flight-based service
+      if (legs.length === 0) {
+        setLegs([
           {
             sequence: 1,
             flightNumber: '',
@@ -248,25 +248,13 @@ const Edit = () => {
             originStation: '',
             destinationStation: '',
             arrivalTime: '',
-            flightOperatingdays: '',
+            flightOperatingDays: '',
             valid: null,
-            serviceLevel: '',
             cutoffTime: '',
             validMessage: [],
           },
-        ];
+        ]);
       }
-
-      const currentServiceLevel = updatedLegs[legIndex]?.serviceLevel;
-      if (
-        (serviceLevel === 'OTHER' && !serviceLevels.includes(currentServiceLevel)) ||
-        currentServiceLevel === serviceLevel
-      ) {
-        updatedLegs[legIndex].serviceLevel = '';
-      } else {
-        updatedLegs[legIndex].serviceLevel = serviceLevel === 'OTHER' ? '' : serviceLevel;
-      }
-      setLegs(updatedLegs);
     }
   };
 
@@ -282,9 +270,8 @@ const Edit = () => {
         originStation: '',
         destinationStation: '',
         arrivalTime: '',
-        flightOperatingdays: '',
+        flightOperatingDays: '',
         valid: null,
-        serviceLevel: '',
         cutoffTime: '',
         validMessage: [],
       },
@@ -301,15 +288,19 @@ const Edit = () => {
     for (const leg of updatedLegs) {
       try {
         const result = await validateFlight(leg);
+        console.log('Validation result:', result);
+        console.log('Operating days from result:', result.operatingDays);
         leg.valid = result.valid;
         leg.validMessage = result.mismatchedFields || [];
-        leg.flightOperatingdays = result.operatingDays;
+        leg.flightOperatingDays = result.operatingDays;
         leg.aircraftByDay = result.aircraftByDay || null;
+        console.log('Updated leg flightOperatingDays:', leg.flightOperatingDays);
       } catch (error) {
         leg.valid = false;
         leg.validMessage = [error.message || 'Validation failed'];
       }
     }
+    console.log('All updated legs:', updatedLegs);
     setLegs(updatedLegs);
     setIsLoading(false);
   };
@@ -322,7 +313,7 @@ const Edit = () => {
     }
 
     setIsLoading(true);
-    const isDirectDrive = legs[0]?.serviceLevel === 'DIRECT DRIVE';
+    const isDirectDrive = updatedLane.serviceLevel === 'DIRECT DRIVE';
 
     try {
       let result;
@@ -384,8 +375,7 @@ const Edit = () => {
         destinationStation: leg.destinationStation,
         departureTime: leg.departureTime,
         arrivalTime: leg.arrivalTime,
-        flightOperatingdays: leg.flightOperatingdays,
-        serviceLevel: leg.serviceLevel || legs[0]?.serviceLevel || '',
+        flightOperatingDays: leg.flightOperatingDays,
         cutoffTime: leg.cutoffTime || legs[0]?.cutoffTime || '',
         valid: null,
         validMessage: [],
@@ -396,8 +386,8 @@ const Edit = () => {
     setSelectedRouteIndex(null);
   };
 
-  const isDirectDriveSelected = legs[0]?.serviceLevel === 'DIRECT DRIVE';
-  const hasFlightLegs = legs.length > 0 && legs[0]?.serviceLevel && !isDirectDriveSelected;
+  const isDirectDriveSelected = updatedLane.serviceLevel === 'DIRECT DRIVE';
+  const hasFlightLegs = legs.length > 0 && updatedLane.serviceLevel && !isDirectDriveSelected;
 
   return (
     <div className="min-h-screen bg-gray-50 text-sm">
@@ -612,24 +602,24 @@ const Edit = () => {
           <div className="flex flex-col md:flex-row gap-4 items-start">
             {/* Direct Drive Option */}
             <div
-              className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all duration-200 ${legs[0]?.serviceLevel === 'DIRECT DRIVE'
+              className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all duration-200 ${updatedLane.serviceLevel === 'DIRECT DRIVE'
                 ? 'border-gray-600 bg-gray-100 shadow-sm'
                 : 'border-gray-200 bg-white hover:border-gray-400'
                 }`}
-              onClick={() => handleServiceLevelChange(0, 'DIRECT DRIVE')}
+              onClick={() => handleServiceLevelChange('DIRECT DRIVE')}
             >
               <div
-                className={`w-5 h-5 rounded-full border-2 mr-3 flex items-center justify-center flex-shrink-0 ${legs[0]?.serviceLevel === 'DIRECT DRIVE'
+                className={`w-5 h-5 rounded-full border-2 mr-3 flex items-center justify-center flex-shrink-0 ${updatedLane.serviceLevel === 'DIRECT DRIVE'
                   ? 'border-gray-600 bg-gray-600'
                   : 'border-gray-300'
                   }`}
               >
-                {legs[0]?.serviceLevel === 'DIRECT DRIVE' && (
+                {updatedLane.serviceLevel === 'DIRECT DRIVE' && (
                   <div className="w-2 h-2 rounded-full bg-white"></div>
                 )}
               </div>
               <span
-                className={`text-xs font-medium ${legs[0]?.serviceLevel === 'DIRECT DRIVE' ? 'text-gray-700' : 'text-gray-600'
+                className={`text-xs font-medium ${updatedLane.serviceLevel === 'DIRECT DRIVE' ? 'text-gray-700' : 'text-gray-600'
                   }`}
               >
                 DIRECT DRIVE
@@ -638,7 +628,7 @@ const Edit = () => {
 
             {/* Custom Service Level Option */}
             <div
-              className={`flex flex-col p-3 rounded-lg border transition-all duration-200 flex-1 ${legs[0]?.serviceLevel && legs[0]?.serviceLevel !== 'DIRECT DRIVE'
+              className={`flex flex-col p-3 rounded-lg border transition-all duration-200 flex-1 ${updatedLane.serviceLevel && updatedLane.serviceLevel !== 'DIRECT DRIVE'
                 ? 'border-gray-600 bg-gray-100 shadow-sm'
                 : 'border-gray-200 bg-white'
                 }`}
@@ -646,23 +636,23 @@ const Edit = () => {
               <div
                 className="flex items-center cursor-pointer"
                 onClick={() => {
-                  if (legs[0]?.serviceLevel === 'DIRECT DRIVE' || !legs[0]?.serviceLevel) {
-                    handleServiceLevelChange(0, 'OTHER');
+                  if (updatedLane.serviceLevel === 'DIRECT DRIVE' || !updatedLane.serviceLevel) {
+                    handleServiceLevelChange('OTHER');
                   }
                 }}
               >
                 <div
-                  className={`w-5 h-5 rounded-full border-2 mr-3 flex items-center justify-center flex-shrink-0 ${legs[0]?.serviceLevel && legs[0]?.serviceLevel !== 'DIRECT DRIVE'
+                  className={`w-5 h-5 rounded-full border-2 mr-3 flex items-center justify-center flex-shrink-0 ${updatedLane.serviceLevel && updatedLane.serviceLevel !== 'DIRECT DRIVE'
                     ? 'border-gray-600 bg-gray-600'
                     : 'border-gray-300'
                     }`}
                 >
-                  {legs[0]?.serviceLevel && legs[0]?.serviceLevel !== 'DIRECT DRIVE' && (
+                  {updatedLane.serviceLevel && updatedLane.serviceLevel !== 'DIRECT DRIVE' && (
                     <div className="w-2 h-2 rounded-full bg-white"></div>
                   )}
                 </div>
                 <span
-                  className={`text-xs font-medium ${legs[0]?.serviceLevel && legs[0]?.serviceLevel !== 'DIRECT DRIVE'
+                  className={`text-xs font-medium ${updatedLane.serviceLevel && updatedLane.serviceLevel !== 'DIRECT DRIVE'
                     ? 'text-gray-700'
                     : 'text-gray-600'
                     }`}
@@ -672,14 +662,9 @@ const Edit = () => {
               </div>
               <input
                 type="text"
-                value={legs[0]?.serviceLevel === 'DIRECT DRIVE' ? '' : legs[0]?.serviceLevel || ''}
+                value={updatedLane.serviceLevel === 'DIRECT DRIVE' ? '' : updatedLane.serviceLevel || ''}
                 onChange={e => {
-                  const updatedLegs = [...legs];
-                  if (!updatedLegs[0]) {
-                    updatedLegs[0] = { serviceLevel: '' };
-                  }
-                  updatedLegs[0].serviceLevel = e.target.value.toUpperCase();
-                  setLegs(updatedLegs);
+                  setUpdatedLane(prev => ({ ...prev, serviceLevel: e.target.value.toUpperCase() }));
                 }}
                 placeholder="Enter service level (e.g., LIFEGUARD, QUICKPAK)"
                 className="mt-2 w-full px-3 py-2 border border-gray-300 rounded text-xs"
@@ -961,9 +946,9 @@ const Edit = () => {
                         </label>
                         <input
                           type="text"
-                          value={leg.flightOperatingdays || ''}
+                          value={leg.flightOperatingDays || ''}
                           onChange={e =>
-                            handleInputChange(index, 'flightOperatingdays', e.target.value)
+                            handleInputChange(index, 'flightOperatingDays', e.target.value)
                           }
                           className="text-xs px-3 py-2 border border-gray-300 rounded w-full"
                           placeholder="Days"

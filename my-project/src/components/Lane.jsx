@@ -35,7 +35,7 @@ function Lane({ lane, onDelete }) {
     navigate('/edit', { state: { lane } });
   };
 
-  const isDirectDrive = lane.legs?.[0]?.serviceLevel === 'DIRECT DRIVE';
+  const isDirectDrive = lane.serviceLevel === 'DIRECT DRIVE';
   const isValid = lane.valid === true;
   const hasLegs = lane.legs && lane.legs.length > 0;
 
@@ -63,7 +63,7 @@ function Lane({ lane, onDelete }) {
           <div className="flex items-center gap-1.5 text-xs">
             <span className="text-gray-500">Service:</span>
             <span className={`px-2 py-0.5 rounded font-medium ${isDirectDrive ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
-              {lane.legs?.[0]?.serviceLevel || 'N/A'}
+              {lane.serviceLevel || 'N/A'}
             </span>
           </div>
         </div>
@@ -154,7 +154,6 @@ function Lane({ lane, onDelete }) {
               <tbody>
                 {[...lane.legs]
                   .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
-                  .filter(leg => leg.serviceLevel !== 'DIRECT DRIVE')
                   .map((leg, idx) => (
                     <tr key={leg.sequence || idx} className={`border-b border-gray-100 last:border-0 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
                       <td className="px-3 py-2 font-medium text-gray-900">{leg.flightNumber}</td>
