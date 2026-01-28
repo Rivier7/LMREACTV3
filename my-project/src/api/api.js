@@ -423,6 +423,7 @@ export const getSuggestedRouteByLocation = async payload => {
       errorMessage = errorData.message || JSON.stringify(errorData);
     } catch {
       errorMessage = await response.text();
+      console.log('Error text:', errorMessage);
     }
     console.error('Error response:', errorMessage);
     throw new Error(` ${errorMessage}`);
