@@ -18,21 +18,21 @@ import {
   FileText,
 } from 'lucide-react';
 import {
-  getLaneByAccountId,
+  getLanesByLaneMappingId,
   updateLane,
-  getAccountbyId,
+  getLaneMappingById,
   validateFlight,
-  updateAccountLanes,
+  updateLaneMappingLanes,
   getSuggestedRoute,
   getSuggestedRouteByLocation,
   getTAT,
   deleteLaneById,
 } from '../api/api.js';
 
-const AccountLanes = () => {
-  const { accountId } = useParams();
+const LaneMappingLanes = () => {
+  const { laneMappingId } = useParams();
   const [lanes, setLanes] = useState([]);
-  const [account, setAccount] = useState(null);
+  const [laneMapping, setLaneMapping] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expandedLanes, setExpandedLanes] = useState({});
@@ -197,8 +197,8 @@ const AccountLanes = () => {
     const fetchLanes = async () => {
       setLoading(true);
       try {
-        const data = await getLaneByAccountId(accountId);
-        if (!data || data.length === 0) setError('No lanes available for this account');
+        const data = await getLanesByLaneMappingId(laneMappingId);
+        if (!data || data.length === 0) setError('No lanes available for this lane mapping');
         else setLanes(data);
       } catch (error) {
         console.error(error);
@@ -208,20 +208,20 @@ const AccountLanes = () => {
       }
     };
     fetchLanes();
-  }, [accountId]);
+  }, [laneMappingId]);
 
   useEffect(() => {
-    const fetchAccount = async () => {
+    const fetchLaneMapping = async () => {
       try {
-        const data = await getAccountbyId(accountId);
-        setAccount(data);
+        const data = await getLaneMappingById(laneMappingId);
+        setLaneMapping(data);
       } catch (error) {
         console.error(error);
-        setError('Error loading account');
+        setError('Error loading lane mapping');
       }
     };
-    fetchAccount();
-  }, [accountId]);
+    fetchLaneMapping();
+  }, [laneMappingId]);
 
   const hourColumns = [
     'driveToAirportDuration',
@@ -348,9 +348,9 @@ const AccountLanes = () => {
     try {
       const updatedLanes = lanes.filter(lane => lane.hasBeenUpdated);
       if (updatedLanes.length > 0) {
-        await updateAccountLanes(accountId, updatedLanes);
+        await updateLaneMappingLanes(laneMappingId, updatedLanes);
       }
-      const freshLanes = await getLaneByAccountId(accountId);
+      const freshLanes = await getLanesByLaneMappingId(laneMappingId);
       setLanes(freshLanes);
     } catch (error) {
       setError('Error saving changes');
@@ -552,7 +552,7 @@ const AccountLanes = () => {
 
       await updateLane(updatedLane.id, updatedLane, updatedLane.legs || []);
 
-      const freshLane = await getLaneByAccountId(accountId, id);
+      const freshLane = await getLanesByLaneMappingId(laneMappingId, id);
       if (freshLane && freshLane.length > 0) {
         setLanes(current =>
           current.map(l => (l.id === id ? { ...freshLane[0], hasBeenUpdated: false } : l))
@@ -604,7 +604,7 @@ const AccountLanes = () => {
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-5 shadow-lg">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold">{account?.name || 'Account'} Lanes</h1>
+            <h1 className="text-2xl font-bold">{laneMapping?.name || 'Lane Mapping'} Lanes</h1>
             <p className="text-blue-100 text-sm mt-1">
               {filteredLanes.length} lane{filteredLanes.length !== 1 ? 's' : ''} displayed
               {lanes.length > 0 && lanes.length !== filteredLanes.length && ` of ${lanes.length} total`}
@@ -970,12 +970,16 @@ const AccountLanes = () => {
                         </div>
                         <div>
                           <label className="block text-xs text-gray-500 mb-1">Lane Option</label>
-                          <input
-                            type="text"
+                          <select
                             value={lane.laneOption || ''}
                             onChange={e => handleLaneChange(lane.id, 'laneOption', e.target.value)}
                             className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
+                          >
+                            <option value="">Select Option</option>
+                            <option value="Primary">Primary</option>
+                            <option value="Secondary">Secondary</option>
+                            <option value="Alternative">Alternative</option>
+                          </select>
                         </div>
                         <div>
                           <label className="block text-xs text-gray-500 mb-1">Pick Up Time</label>
@@ -1282,7 +1286,7 @@ const AccountLanes = () => {
               <p className="text-gray-500 text-sm">
                 {filters.quickFilter || activeFilterCount > 0
                   ? 'Try adjusting your filters to see more results.'
-                  : 'This account has no lanes configured.'}
+                  : 'This lane mapping has no lanes configured.'}
               </p>
               {(filters.quickFilter || activeFilterCount > 0) && (
                 <button
@@ -1300,4 +1304,4 @@ const AccountLanes = () => {
   );
 };
 
-export default AccountLanes;
+export default LaneMappingLanes;

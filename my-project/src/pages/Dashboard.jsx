@@ -4,8 +4,8 @@ import { TrendingUp, Download, ChevronRight, Trash2 } from 'lucide-react';
 import Header from '../components/Header';
 import FileUploader from '../components/FileUploader';
 import ErrorMessage from '../components/ErrorMessage';
-import { getAccountExcel, deleteAccountbyId } from '../api/api';
-import { useAccounts } from '../hooks/useAccountQueries';
+import { getLaneMappingExcel, deleteLaneMappingById } from '../api/api';
+import { useLaneMappings } from '../hooks/useLaneMappingQueries';
 import { useLaneCounts } from '../hooks/useLaneQueries';
 
 function Dashboard() {
@@ -17,7 +17,7 @@ function Dashboard() {
 
   // React Query automatically handles loading, error, and caching!
   // No more useState, useEffect, or manual error handling needed
-  const { data: accounts = [], isLoading: accountsLoading, error: accountsError, refetch: refetchAccounts } = useAccounts();
+  const { data: laneMappings = [], isLoading: laneMappingsLoading, error: laneMappingsError, refetch: refetchLaneMappings } = useLaneMappings();
 
   const {
     data: counts = { total: 0, valid: 0, invalid: 0 },
@@ -25,33 +25,33 @@ function Dashboard() {
     error: countsError,
   } = useLaneCounts();
 
-  const handleSelectAccount = accountId => {
-    console.log(`Selected account ID: ${accountId}`);
-    navigate(`/accountLanes/${accountId}`);
+  const handleSelectLaneMapping = laneMappingId => {
+    console.log(`Selected lane mapping ID: ${laneMappingId}`);
+    navigate(`/laneMappingLanes/${laneMappingId}`);
   };
 
-  const handleDeleteAccount = async (accountId, accountName) => {
-    if (deleteConfirm !== accountId) {
-      setDeleteConfirm(accountId);
+  const handleDeleteLaneMapping = async (laneMappingId, laneMappingName) => {
+    if (deleteConfirm !== laneMappingId) {
+      setDeleteConfirm(laneMappingId);
       return;
     }
 
     setIsDeleting(true);
     try {
-      await deleteAccountbyId(accountId);
-      await refetchAccounts();
+      await deleteLaneMappingById(laneMappingId);
+      await refetchLaneMappings();
       setDeleteConfirm(null);
     } catch (error) {
-      alert(error.message || `Failed to delete account ${accountName}`);
+      alert(error.message || `Failed to delete lane mapping ${laneMappingName}`);
     } finally {
       setIsDeleting(false);
     }
   };
 
   // Combined loading state
-  const isLoading = accountsLoading || countsLoading;
+  const isLoading = laneMappingsLoading || countsLoading;
   // Combined error state
-  const error = accountsError || countsError;
+  const error = laneMappingsError || countsError;
 
   if (isLoading) {
     return <div className="text-center py-12 text-lg text-gray-500">Loading dashboard...</div>;
@@ -60,13 +60,13 @@ function Dashboard() {
   const validPercentage = counts.total > 0 ? (counts.valid / counts.total) * 100 : 0;
   const invalidPercentage = counts.total > 0 ? (counts.invalid / counts.total) * 100 : 0;
 
-  // Filter accounts
-  const filteredAccounts = accounts.filter(account => {
-    const matchesSearch = account.accountName.toLowerCase().includes(searchQuery.toLowerCase());
+  // Filter lane mappings
+  const filteredLaneMappings = laneMappings.filter(laneMapping => {
+    const matchesSearch = laneMapping.laneMappingName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus =
       statusFilter === 'all' ||
-      (statusFilter === 'valid' && account.validCount > 0 && account.invalidCount === 0) ||
-      (statusFilter === 'invalid' && account.invalidCount > 0);
+      (statusFilter === 'valid' && laneMapping.validCount > 0 && laneMapping.invalidCount === 0) ||
+      (statusFilter === 'invalid' && laneMapping.invalidCount > 0);
     return matchesSearch && matchesStatus;
   });
 
@@ -91,7 +91,7 @@ function Dashboard() {
             {/* Left: Title & Upload */}
             <div>
               <h1 className="text-4xl font-bold text-gray-900 mb-2">Dashboard</h1>
-              <p className="text-gray-600">Manage and monitor your account lanes</p>
+              <p className="text-gray-600">Manage and monitor your lane mappings</p>
               <div className="mt-6">
                 <FileUploader />
               </div>
@@ -146,17 +146,17 @@ function Dashboard() {
             </div>
           </div>
 
-          {/* Account Overview Section */}
+          {/* Lane Mapping Overview Section */}
           <section>
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">Accounts</h2>
+                <h2 className="text-2xl font-bold text-gray-900">Lane Mappings</h2>
                 <p className="text-gray-600 text-sm mt-1">
-                  {filteredAccounts.length} of {accounts.length} accounts
+                  {filteredLaneMappings.length} of {laneMappings.length} lane mappings
                 </p>
               </div>
               <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm font-semibold">
-                {accounts.length} Active
+                {laneMappings.length} Active
               </div>
             </div>
 
@@ -166,7 +166,7 @@ function Dashboard() {
               <div className="flex-1">
                 <input
                   type="text"
-                  placeholder="Search by account name..."
+                  placeholder="Search by lane mapping name..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
@@ -209,16 +209,16 @@ function Dashboard() {
             </div>
 
             {/* No Results */}
-            {filteredAccounts.length === 0 && (
+            {filteredLaneMappings.length === 0 && (
               <div className="text-center py-12">
-                <p className="text-gray-500 text-lg">No accounts match your filters</p>
+                <p className="text-gray-500 text-lg">No lane mappings match your filters</p>
               </div>
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredAccounts.map(account => (
+              {filteredLaneMappings.map(laneMapping => (
                 <div
-                  key={account.accountId}
+                  key={laneMapping.laneMappingId}
                   className="group bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg hover:border-blue-200 transition-all duration-300"
                 >
                   {/* Card Header */}
@@ -226,9 +226,9 @@ function Dashboard() {
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
-                          {account.accountName}
+                          {laneMapping.laneMappingName}
                         </h3>
-                        <p className="text-xs text-gray-500 mt-1">ID: {account.accountId}</p>
+                        <p className="text-xs text-gray-500 mt-1">ID: {laneMapping.laneMappingId}</p>
                       </div>
                       <div className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
                         Active
@@ -241,58 +241,58 @@ function Dashboard() {
                     {/* Stats Grid */}
                     <div className="grid grid-cols-3 gap-3 mb-5">
                       <div className="text-center">
-                        <p className="text-2xl font-bold text-blue-600">{account.totalCount}</p>
+                        <p className="text-2xl font-bold text-blue-600">{laneMapping.totalCount}</p>
                         <p className="text-xs text-gray-500 mt-1">Total</p>
                       </div>
                       <div className="text-center border-l border-r border-gray-100">
-                        <p className="text-2xl font-bold text-green-600">{account.validCount}</p>
+                        <p className="text-2xl font-bold text-green-600">{laneMapping.validCount}</p>
                         <p className="text-xs text-gray-500 mt-1">Active</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-2xl font-bold text-red-600">{account.invalidCount}</p>
+                        <p className="text-2xl font-bold text-red-600">{laneMapping.invalidCount}</p>
                         <p className="text-xs text-gray-500 mt-1">Invalid</p>
                       </div>
                     </div>
 
                     {/* Description */}
-                    {account.description && (
+                    {laneMapping.description && (
                       <p className="text-sm text-gray-600 line-clamp-2 mb-5 pb-5 border-b border-gray-100">
-                        {account.description}
+                        {laneMapping.description}
                       </p>
                     )}
 
                     {/* Buttons */}
                     <div className="space-y-2">
                       <button
-                        onClick={() => handleSelectAccount(account.accountId)}
+                        onClick={() => handleSelectLaneMapping(laneMapping.laneMappingId)}
                         className="w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-all duration-200 flex items-center justify-center gap-2"
-                        aria-label={`Select account ${account.accountName}`}
+                        aria-label={`Select lane mapping ${laneMapping.laneMappingName}`}
                       >
                         View Lanes
                         <ChevronRight size={16} />
                       </button>
 
                       <button
-                        onClick={() => getAccountExcel(account.accountId)}
+                        onClick={() => getLaneMappingExcel(laneMapping.laneMappingId)}
                         className="w-full px-4 py-2.5 bg-gray-100 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-200 active:bg-gray-300 transition-all duration-200 flex items-center justify-center gap-2"
-                        aria-label={`Download excel for account ${account.accountName}`}
+                        aria-label={`Download excel for lane mapping ${laneMapping.laneMappingName}`}
                       >
                         <Download size={16} />
                         Export
                       </button>
 
                       <button
-                        onClick={() => handleDeleteAccount(account.accountId, account.accountName)}
+                        onClick={() => handleDeleteLaneMapping(laneMapping.laneMappingId, laneMapping.laneMappingName)}
                         disabled={isDeleting}
                         className={`w-full px-4 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${
-                          deleteConfirm === account.accountId
+                          deleteConfirm === laneMapping.laneMappingId
                             ? 'bg-red-600 text-white hover:bg-red-700'
                             : 'bg-gray-100 text-red-600 hover:bg-red-50'
                         } disabled:opacity-50`}
-                        aria-label={`Delete account ${account.accountName}`}
+                        aria-label={`Delete lane mapping ${laneMapping.laneMappingName}`}
                       >
                         <Trash2 size={16} />
-                        {deleteConfirm === account.accountId ? 'Click to Confirm' : 'Delete'}
+                        {deleteConfirm === laneMapping.laneMappingId ? 'Click to Confirm' : 'Delete'}
                       </button>
                     </div>
                   </div>

@@ -1,11 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getAllAccounts,
-  allLaneCount,
-  getAccountbyId,
-  deleteAccountbyId,
-  postAccountExcel,
+  getAccountById,
+  createAccount,
+  updateAccount,
+  deleteAccountById,
+  assignLaneMappingToAccount,
+  removeLaneMappingFromAccount,
 } from '../api/api';
+import { laneMappingKeys } from './useLaneMappingQueries';
 
 /**
  * Query Keys - Centralized for consistency
@@ -17,43 +20,67 @@ export const accountKeys = {
   list: () => [...accountKeys.lists()],
   details: () => [...accountKeys.all, 'detail'],
   detail: id => [...accountKeys.details(), id],
-  counts: () => [...accountKeys.all, 'counts'],
 };
 
 /**
- * Fetch all accounts with lane counts
- * Used in: Dashboard
+ * Fetch all accounts
+ * Used in: Accounts page
  */
 export function useAccounts() {
   return useQuery({
-    queryKey: accountKeys.counts(),
-    queryFn: allLaneCount,
+    queryKey: accountKeys.list(),
+    queryFn: getAllAccounts,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
 
 /**
- * Fetch all accounts (basic list)
- * Used in: Accounts page
+ * Fetch a single account by ID (includes laneMappings)
+ * Used in: AccountDetail page
  */
-export function useAccountsList() {
+export function useAccount(accountId) {
   return useQuery({
-    queryKey: accountKeys.list(),
-    queryFn: getAllAccounts,
+    queryKey: accountKeys.detail(accountId),
+    queryFn: () => getAccountById(accountId),
+    enabled: !!accountId, // Only fetch if accountId exists
     staleTime: 5 * 60 * 1000,
   });
 }
 
 /**
- * Fetch a single account by ID
- * Used in: AccountLanes, Edit
+ * Create a new account
+ * Automatically invalidates account queries on success
  */
-export function useAccount(accountId) {
-  return useQuery({
-    queryKey: accountKeys.detail(accountId),
-    queryFn: () => getAccountbyId(accountId),
-    enabled: !!accountId, // Only fetch if accountId exists
-    staleTime: 5 * 60 * 1000,
+export function useCreateAccount() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: createAccount,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: accountKeys.all });
+    },
+    onError: error => {
+      console.error('Failed to create account:', error);
+    },
+  });
+}
+
+/**
+ * Update an account
+ * Automatically invalidates account queries on success
+ */
+export function useUpdateAccount() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, name }) => updateAccount(id, name),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: accountKeys.detail(variables.id) });
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() });
+    },
+    onError: error => {
+      console.error('Failed to update account:', error);
+    },
   });
 }
 
@@ -65,9 +92,8 @@ export function useDeleteAccount() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: deleteAccountbyId,
+    mutationFn: deleteAccountById,
     onSuccess: () => {
-      // Invalidate all account queries to refetch fresh data
       queryClient.invalidateQueries({ queryKey: accountKeys.all });
     },
     onError: error => {
@@ -77,20 +103,41 @@ export function useDeleteAccount() {
 }
 
 /**
- * Upload Excel file to create/update accounts
- * Automatically invalidates account queries on success
+ * Assign a LaneMapping to an Account
+ * Invalidates both account and laneMapping queries
  */
-export function useUploadAccountExcel() {
+export function useAssignLaneMapping() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: postAccountExcel,
-    onSuccess: () => {
-      // Invalidate all account queries to show new data
-      queryClient.invalidateQueries({ queryKey: accountKeys.all });
+    mutationFn: ({ accountId, laneMappingId }) =>
+      assignLaneMappingToAccount(accountId, laneMappingId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: accountKeys.detail(variables.accountId) });
+      queryClient.invalidateQueries({ queryKey: laneMappingKeys.all });
     },
     onError: error => {
-      console.error('Failed to upload Excel:', error);
+      console.error('Failed to assign lane mapping:', error);
+    },
+  });
+}
+
+/**
+ * Remove a LaneMapping from an Account
+ * Invalidates both account and laneMapping queries
+ */
+export function useRemoveLaneMapping() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ laneMappingId, accountId }) =>
+      removeLaneMappingFromAccount(laneMappingId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: accountKeys.detail(variables.accountId) });
+      queryClient.invalidateQueries({ queryKey: laneMappingKeys.all });
+    },
+    onError: error => {
+      console.error('Failed to remove lane mapping:', error);
     },
   });
 }

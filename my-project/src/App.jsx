@@ -9,9 +9,10 @@ import PrivateRoute from './components/PrivateRoute';
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const AllLanes = lazy(() => import('./pages/allLanes'));
-const Accounts = lazy(() => import('./pages/Accounts'));
-const AccountLanes = lazy(() => import('./pages/AccountLanes'));
+const LaneMappingLanes = lazy(() => import('./pages/LaneMappingLanes'));
 const Edit = lazy(() => import('./pages/edit'));
+const Accounts = lazy(() => import('./pages/Accounts'));
+const AccountDetail = lazy(() => import('./pages/AccountDetail'));
 
 // Loading component shown while lazy components load
 const PageLoader = () => (
@@ -61,17 +62,6 @@ function App() {
             />
 
             <Route
-              path="/Accounts"
-              element={
-                <ErrorBoundary fallback={<PageErrorFallback />}>
-                  <PrivateRoute>
-                    <Accounts />
-                  </PrivateRoute>
-                </ErrorBoundary>
-              }
-            />
-
-            <Route
               path="/edit"
               element={
                 <ErrorBoundary fallback={<PageErrorFallback />}>
@@ -83,11 +73,33 @@ function App() {
             />
 
             <Route
-              path="/accountLanes/:accountId"
+              path="/laneMappingLanes/:laneMappingId"
               element={
                 <ErrorBoundary fallback={<PageErrorFallback />}>
                   <PrivateRoute>
-                    <AccountLanes />
+                    <LaneMappingLanes />
+                  </PrivateRoute>
+                </ErrorBoundary>
+              }
+            />
+
+            <Route
+              path="/accounts"
+              element={
+                <ErrorBoundary fallback={<PageErrorFallback />}>
+                  <PrivateRoute>
+                    <Accounts />
+                  </PrivateRoute>
+                </ErrorBoundary>
+              }
+            />
+
+            <Route
+              path="/accounts/:id"
+              element={
+                <ErrorBoundary fallback={<PageErrorFallback />}>
+                  <PrivateRoute>
+                    <AccountDetail />
                   </PrivateRoute>
                 </ErrorBoundary>
               }

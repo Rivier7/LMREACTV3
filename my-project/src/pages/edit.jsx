@@ -79,8 +79,13 @@ const Edit = () => {
       setIsLoading(true);
       try {
         const legData = await getFlights(lane.id);
-        setLegs(legData);
-        setOriginalLegs(JSON.parse(JSON.stringify(legData))); // Deep copy for comparison
+        // Ensure all legs have cutoffTime field initialized
+        const legsWithCutoffTime = legData.map((leg, index) => ({
+          ...leg,
+          cutoffTime: leg.cutoffTime || (index === 0 ? '' : ''),
+        }));
+        setLegs(legsWithCutoffTime);
+        setOriginalLegs(JSON.parse(JSON.stringify(legsWithCutoffTime))); // Deep copy for comparison
       } catch (err) {
         console.error('Error loading legs:', err.message);
       } finally {
@@ -177,7 +182,10 @@ const Edit = () => {
   };
 
   const handleInputChange = (index, field, rawValue) => {
-    let value = rawValue.toUpperCase();
+    // Don't uppercase cutoff time or other time-based fields
+    let value = (field === 'cutoffTime' || field === 'departureTime' || field === 'arrivalTime') 
+      ? rawValue 
+      : rawValue.toUpperCase();
 
     if ((field === 'originStation' || field === 'destinationStation') && value.length > 3) {
       alert('Origin and destination must be max 3 letters.');
@@ -215,9 +223,17 @@ const Edit = () => {
       value = value.substring(0, 2).toUpperCase() + value.substring(2);
     }
 
-    const updatedLegs = [...legs];
-    updatedLegs[index][field] = value;
-    updatedLegs[index].valid = null;
+    const updatedLegs = legs.map((leg, i) => {
+      if (i !== index) return leg;
+      // Create a new leg object with the updated field
+      const newLeg = { ...leg, [field]: value };
+      // Only reset validation status for fields that affect flight validation
+      // cutoffTime doesn't affect flight validation, so don't reset valid status
+      if (field !== 'cutoffTime') {
+        newLeg.valid = null;
+      }
+      return newLeg;
+    });
     setLegs(updatedLegs);
   };
 
@@ -306,14 +322,20 @@ const Edit = () => {
   };
 
   const handleSubmit = async () => {
+    console.log('handleSubmit called');
+    console.log('Current legs state:', legs);
+    console.log('legs[0].cutoffTime:', legs[0]?.cutoffTime);
+
     // Check if any changes were made before submitting
     if (!hasLaneChanged() && !hasLegsChanged()) {
+      console.log('Blocked: No changes detected');
       alert('No changes detected. Please make changes before updating.');
       return;
     }
 
     setIsLoading(true);
     const isDirectDrive = updatedLane.serviceLevel === 'DIRECT DRIVE';
+    console.log('isDirectDrive:', isDirectDrive);
 
     try {
       let result;
@@ -321,18 +343,27 @@ const Edit = () => {
         result = await updateLaneToDirectDrive(updatedLane.id, updatedLane, []);
       } else {
         if (legs.some(f => !f.flightNumber || !f.originStation || !f.destinationStation)) {
+          console.log('Blocked: Missing flight fields');
           alert('Please fill out all flight fields!');
           setIsLoading(false);
           return;
         }
         if (legs.some(f => f.valid === false || f.valid === null)) {
+          console.log('Blocked: Invalid legs', legs.map(l => ({ valid: l.valid })));
           alert('Not all legs are valid');
           setIsLoading(false);
           return;
         }
-        console.log('Submitting updated lane with legs:', updatedLane, legs);
+        
+        // Ensure all legs include cutoffTime field when submitting
+        const legsToSubmit = legs.map(leg => ({
+          ...leg,
+          cutoffTime: leg.cutoffTime || '',
+        }));
+        
+        console.log('Submitting updated lane with legs:', updatedLane, legsToSubmit);
 
-        result = await updateLane(updatedLane.id, updatedLane, legs);
+        result = await updateLane(updatedLane.id, updatedLane, legsToSubmit);
       }
 
       if (result?.notModified) {
@@ -416,14 +447,19 @@ const Edit = () => {
       )}
 
       <div className="w-full p-6 space-y-8">
-        {/* Account Name */}
+        {/* Account & Lane Mapping */}
         <div className="bg-white rounded shadow border-gray-300 p-4 mb-4">
-          <div className="text-center">
+          <div className="text-center flex items-center justify-center gap-3 flex-wrap">
             <span className="inline-block bg-gray-100 px-2 py-1 rounded text-xs font-semibold text-gray-800">
               {updatedLane.accountName}
             </span>
+            {updatedLane.laneMappingName && (
+              <span className="inline-block px-2 py-1 rounded text-xs font-semibold bg-indigo-100 text-indigo-700">
+                {updatedLane.laneMappingName}
+              </span>
+            )}
             {updatedLane.lastUpdate && (
-              <p className="text-xs text-gray-500 mt-1">Last Updated: {updatedLane.lastUpdate}</p>
+              <p className="text-xs text-gray-500 w-full mt-1">Last Updated: {updatedLane.lastUpdate}</p>
             )}
           </div>
         </div>
@@ -533,14 +569,17 @@ const Edit = () => {
             <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
               Lane Option
             </label>
-            <input
-              type="text"
+            <select
               name="laneOption"
               value={updatedLane.laneOption || ''}
               onChange={handleChange}
               className="w-full mb-3 px-2 py-1 border border-gray-300 rounded text-xs"
-              placeholder="Option"
-            />
+            >
+              <option value="">Select Option</option>
+              <option value="Primary">Primary</option>
+              <option value="Secondary">Secondary</option>
+              <option value="Alternative">Alternative</option>
+            </select>
 
             <label className="block mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">
               Pickup Time

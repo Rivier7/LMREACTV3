@@ -2,12 +2,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getLanes,
   getLanebyId,
-  getLaneByAccountId,
+  getLanesByLaneMappingId,
   getLaneCounts,
   getFlights,
   updateLane,
   updateLaneToDirectDrive,
-  updateAccountLanes,
+  updateLaneMappingLanes,
   validateLanes,
   validateFlight,
   getSuggestedRoute,
@@ -25,7 +25,7 @@ export const laneKeys = {
   list: () => [...laneKeys.lists()],
   details: () => [...laneKeys.all, 'detail'],
   detail: id => [...laneKeys.details(), id],
-  byAccount: accountId => [...laneKeys.all, 'account', accountId],
+  byLaneMapping: laneMappingId => [...laneKeys.all, 'laneMapping', laneMappingId],
   counts: () => [...laneKeys.all, 'counts'],
   flights: laneId => [...laneKeys.all, 'flights', laneId],
 };
@@ -68,14 +68,14 @@ export function useLane(laneId) {
 }
 
 /**
- * Fetch lanes for a specific account
- * Used in: AccountLanes page
+ * Fetch lanes for a specific lane mapping
+ * Used in: LaneMappingLanes page
  */
-export function useLanesByAccount(accountId) {
+export function useLanesByLaneMapping(laneMappingId) {
   return useQuery({
-    queryKey: laneKeys.byAccount(accountId),
-    queryFn: () => getLaneByAccountId(accountId),
-    enabled: !!accountId,
+    queryKey: laneKeys.byLaneMapping(laneMappingId),
+    queryFn: () => getLanesByLaneMappingId(laneMappingId),
+    enabled: !!laneMappingId,
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -109,10 +109,10 @@ export function useUpdateLane() {
       queryClient.invalidateQueries({ queryKey: laneKeys.lists() });
       // Invalidate lane counts
       queryClient.invalidateQueries({ queryKey: laneKeys.counts() });
-      // If this lane belongs to an account, invalidate that account's lanes
-      if (variables.updatedLane?.accountId) {
+      // If this lane belongs to a lane mapping, invalidate that lane mapping's lanes
+      if (variables.updatedLane?.laneMappingId) {
         queryClient.invalidateQueries({
-          queryKey: laneKeys.byAccount(variables.updatedLane.accountId),
+          queryKey: laneKeys.byLaneMapping(variables.updatedLane.laneMappingId),
         });
       }
     },
@@ -137,17 +137,17 @@ export function useUpdateLaneToDirectDrive() {
 }
 
 /**
- * Update multiple lanes for an account
- * Automatically invalidates account lanes on success
+ * Update multiple lanes for a lane mapping
+ * Automatically invalidates lane mapping lanes on success
  */
-export function useUpdateAccountLanes() {
+export function useUpdateLaneMappingLanes() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ accountId, updatedLanes }) => updateAccountLanes(accountId, updatedLanes),
+    mutationFn: ({ laneMappingId, updatedLanes }) => updateLaneMappingLanes(laneMappingId, updatedLanes),
     onSuccess: (data, variables) => {
-      // Invalidate lanes for this account
-      queryClient.invalidateQueries({ queryKey: laneKeys.byAccount(variables.accountId) });
+      // Invalidate lanes for this lane mapping
+      queryClient.invalidateQueries({ queryKey: laneKeys.byLaneMapping(variables.laneMappingId) });
       // Invalidate lane counts
       queryClient.invalidateQueries({ queryKey: laneKeys.counts() });
     },
@@ -155,15 +155,15 @@ export function useUpdateAccountLanes() {
 }
 
 /**
- * Update TAT time for all lanes in an account
+ * Update TAT time for all lanes in a lane mapping
  */
 export function useUpdateAllTatTime() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ accountId, updatedLane }) => updateAllTatTime(accountId, updatedLane),
+    mutationFn: ({ laneMappingId, updatedLane }) => updateAllTatTime(laneMappingId, updatedLane),
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: laneKeys.byAccount(variables.accountId) });
+      queryClient.invalidateQueries({ queryKey: laneKeys.byLaneMapping(variables.laneMappingId) });
     },
   });
 }

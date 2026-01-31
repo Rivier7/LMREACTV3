@@ -1,13 +1,13 @@
 import React, { useState, useRef } from 'react';
 import { downloadExcelTemplate } from '../api/api';
-import { useUploadAccountExcel } from '../hooks/useAccountQueries';
+import { useUploadLaneMappingExcel } from '../hooks/useLaneMappingQueries';
 
 export default function FileUploader() {
   const [file, setFile] = useState(null);
   const fileInputRef = useRef(null);
 
-  // React Query mutation - automatically invalidates account queries on success!
-  const uploadMutation = useUploadAccountExcel();
+  // React Query mutation - automatically invalidates lane mapping queries on success!
+  const uploadMutation = useUploadLaneMappingExcel();
 
   function handleFileChange(e) {
     if (e.target.files && e.target.files.length > 0) {

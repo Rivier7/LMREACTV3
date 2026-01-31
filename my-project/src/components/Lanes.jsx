@@ -5,6 +5,7 @@ import Lane from './Lane';
 function Lanes({ lanes, onDelete }) {
   const [filters, setFilters] = useState({
     accountName: '',
+    laneMappingName: '',
     originCountry: '',
     originState: '',
     originStation: '',
@@ -14,8 +15,12 @@ function Lanes({ lanes, onDelete }) {
     destinationCity: '',
     itemNumber: '',
     destinationStation: '',
+    laneOption: '',
     valid: '',
   });
+
+  // Helper to get lane mapping name (stored as flat property from backend)
+  const getLaneMappingName = lane => lane.laneMappingName || '';
 
   const [filteredLanes, setFilteredLanes] = useState(lanes);
   const [showFilters, setShowFilters] = useState(true);
@@ -24,6 +29,7 @@ function Lanes({ lanes, onDelete }) {
     const result = lanes.filter(lane => {
       return (
         (!filters.accountName || lane.accountName === filters.accountName) &&
+        (!filters.laneMappingName || getLaneMappingName(lane) === filters.laneMappingName) &&
         (!filters.originCountry || lane.originCountry === filters.originCountry) &&
         (!filters.originState || lane.originState === filters.originState) &&
         (!filters.originStation || lane.originStation === filters.originStation) &&
@@ -47,6 +53,7 @@ function Lanes({ lanes, onDelete }) {
   const clearFilters = () => {
     setFilters({
       accountName: '',
+      laneMappingName: '',
       originCountry: '',
       originState: '',
       originStation: '',
@@ -65,6 +72,7 @@ function Lanes({ lanes, onDelete }) {
 
   const fields = [
     { label: 'Account', name: 'accountName', icon: '🏢' },
+    { label: 'Lane Mapping', name: 'laneMappingName', icon: '🗺️', nested: true },
     { label: 'Origin Country', name: 'originCountry', icon: '🌍' },
     { label: 'Origin State', name: 'originState', icon: '📍' },
     { label: 'Origin City', name: 'originCity', icon: '🏙️' },
@@ -132,6 +140,9 @@ function Lanes({ lanes, onDelete }) {
                     if (key === 'valid') {
                       return !val || lane.valid === (val === 'true');
                     }
+                    if (key === 'laneMappingName') {
+                      return !val || getLaneMappingName(lane) === val;
+                    }
                     return !val || lane[key] === val;
                   });
                 });
@@ -139,7 +150,9 @@ function Lanes({ lanes, onDelete }) {
                 const options =
                   field.name === 'valid'
                     ? ['true', 'false']
-                    : [...new Set(tempFiltered.map(lane => lane[field.name]).filter(Boolean))];
+                    : field.nested
+                      ? [...new Set(tempFiltered.map(lane => getLaneMappingName(lane)).filter(Boolean))]
+                      : [...new Set(tempFiltered.map(lane => lane[field.name]).filter(Boolean))];
 
                 const hasValue = filters[field.name] !== '';
 

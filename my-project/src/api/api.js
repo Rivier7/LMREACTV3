@@ -4,7 +4,7 @@ import { FlipHorizontal } from 'lucide-react';
 const API_BASE = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:8080';
 
 const BASE_URL = `${API_BASE}/lanes`;
-const BASE_URL2 = `${API_BASE}/Account`;
+const BASE_URL2 = `${API_BASE}/laneMapping`;
 const BASE_URL3 = `${API_BASE}/api/flights/validate-leg`;
 
 // ✅ Centralized headers function (always attaches JWT)
@@ -29,14 +29,21 @@ export const getLanes = async () => {
 
 export const updateLane = async (id, updatedLane, legs) => {
   console.log('lane: ', updatedLane, legs);
+  console.log('cutoffTime from legs[0]:', legs[0]?.cutoffTime);
   try {
+    // Ensure laneMappingId is set on the lane for backend association
+    const laneWithMapping = {
+      ...updatedLane,
+      laneMappingId: updatedLane.laneMappingId || updatedLane.laneMapping?.id,
+    };
+
     const response = await fetch(`${BASE_URL}/updateLane/${id}`, {
       method: 'PUT',
       headers: {
         ...getAuthHeaders(),
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ updatedLane, legs }),
+      body: JSON.stringify({ updatedLane: laneWithMapping, legs }),
     });
 
     // 304 Not Modified is uncommon for PUT, but handle if backend returns it
@@ -95,7 +102,7 @@ export const getTAT = async (updatedLane, legs) => {
   return text;
 };
 
-export const updateAccountLanes = async (id, updatedLanes) => {
+export const updateLaneMappingLanes = async (id, updatedLanes) => {
   const response = await fetch(`${BASE_URL2}/updateLanes/${id}`, {
     method: 'PUT',
     headers: {
@@ -105,7 +112,7 @@ export const updateAccountLanes = async (id, updatedLanes) => {
     body: JSON.stringify(updatedLanes),
   });
 
-  if (!response.ok) throw new Error(`Failed to update lanes for account with ID ${id}`);
+  if (!response.ok) throw new Error(`Failed to update lanes for lane mapping with ID ${id}`);
   return await response.json();
 };
 
@@ -120,12 +127,12 @@ export const updateLaneToDirectDrive = async (id, updatedLane) => {
   return await response.json();
 };
 
-// ✅ Fetch all accounts
-export const getAllAccounts = async () => {
+// ✅ Fetch all lane mappings
+export const getAllLaneMappings = async () => {
   const response = await fetch(BASE_URL2, {
     headers: getAuthHeaders(),
   });
-  if (!response.ok) throw new Error(`Failed to fetch accounts: ${response.status}`);
+  if (!response.ok) throw new Error(`Failed to fetch lane mappings: ${response.status}`);
   return await response.json();
 };
 
@@ -157,20 +164,20 @@ export const getFlights = async id => {
   return await response.json();
 };
 
-// ✅ Download Excel for an account
-export const getAccountExcel = async id => {
+// ✅ Download Excel for a lane mapping
+export const getLaneMappingExcel = async id => {
   const response = await fetch(`${BASE_URL2}/${id}/Excel`, {
     headers: getAuthHeaders(),
   });
 
-  const account = await getAccountbyId(id);
-  if (!response.ok) throw new Error(`Failed to fetch Excel for account ID ${id}`);
+  const laneMapping = await getLaneMappingById(id);
+  if (!response.ok) throw new Error(`Failed to fetch Excel for lane mapping ID ${id}`);
 
   const blob = await response.blob();
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${account.name} Lane-Mapping.xlsx`;
+  a.download = `${laneMapping.name} Lane-Mapping.xlsx`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -198,12 +205,12 @@ export const downloadExcelTemplate = async () => {
 };
 
 /**
- * Upload an Excel file to create or update accounts.
+ * Upload an Excel file to create or update lane mappings.
  * @param {File|Blob} file - The Excel file to upload.
  * @returns {Promise<Object>} Parsed response from the server.
  * @throws {Error} Throws if the upload fails or the server returns an error.
  */
-export const postAccountExcel = async file => {
+export const postLaneMappingExcel = async file => {
   if (!(file instanceof File || file instanceof Blob)) {
     throw new TypeError('Invalid file type. Expected File or Blob.');
   }
@@ -225,7 +232,7 @@ export const postAccountExcel = async file => {
   const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
   try {
-    const response = await fetch(`${BASE_URL2}/post-account_excel`, {
+    const response = await fetch(`${BASE_URL2}/post-laneMapping_excel`, {
       method: 'POST',
       headers,
       body: formData,
@@ -281,16 +288,16 @@ export const getLanebyId = async id => {
   return await response.json();
 };
 
-// ✅ Get a single account by ID
-export const getAccountbyId = async id => {
+// ✅ Get a single lane mapping by ID
+export const getLaneMappingById = async id => {
   const response = await fetch(`${BASE_URL2}/${id}`, {
     headers: getAuthHeaders(),
   });
-  if (!response.ok) throw new Error(`Failed to fetch account with ID ${id}`);
+  if (!response.ok) throw new Error(`Failed to fetch lane mapping with ID ${id}`);
   return await response.json();
 };
 
-export const getLaneByAccountId = async id => {
+export const getLanesByLaneMappingId = async id => {
   try {
     const response = await fetch(`${BASE_URL2}/${id}/lanes`, {
       method: 'GET',
@@ -302,23 +309,23 @@ export const getLaneByAccountId = async id => {
       console.error('Response headers:', response.headers);
       const errorText = await response.text();
       console.error('Error response:', errorText);
-      throw new Error(`Failed to fetch lanes for account with ID ${id}`);
+      throw new Error(`Failed to fetch lanes for lane mapping with ID ${id}`);
     }
 
     return await response.json();
   } catch (error) {
-    console.error('Error in getLaneByAccountId:', error);
+    console.error('Error in getLanesByLaneMappingId:', error);
     throw error;
   }
 };
 
-// ✅ Delete an account by ID
-export const deleteAccountbyId = async id => {
+// ✅ Delete a lane mapping by ID
+export const deleteLaneMappingById = async id => {
   const response = await fetch(`${BASE_URL2}/delete/${id}`, {
     method: 'DELETE',
     headers: getAuthHeaders(),
   });
-  if (!response.ok) throw new Error(`Failed to delete account with ID ${id}`);
+  if (!response.ok) throw new Error(`Failed to delete lane mapping with ID ${id}`);
   return await response.json();
 };
 
@@ -429,5 +436,80 @@ export const getSuggestedRouteByLocation = async payload => {
     throw new Error(` ${errorMessage}`);
   }
 
+  return await response.json();
+};
+
+// =====================
+// Account API Functions
+// =====================
+const BASE_URL_ACCOUNT = `${API_BASE}/account`;
+
+// Get all accounts
+export const getAllAccounts = async () => {
+  const response = await fetch(BASE_URL_ACCOUNT, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error(`Failed to fetch accounts: ${response.status}`);
+  return await response.json();
+};
+
+// Get account by ID (includes laneMappings)
+export const getAccountById = async id => {
+  const response = await fetch(`${BASE_URL_ACCOUNT}/${id}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error(`Failed to fetch account with ID ${id}`);
+  return await response.json();
+};
+
+// Create a new account
+export const createAccount = async name => {
+  const response = await fetch(BASE_URL_ACCOUNT, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ name }),
+  });
+  if (!response.ok) throw new Error('Failed to create account');
+  return await response.json();
+};
+
+// Update account name
+export const updateAccount = async (id, name) => {
+  const response = await fetch(`${BASE_URL_ACCOUNT}/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ name }),
+  });
+  if (!response.ok) throw new Error(`Failed to update account with ID ${id}`);
+  return await response.json();
+};
+
+// Delete account (cascades to laneMappings)
+export const deleteAccountById = async id => {
+  const response = await fetch(`${BASE_URL_ACCOUNT}/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error(`Failed to delete account with ID ${id}`);
+  return await response.json();
+};
+
+// Assign a LaneMapping to an Account
+export const assignLaneMappingToAccount = async (accountId, laneMappingId) => {
+  const response = await fetch(`${BASE_URL_ACCOUNT}/${accountId}/laneMapping/${laneMappingId}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error(`Failed to assign lane mapping ${laneMappingId} to account ${accountId}`);
+  return await response.json();
+};
+
+// Remove a LaneMapping from an Account
+export const removeLaneMappingFromAccount = async laneMappingId => {
+  const response = await fetch(`${BASE_URL_ACCOUNT}/laneMapping/${laneMappingId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error(`Failed to remove lane mapping ${laneMappingId} from account`);
   return await response.json();
 };

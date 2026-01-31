@@ -84,7 +84,7 @@ function AllLanes() {
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-gray-900">All Lanes</h1>
             <p className="text-gray-600 mt-1">
-              Viewing {lanes.length} lane{lanes.length !== 1 ? 's' : ''} across all accounts
+              Viewing {lanes.length} lane{lanes.length !== 1 ? 's' : ''} across all lane mappings
             </p>
           </div>
 

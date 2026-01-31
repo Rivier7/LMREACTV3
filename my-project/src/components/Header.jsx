@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { jwtDecode } from 'jwt-decode';
@@ -33,11 +32,11 @@ const Header = () => {
                 Lanes
               </Link>
             </li>
-            {/* <li>
+            <li>
               <Link to="/accounts" className="text-lg hover:text-blue-500 transition-colors">
                 Accounts
               </Link>
-            </li> */}
+            </li>
           </ul>
         </nav>
       </div>

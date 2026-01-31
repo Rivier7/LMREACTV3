@@ -50,6 +50,11 @@ function Lane({ lane, onDelete }) {
             <XCircle className="w-5 h-5 text-red-600" />
           )}
           <span className="font-semibold text-gray-900">{lane.accountName}</span>
+          {lane.laneMappingName && (
+            <span className="px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-700">
+              {lane.laneMappingName}
+            </span>
+          )}
 
           {/* Info Pills */}
           <div className="flex items-center gap-1.5 text-xs">
