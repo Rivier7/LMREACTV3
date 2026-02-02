@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import ErrorBoundary from './components/ErrorBoundary';
 import PageErrorFallback from './components/PageErrorFallback';
 import PrivateRoute from './components/PrivateRoute';
+import SessionExpirationWarning from './components/SessionExpirationWarning';
 
 // Lazy load all page components
 // This splits each page into its own chunk, loaded only when needed
@@ -27,6 +28,7 @@ const PageLoader = () => (
 function App() {
   return (
     <ErrorBoundary>
+      <SessionExpirationWarning />
       <Router>
         <Suspense fallback={<PageLoader />}>
           <Routes>

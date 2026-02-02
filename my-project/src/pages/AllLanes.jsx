@@ -1,6 +1,8 @@
 import React from 'react';
 import { useState, useEffect } from 'react';
-import { getLanes, deleteLaneById } from '../api/api.js';
+import { Building2, ChevronDown } from 'lucide-react';
+import { getLanes, getLanesByAccountId, deleteLaneById } from '../api/api.js';
+import { useAccounts } from '../hooks/useAccountQueries.js';
 import Lanes from '../components/Lanes.jsx';
 import Header from '../components/Header.jsx';
 
@@ -8,6 +10,9 @@ function AllLanes() {
   const [lanes, setLanes] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedAccountId, setSelectedAccountId] = useState('');
+
+  const { data: accounts = [], isLoading: accountsLoading } = useAccounts();
 
   const handleDeleteLane = async id => {
     if (!window.confirm('Are you sure you want to delete this lane? This action cannot be undone.')) {
@@ -22,15 +27,19 @@ function AllLanes() {
     }
   };
 
+  const handleAccountChange = e => {
+    setSelectedAccountId(e.target.value);
+  };
+
   useEffect(() => {
     const loadLanes = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        const lanes = await getLanes();
-        if (!lanes || lanes.length === 0) {
-          setError('No data available');
-        } else {
-          setLanes(lanes);
-        }
+        const fetchedLanes = selectedAccountId
+          ? await getLanesByAccountId(selectedAccountId)
+          : await getLanes();
+        setLanes(fetchedLanes || []);
       } catch (error) {
         setError('Error loading data');
         console.error('API Error:', error);
@@ -40,7 +49,7 @@ function AllLanes() {
     };
 
     loadLanes();
-  }, []);
+  }, [selectedAccountId]);
 
   if (loading) {
     return (
@@ -75,17 +84,52 @@ function AllLanes() {
     );
   }
 
+  const selectedAccount = accounts.find(a => a.id === Number(selectedAccountId));
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <Header />
       <main className="p-6">
         <div className="max-w-[1600px] mx-auto">
           {/* Page Header */}
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold text-gray-900">All Lanes</h1>
-            <p className="text-gray-600 mt-1">
-              Viewing {lanes.length} lane{lanes.length !== 1 ? 's' : ''} across all lane mappings
-            </p>
+          <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">All Lanes</h1>
+              <p className="text-gray-600 mt-1">
+                Viewing {lanes.length} lane{lanes.length !== 1 ? 's' : ''}{' '}
+                {selectedAccount ? `for ${selectedAccount.name}` : 'across all accounts'}
+              </p>
+            </div>
+
+            {/* Account Filter Dropdown */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <Building2 className="w-4 h-4" />
+                <span className="font-medium">Filter by Account:</span>
+              </div>
+              <div className="relative">
+                <select
+                  value={selectedAccountId}
+                  onChange={handleAccountChange}
+                  disabled={accountsLoading}
+                  className={`appearance-none bg-white border rounded-lg px-4 py-2.5 pr-10 text-sm font-medium cursor-pointer transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[200px] ${
+                    selectedAccountId
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-gray-300 text-gray-700 hover:border-gray-400'
+                  }`}
+                >
+                  <option value="">All Accounts</option>
+                  {accounts.map(account => (
+                    <option key={account.id} value={account.id}>
+                      {account.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <ChevronDown className="w-4 h-4 text-gray-400" />
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Lanes Component */}

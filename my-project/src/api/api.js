@@ -1,11 +1,8 @@
-import { FlipHorizontal } from 'lucide-react';
+import { API_SERVER_URL } from '../config/api';
 
-// Use environment variable for API base URL
-const API_BASE = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:8080';
-
-const BASE_URL = `${API_BASE}/lanes`;
-const BASE_URL2 = `${API_BASE}/laneMapping`;
-const BASE_URL3 = `${API_BASE}/api/flights/validate-leg`;
+const BASE_URL = `${API_SERVER_URL}/lanes`;
+const BASE_URL2 = `${API_SERVER_URL}/laneMapping`;
+const BASE_URL3 = `${API_SERVER_URL}/api/flights/validate-leg`;
 
 // ✅ Centralized headers function (always attaches JWT)
 const getAuthHeaders = (isFormData = false) => {
@@ -27,9 +24,16 @@ export const getLanes = async () => {
   return await response.json();
 };
 
+// ✅ Fetch lanes by account ID
+export const getLanesByAccountId = async accountId => {
+  const response = await fetch(`${BASE_URL}/account/${accountId}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error(`Failed to fetch lanes for account ${accountId}`);
+  return await response.json();
+};
+
 export const updateLane = async (id, updatedLane, legs) => {
-  console.log('lane: ', updatedLane, legs);
-  console.log('cutoffTime from legs[0]:', legs[0]?.cutoffTime);
   try {
     // Ensure laneMappingId is set on the lane for backend association
     const laneWithMapping = {
@@ -66,8 +70,6 @@ export const updateLane = async (id, updatedLane, legs) => {
     const data = await response.json();
     return data;
   } catch (error) {
-    // Consider integrating with your app's logging or error reporting system here
-    console.error(`Error updating lane with ID ${id}:`, error);
     throw error;
   }
 };
@@ -97,8 +99,6 @@ export const getTAT = async (updatedLane, legs) => {
   if (!response.ok) throw new Error(`Failed to calculate TAT`);
 
   const text = await response.text();
-  console.log(text);
-
   return text;
 };
 
@@ -305,16 +305,11 @@ export const getLanesByLaneMappingId = async id => {
     });
 
     if (!response.ok) {
-      console.error('Response status:', response.status);
-      console.error('Response headers:', response.headers);
-      const errorText = await response.text();
-      console.error('Error response:', errorText);
       throw new Error(`Failed to fetch lanes for lane mapping with ID ${id}`);
     }
 
     return await response.json();
   } catch (error) {
-    console.error('Error in getLanesByLaneMappingId:', error);
     throw error;
   }
 };
@@ -357,10 +352,8 @@ export const validateFlight = async flight => {
     try {
       const errorData = JSON.parse(errorText);
       errorMessage = errorData.message || errorData.error || errorText;
-      console.log('Error data:', errorData);
     } catch {
       // Not JSON, use the raw text
-      console.log('Error text:', errorText);
     }
 
     throw new Error(errorMessage);
@@ -396,13 +389,11 @@ export const getSuggestedRoute = async payload => {
     let errorMessage;
     try {
       const errorData = await response.json();
-      console.log('Error data:', errorData);
       errorMessage = errorData.message || JSON.stringify(errorData);
     } catch {
       errorMessage = await response.text();
     }
-    console.error('Error response:', errorMessage);
-    throw new Error(` ${errorMessage}`);
+    throw new Error(errorMessage);
   }
 
   return await response.json();
@@ -426,14 +417,11 @@ export const getSuggestedRouteByLocation = async payload => {
     let errorMessage;
     try {
       const errorData = await response.json();
-      console.log('Error data:', errorData);
       errorMessage = errorData.message || JSON.stringify(errorData);
     } catch {
       errorMessage = await response.text();
-      console.log('Error text:', errorMessage);
     }
-    console.error('Error response:', errorMessage);
-    throw new Error(` ${errorMessage}`);
+    throw new Error(errorMessage);
   }
 
   return await response.json();

@@ -1,7 +1,7 @@
 import axios from 'axios';
+import { API_BASE_URL } from '../config/api';
 
-// Use environment variable for API base URL
-const BASE_URL = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'}/auth`;
+const BASE_URL = `${API_BASE_URL}/auth`;
 
 // Initialize login and get 2FA code
 export const initiateLogin = async (email, password) => {
@@ -40,7 +40,7 @@ export const verify2FA = async (email, code) => {
 // Resend 2FA code
 export const resend2FACode = async email => {
   try {
-    const response = await axios.post(`${BASE_URL}/resend-2fa?email=${email}`);
+    const response = await axios.post(`${BASE_URL}/resend-2fa`, { email });
     return response.data;
   } catch (error) {
     throw error.response?.data || 'Failed to resend code';

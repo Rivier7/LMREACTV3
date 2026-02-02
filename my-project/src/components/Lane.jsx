@@ -1,25 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { Edit3, Plane, Truck, CheckCircle, XCircle, AlertCircle, Trash2 } from 'lucide-react';
 
-const dayAbbreviations = {
-  MONDAY: 'Mon',
-  TUESDAY: 'Tue',
-  WEDNESDAY: 'Wed',
-  THURSDAY: 'Thu',
-  FRIDAY: 'Fri',
-  SATURDAY: 'Sat',
-  SUNDAY: 'Sun',
-};
-
-const formatAircraftByDay = aircraftByDay => {
-  if (!aircraftByDay || typeof aircraftByDay !== 'object') return '-';
-  const entries = Object.entries(aircraftByDay);
-  if (entries.length === 0) return '-';
-  const uniqueAircraft = [...new Set(entries.map(([, aircraft]) => aircraft))];
-  if (uniqueAircraft.length === 1) return uniqueAircraft[0];
-  return entries.map(([day, aircraft]) => `${dayAbbreviations[day] || day}: ${aircraft}`).join(', ');
-};
-
 function Lane({ lane, onDelete }) {
   const navigate = useNavigate();
 
@@ -151,8 +132,7 @@ function Lane({ lane, onDelete }) {
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">Route</th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">Dep</th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">Arr</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">Aircraft</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">Days</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">Operating Days</th>
                   <th className="px-3 py-2 text-center text-xs font-medium text-gray-600">Status</th>
                 </tr>
               </thead>
@@ -165,12 +145,7 @@ function Lane({ lane, onDelete }) {
                       <td className="px-3 py-2 text-gray-700">{leg.originStation} → {leg.destinationStation}</td>
                       <td className="px-3 py-2 text-gray-600">{leg.departureTime}</td>
                       <td className="px-3 py-2 text-gray-600">{leg.arrivalTime}</td>
-                      <td className="px-3 py-2 text-gray-600 text-xs" title={
-                        leg.aircraftByDay
-                          ? Object.entries(leg.aircraftByDay).map(([day, aircraft]) => `${day}: ${aircraft}`).join('\n')
-                          : ''
-                      }>{formatAircraftByDay(leg.aircraftByDay)}</td>
-                      <td className="px-3 py-2 text-xs text-gray-500">{leg.flightOperatingdays || 'N/A'}</td>
+                      <td className="px-3 py-2 text-gray-600 text-xs">{leg.flightOperatingdays || 'N/A'}</td>
                       <td className="px-3 py-2 text-center">
                         {leg.valid === true ? (
                           <CheckCircle className="w-4 h-4 text-green-500 inline-block" />
@@ -184,6 +159,25 @@ function Lane({ lane, onDelete }) {
                   ))}
               </tbody>
             </table>
+
+            {/* Aircraft by Day */}
+            <div className="px-4 py-3 bg-slate-50 border-t border-gray-200">
+              <div className="text-xs font-medium text-gray-600 mb-2">Aircraft by Day</div>
+              <div className="flex flex-wrap gap-2">
+                {['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'].map(day => {
+                  const aircraft = lane.legs?.[0]?.aircraftByDay?.[day];
+                  const dayAbbr = { MONDAY: 'Mon', TUESDAY: 'Tue', WEDNESDAY: 'Wed', THURSDAY: 'Thu', FRIDAY: 'Fri', SATURDAY: 'Sat', SUNDAY: 'Sun' }[day];
+                  return (
+                    <div key={day} className="flex items-center gap-1.5 px-2 py-1 bg-white border border-gray-200 rounded">
+                      <span className="text-xs font-medium text-gray-500">{dayAbbr}</span>
+                      <span className={`text-xs font-semibold ${aircraft ? 'text-gray-800' : 'text-gray-300'}`}>
+                        {aircraft || '-'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         )}
 

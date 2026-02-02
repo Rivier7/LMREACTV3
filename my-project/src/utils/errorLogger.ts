@@ -104,12 +104,17 @@ export const logApiError = (error: ApiError, endpoint: string = ''): ErrorInfo =
     severity = ErrorSeverity.CRITICAL;
   }
 
+  // In production, only log status code to avoid exposing sensitive backend data
+  const responseData = import.meta.env.PROD
+    ? { status }
+    : error.response?.data;
+
   return logError(error as Error, {
     category,
     severity,
     endpoint,
     status,
-    responseData: error.response?.data,
+    responseData,
   });
 };
 

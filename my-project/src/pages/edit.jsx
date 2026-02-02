@@ -304,38 +304,28 @@ const Edit = () => {
     for (const leg of updatedLegs) {
       try {
         const result = await validateFlight(leg);
-        console.log('Validation result:', result);
-        console.log('Operating days from result:', result.operatingDays);
         leg.valid = result.valid;
         leg.validMessage = result.mismatchedFields || [];
         leg.flightOperatingDays = result.operatingDays;
         leg.aircraftByDay = result.aircraftByDay || null;
-        console.log('Updated leg flightOperatingDays:', leg.flightOperatingDays);
       } catch (error) {
         leg.valid = false;
         leg.validMessage = [error.message || 'Validation failed'];
       }
     }
-    console.log('All updated legs:', updatedLegs);
     setLegs(updatedLegs);
     setIsLoading(false);
   };
 
   const handleSubmit = async () => {
-    console.log('handleSubmit called');
-    console.log('Current legs state:', legs);
-    console.log('legs[0].cutoffTime:', legs[0]?.cutoffTime);
-
     // Check if any changes were made before submitting
     if (!hasLaneChanged() && !hasLegsChanged()) {
-      console.log('Blocked: No changes detected');
       alert('No changes detected. Please make changes before updating.');
       return;
     }
 
     setIsLoading(true);
     const isDirectDrive = updatedLane.serviceLevel === 'DIRECT DRIVE';
-    console.log('isDirectDrive:', isDirectDrive);
 
     try {
       let result;
@@ -343,25 +333,21 @@ const Edit = () => {
         result = await updateLaneToDirectDrive(updatedLane.id, updatedLane, []);
       } else {
         if (legs.some(f => !f.flightNumber || !f.originStation || !f.destinationStation)) {
-          console.log('Blocked: Missing flight fields');
           alert('Please fill out all flight fields!');
           setIsLoading(false);
           return;
         }
         if (legs.some(f => f.valid === false || f.valid === null)) {
-          console.log('Blocked: Invalid legs', legs.map(l => ({ valid: l.valid })));
           alert('Not all legs are valid');
           setIsLoading(false);
           return;
         }
-        
+
         // Ensure all legs include cutoffTime field when submitting
         const legsToSubmit = legs.map(leg => ({
           ...leg,
           cutoffTime: leg.cutoffTime || '',
         }));
-        
-        console.log('Submitting updated lane with legs:', updatedLane, legsToSubmit);
 
         result = await updateLane(updatedLane.id, updatedLane, legsToSubmit);
       }
@@ -376,7 +362,6 @@ const Edit = () => {
         }, 3000);
       }
     } catch (error) {
-      console.error('Error updating lane:', error.message);
       alert(error.message);
     } finally {
       setIsLoading(false);
@@ -389,7 +374,6 @@ const Edit = () => {
       const tatTTime = await getTAT(updatedLane, legs);
       setUpdatedLane(prev => ({ ...prev, tatToConsigneeDuration: tatTTime }));
     } catch (error) {
-      console.error('Error calculating TAT:', error.message);
       alert('Failed to calculate TAT.');
     } finally {
       setIsLoading(false);

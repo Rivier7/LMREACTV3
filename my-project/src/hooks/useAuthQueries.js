@@ -8,9 +8,6 @@ import { initiateLogin, verify2FA, resend2FACode } from '../api/auth';
 export function useInitiateLogin() {
   return useMutation({
     mutationFn: ({ email, password }) => initiateLogin(email, password),
-    onError: error => {
-      console.error('Login initiation failed:', error);
-    },
   });
 }
 
@@ -21,13 +18,6 @@ export function useInitiateLogin() {
 export function useVerify2FA() {
   return useMutation({
     mutationFn: ({ email, code }) => verify2FA(email, code),
-    onSuccess: data => {
-      // Token is handled by AuthContext, so we don't need to do anything here
-      console.log('2FA verification successful');
-    },
-    onError: error => {
-      console.error('2FA verification failed:', error);
-    },
   });
 }
 
@@ -38,8 +28,5 @@ export function useVerify2FA() {
 export function useResend2FACode() {
   return useMutation({
     mutationFn: email => resend2FACode(email),
-    onError: error => {
-      console.error('Failed to resend 2FA code:', error);
-    },
   });
 }

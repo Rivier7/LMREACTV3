@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { saveToken } from '../utils/auth';
+import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../config/api';
 
 function LoginForm() {
   const [email, setEmail] = useState('');
@@ -9,23 +10,20 @@ function LoginForm() {
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const { login } = useAuth();
+
   const handleSubmit = async e => {
     e.preventDefault();
 
     try {
-      const res = await axios.post('http://localhost:8080/api/auth/login', {
+      const res = await axios.post(`${API_BASE_URL}/auth/login`, {
         email,
         password,
       });
 
       const token = res.data.token;
-      saveToken(token); // Save to localStorage
-      console.log('Login success:', res.data);
-
       login(token);
       navigate('/dashboard');
     } catch (err) {
-      console.error(err);
       setError('Invalid login credentials');
     }
   };

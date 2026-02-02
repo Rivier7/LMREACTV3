@@ -4,18 +4,19 @@ import tailwindcss from '@tailwindcss/vite';
 import { visualizer } from 'rollup-plugin-visualizer';
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     tailwindcss(),
-    // Bundle analyzer - generates stats.html
-    visualizer({
-      filename: './dist/stats.html',
-      open: false,
-      gzipSize: true,
-      brotliSize: true,
-    }),
-  ],
+    // Bundle analyzer - only in development/analyze mode, not in production builds
+    mode !== 'production' &&
+      visualizer({
+        filename: './dist/stats.html',
+        open: false,
+        gzipSize: true,
+        brotliSize: true,
+      }),
+  ].filter(Boolean),
   build: {
     // Performance optimizations
     rollupOptions: {
@@ -53,4 +54,4 @@ export default defineConfig({
       ]
     }
   }
-})
+}))

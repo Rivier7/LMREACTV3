@@ -3,6 +3,7 @@ import {
   getLanes,
   getLanebyId,
   getLanesByLaneMappingId,
+  getLanesByAccountId,
   getLaneCounts,
   getFlights,
   updateLane,
@@ -26,6 +27,7 @@ export const laneKeys = {
   details: () => [...laneKeys.all, 'detail'],
   detail: id => [...laneKeys.details(), id],
   byLaneMapping: laneMappingId => [...laneKeys.all, 'laneMapping', laneMappingId],
+  byAccount: accountId => [...laneKeys.all, 'account', accountId],
   counts: () => [...laneKeys.all, 'counts'],
   flights: laneId => [...laneKeys.all, 'flights', laneId],
 };
@@ -76,6 +78,19 @@ export function useLanesByLaneMapping(laneMappingId) {
     queryKey: laneKeys.byLaneMapping(laneMappingId),
     queryFn: () => getLanesByLaneMappingId(laneMappingId),
     enabled: !!laneMappingId,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * Fetch lanes for a specific account
+ * Used in: AllLanes page with account filter
+ */
+export function useLanesByAccount(accountId) {
+  return useQuery({
+    queryKey: laneKeys.byAccount(accountId),
+    queryFn: () => getLanesByAccountId(accountId),
+    enabled: !!accountId,
     staleTime: 5 * 60 * 1000,
   });
 }

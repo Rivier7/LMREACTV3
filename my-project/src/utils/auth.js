@@ -1,11 +1,11 @@
 // Save JWT token
 export function saveToken(token) {
-  localStorage.setItem('jwt', token);
+  localStorage.setItem('token', token);
 }
 
 // Retrieve token
 export function getToken() {
-  return localStorage.getItem('jwt');
+  return localStorage.getItem('token');
 }
 
 // Check if logged in
@@ -15,5 +15,5 @@ export function isLoggedIn() {
 
 // Log out
 export function logout() {
-  localStorage.removeItem('jwt');
+  localStorage.removeItem('token');
 }

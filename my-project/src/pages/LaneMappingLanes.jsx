@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import Header from '../components/Header';
 import {
@@ -154,7 +154,6 @@ const LaneMappingLanes = () => {
     'destinationStation',
     'arrivalTime',
     'flightOperatingDays',
-    'aircraftByDay',
     'cutoffTime',
     'legValidationMessage',
   ];
@@ -167,7 +166,6 @@ const LaneMappingLanes = () => {
     destinationStation: 'Destination',
     arrivalTime: 'Arrival',
     flightOperatingDays: 'Operating Days',
-    aircraftByDay: 'Aircraft by Day',
     cutoffTime: 'Cutoff',
     legValidationMessage: 'Leg Status',
   };
@@ -199,7 +197,11 @@ const LaneMappingLanes = () => {
       try {
         const data = await getLanesByLaneMappingId(laneMappingId);
         if (!data || data.length === 0) setError('No lanes available for this lane mapping');
-        else setLanes(data);
+        else {
+          // Reset hasBeenUpdated to false for all lanes on initial load
+          const cleanedData = data.map(lane => ({ ...lane, hasBeenUpdated: false }));
+          setLanes(cleanedData);
+        }
       } catch (error) {
         console.error(error);
         setError('Error loading lanes');
@@ -370,8 +372,6 @@ const LaneMappingLanes = () => {
         laneToValidate.legs.map(async leg => {
           try {
             const result = await validateFlight(leg);
-            console.log('Validation result:', result);
-            console.log('Operating days from result:', result.operatingDays);
             const updatedLeg = {
               ...leg,
               valid: result.valid,
@@ -380,7 +380,6 @@ const LaneMappingLanes = () => {
               flightOperatingDays: result.operatingDays,
               aircraftByDay: result.aircraftByDay || null,
             };
-            console.log('Updated leg with flightOperatingDays:', updatedLeg);
             return updatedLeg;
           } catch (error) {
             return {
@@ -400,7 +399,6 @@ const LaneMappingLanes = () => {
       );
     } catch (err) {
       setError('Error validating flight legs.');
-      console.error('Validation Error:', err);
     } finally {
       setLoading(false);
     }
@@ -419,7 +417,6 @@ const LaneMappingLanes = () => {
       );
     } catch (error) {
       setError('Error calculating TAT.');
-      console.error('TAT Calculation Error:', error);
     } finally {
       setLoading(false);
     }
@@ -458,7 +455,6 @@ const LaneMappingLanes = () => {
       setLanes(newLanes);
     } catch (err) {
       setError('Error validating all flight legs.');
-      console.error('Bulk Validation Error:', err);
     } finally {
       setLoading(false);
     }
@@ -546,10 +542,6 @@ const LaneMappingLanes = () => {
       const updatedLane = lanes.find(l => l.id === id);
       if (!updatedLane) return;
 
-      console.log('Saving lane:', updatedLane);
-      console.log('Saving legs:', updatedLane.legs);
-      console.log('First leg flightOperatingDays:', updatedLane.legs?.[0]?.flightOperatingDays);
-
       await updateLane(updatedLane.id, updatedLane, updatedLane.legs || []);
 
       const freshLane = await getLanesByLaneMappingId(laneMappingId, id);
@@ -562,7 +554,6 @@ const LaneMappingLanes = () => {
       setSavedLaneId(id);
       setTimeout(() => setSavedLaneId(null), 3000);
     } catch (error) {
-      console.error('Error updating lane:', error.message);
       alert(error.message);
     } finally {
       setLoading(false);
@@ -578,7 +569,6 @@ const LaneMappingLanes = () => {
       await deleteLaneById(id);
       setLanes(current => current.filter(lane => lane.id !== id));
     } catch (error) {
-      console.error('Error deleting lane:', error.message);
       alert(error.message);
     } finally {
       setLoading(false);
@@ -604,6 +594,7 @@ const LaneMappingLanes = () => {
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-5 shadow-lg">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div>
+            <p className="text-blue-200 text-sm font-medium">{laneMapping?.accountName || 'Account'}</p>
             <h1 className="text-2xl font-bold">{laneMapping?.name || 'Lane Mapping'} Lanes</h1>
             <p className="text-blue-100 text-sm mt-1">
               {filteredLanes.length} lane{filteredLanes.length !== 1 ? 's' : ''} displayed
@@ -1049,63 +1040,65 @@ const LaneMappingLanes = () => {
                           </thead>
                           <tbody>
                             {lane.legs.map((leg, legIdx) => (
-                              <tr
-                                key={leg.id || legIdx}
-                                className={`border-b border-gray-100 last:border-0 ${legIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
-                                  }`}
-                              >
-                                {legColumns.map(col => (
-                                  <td key={col} className="px-3 py-2">
-                                    {col === 'sequence' ? (
-                                      <input
-                                        type="number"
-                                        value={leg[col] || ''}
-                                        onChange={e => handleLegChange(lane.id, leg.id, col, e.target.value)}
-                                        className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                      />
-                                    ) : col === 'legValidationMessage' ? (
-                                      leg.valid === false && leg.validMessage?.length > 0 ? (
-                                        <div className="text-red-600 text-xs max-w-[150px] truncate" title={leg.validMessage.join('; ')}>
-                                          {leg.validMessage.join('; ')}
-                                        </div>
-                                      ) : leg.valid === true ? (
-                                        <CheckCircle size={16} className="text-green-500" />
+                              <React.Fragment key={leg.id || legIdx}>
+                                <tr
+                                  className={`border-b border-gray-100 ${legIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
+                                    }`}
+                                >
+                                  {legColumns.map(col => (
+                                    <td key={col} className="px-3 py-2">
+                                      {col === 'sequence' ? (
+                                        <input
+                                          type="number"
+                                          value={leg[col] || ''}
+                                          onChange={e => handleLegChange(lane.id, leg.id, col, e.target.value)}
+                                          className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                        />
+                                      ) : col === 'legValidationMessage' ? (
+                                        leg.valid === false && leg.validMessage?.length > 0 ? (
+                                          <div className="text-red-600 text-xs max-w-[150px] truncate" title={leg.validMessage.join('; ')}>
+                                            {leg.validMessage.join('; ')}
+                                          </div>
+                                        ) : leg.valid === true ? (
+                                          <CheckCircle size={16} className="text-green-500" />
+                                        ) : (
+                                          <span className="text-gray-400 text-xs">Pending</span>
+                                        )
                                       ) : (
-                                        <span className="text-gray-400 text-xs">Pending</span>
-                                      )
-                                    ) : col === 'aircraftByDay' ? (
-                                      <div
-                                        className="text-xs text-gray-700 max-w-[100px] truncate"
-                                        title={
-                                          leg.aircraftByDay
-                                            ? Object.entries(leg.aircraftByDay)
-                                              .map(([day, aircraft]) => `${day}: ${aircraft}`)
-                                              .join('\n')
-                                            : ''
-                                        }
-                                      >
-                                        {formatAircraftByDay(leg.aircraftByDay)}
-                                      </div>
-                                    ) : (
-                                      <input
-                                        type="text"
-                                        value={leg[col] || ''}
-                                        onChange={e => handleLegChange(lane.id, leg.id, col, e.target.value)}
-                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                      />
-                                    )}
+                                        <input
+                                          type="text"
+                                          value={leg[col] || ''}
+                                          onChange={e => handleLegChange(lane.id, leg.id, col, e.target.value)}
+                                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                        />
+                                      )}
+                                    </td>
+                                  ))}
+                                  <td className="px-3 py-2">
+                                    <button
+                                      onClick={() => handleRemoveLeg(lane.id, leg.id)}
+                                      className="p-1.5 hover:bg-red-100 text-red-600 rounded transition"
+                                      title="Remove leg"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
                                   </td>
-                                ))}
-                                <td className="px-3 py-2">
-                                  <button
-                                    onClick={() => handleRemoveLeg(lane.id, leg.id)}
-                                    className="p-1.5 hover:bg-red-100 text-red-600 rounded transition"
-                                    title="Remove leg"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                </td>
-                              </tr>
+                                </tr>
+                                {/* Aircraft by Day row */}
+                                <tr
+                                  className={`border-b border-gray-200 ${legIdx % 2 === 0 ? 'bg-blue-50/30' : 'bg-blue-50/50'
+                                    }`}
+                                >
+                                  <td colSpan={legColumns.length + 1} className="px-3 py-1.5">
+                                    <div className="flex items-center gap-2 text-xs">
+                                      <span className="font-medium text-gray-500">Aircraft by Day:</span>
+                                      <span className="text-gray-700">
+                                        {formatAircraftByDay(leg.aircraftByDay)}
+                                      </span>
+                                    </div>
+                                  </td>
+                                </tr>
+                              </React.Fragment>
                             ))}
                           </tbody>
                         </table>

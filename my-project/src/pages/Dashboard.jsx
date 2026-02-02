@@ -26,7 +26,6 @@ function Dashboard() {
   } = useLaneCounts();
 
   const handleSelectLaneMapping = laneMappingId => {
-    console.log(`Selected lane mapping ID: ${laneMappingId}`);
     navigate(`/laneMappingLanes/${laneMappingId}`);
   };
 

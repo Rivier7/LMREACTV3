@@ -48,14 +48,12 @@ function LoginPage() {
 
     try {
       const response = await initiateLogin(email, password);
-      console.log('Login response:', response);
 
       // Reset timer and show verification form
       setTimeLeft(600);
       setInfoMessage(response.message || '2FA code sent to your email');
       setStage('verify');
     } catch (err) {
-      console.error('Login Error:', err);
       setError(err.message || 'Invalid credentials or server error');
     } finally {
       setIsLoading(false);
@@ -80,10 +78,8 @@ function LoginPage() {
       if (response.token) {
         try {
           await login(response.token);
-          console.log('Verification successful, token expires:', new Date(response.expirationTime));
           navigate('/dashboard');
         } catch (e) {
-          console.error('Login failed but token received:', e);
           localStorage.setItem('token', response.token);
           navigate('/dashboard');
         }
@@ -91,7 +87,6 @@ function LoginPage() {
         setError('Verification failed: no token received');
       }
     } catch (err) {
-      console.error('Verification Error:', err);
       setError(err.message || 'Invalid verification code');
     } finally {
       setIsLoading(false);
@@ -108,7 +103,6 @@ function LoginPage() {
       setTimeLeft(600); // Reset timer
       setInfoMessage('A new verification code has been sent to your email.');
     } catch (err) {
-      console.error('Resend Error:', err);
       setError(typeof err === 'string' ? err : 'Could not resend verification code');
     } finally {
       setIsLoading(false);

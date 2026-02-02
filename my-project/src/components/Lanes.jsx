@@ -4,7 +4,6 @@ import Lane from './Lane';
 
 function Lanes({ lanes, onDelete }) {
   const [filters, setFilters] = useState({
-    accountName: '',
     laneMappingName: '',
     originCountry: '',
     originState: '',
@@ -28,7 +27,6 @@ function Lanes({ lanes, onDelete }) {
   useEffect(() => {
     const result = lanes.filter(lane => {
       return (
-        (!filters.accountName || lane.accountName === filters.accountName) &&
         (!filters.laneMappingName || getLaneMappingName(lane) === filters.laneMappingName) &&
         (!filters.originCountry || lane.originCountry === filters.originCountry) &&
         (!filters.originState || lane.originState === filters.originState) &&
@@ -52,7 +50,6 @@ function Lanes({ lanes, onDelete }) {
 
   const clearFilters = () => {
     setFilters({
-      accountName: '',
       laneMappingName: '',
       originCountry: '',
       originState: '',
@@ -71,7 +68,6 @@ function Lanes({ lanes, onDelete }) {
   const activeFilterCount = Object.values(filters).filter(v => v !== '').length;
 
   const fields = [
-    { label: 'Account', name: 'accountName', icon: '🏢' },
     { label: 'Lane Mapping', name: 'laneMappingName', icon: '🗺️', nested: true },
     { label: 'Origin Country', name: 'originCountry', icon: '🌍' },
     { label: 'Origin State', name: 'originState', icon: '📍' },
