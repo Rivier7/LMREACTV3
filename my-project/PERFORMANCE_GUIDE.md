@@ -15,6 +15,7 @@ Your application is now optimized for **maximum performance** using industry-sta
 ## 📊 Performance Improvements
 
 ### Before Optimization:
+
 ```
 Single bundle: ~250 KB (gzipped: ~80 KB)
 Initial load: Loads entire application
@@ -22,6 +23,7 @@ Time to interactive: ~2-3 seconds
 ```
 
 ### After Optimization:
+
 ```
 Main bundle: 181 KB (gzipped: 57.60 KB)
 + Lazy chunks loaded on demand
@@ -44,26 +46,26 @@ import { lazy, Suspense } from 'react';
 // Each page is a separate chunk
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
-const AllLanes = lazy(() => import('./pages/allLanes'));
+const AllLanes = lazy(() => import('./pages/AllLanes'));
 // ... more routes
 
 function App() {
   return (
     <Suspense fallback={<PageLoader />}>
-      <Routes>
-        {/* Routes here */}
-      </Routes>
+      <Routes>{/* Routes here */}</Routes>
     </Suspense>
   );
 }
 ```
 
 **How it works:**
+
 - Each page is split into its own JavaScript file
 - Files are loaded only when user navigates to that page
 - First page load is much smaller
 
 **Build output:**
+
 ```
 dist/assets/LoginPage-DG43JPGg.js      6.50 kB
 dist/assets/Dashboard-lIqHsrDX.js      9.46 kB
@@ -93,12 +95,14 @@ build: {
 ```
 
 **Benefits:**
+
 - Separate vendor code from application code
 - Vendor chunks cached by browser (rarely change)
 - Application code can be updated without re-downloading vendors
 - Parallel loading of chunks
 
 **Build output:**
+
 ```
 dist/assets/react-vendor-Fh5VkN55.js  46.39 kB  (React, Router)
 dist/assets/ui-vendor-jgAOMlmm.js      2.65 kB  (Icons)
@@ -112,18 +116,21 @@ dist/assets/utils-vendor-DCWxvbfg.js  37.01 kB  (Axios, JWT)
 **Script:** `npm run build:analyze`
 
 Generates `dist/stats.html` showing:
+
 - What's in your bundle
 - Size of each module
 - Dependencies visualization
 - Gzip and Brotli sizes
 
 **How to use:**
+
 ```bash
 npm run build:analyze
 # Open dist/stats.html in browser
 ```
 
 **What to look for:**
+
 - Large dependencies you might not need
 - Duplicated code
 - Opportunities for lazy loading
@@ -143,6 +150,7 @@ build: {
 ```
 
 **Optimizations applied:**
+
 - ✅ Minification (removes whitespace, shortens names)
 - ✅ Tree-shaking (removes unused code)
 - ✅ Dead code elimination
@@ -155,22 +163,22 @@ build: {
 
 ### Bundle Sizes
 
-| File | Size | Gzipped | Type |
-|------|------|---------|------|
-| **Vendors** | | | |
-| react-vendor | 46.39 KB | 16.11 KB | Framework |
-| utils-vendor | 37.01 KB | 14.46 KB | HTTP/Auth |
-| ui-vendor | 2.65 KB | 1.31 KB | Icons |
-| **Pages** | | | |
-| Dashboard | 9.46 KB | 2.74 KB | Lazy |
-| AllLanes | 11.58 KB | 2.93 KB | Lazy |
-| AccountLanes | 20.48 KB | 5.67 KB | Lazy |
-| Edit | 24.51 KB | 5.27 KB | Lazy |
-| LoginPage | 6.50 KB | 2.02 KB | Lazy |
-| Accounts | 5.90 KB | 2.07 KB | Lazy |
-| **Main** | | | |
-| index.js | 181.13 KB | 57.60 KB | Core |
-| index.css | 37.83 KB | 7.13 KB | Styles |
+| File         | Size      | Gzipped  | Type      |
+| ------------ | --------- | -------- | --------- |
+| **Vendors**  |           |          |           |
+| react-vendor | 46.39 KB  | 16.11 KB | Framework |
+| utils-vendor | 37.01 KB  | 14.46 KB | HTTP/Auth |
+| ui-vendor    | 2.65 KB   | 1.31 KB  | Icons     |
+| **Pages**    |           |          |           |
+| Dashboard    | 9.46 KB   | 2.74 KB  | Lazy      |
+| AllLanes     | 11.58 KB  | 2.93 KB  | Lazy      |
+| AccountLanes | 20.48 KB  | 5.67 KB  | Lazy      |
+| Edit         | 24.51 KB  | 5.27 KB  | Lazy      |
+| LoginPage    | 6.50 KB   | 2.02 KB  | Lazy      |
+| Accounts     | 5.90 KB   | 2.07 KB  | Lazy      |
+| **Main**     |           |          |           |
+| index.js     | 181.13 KB | 57.60 KB | Core      |
+| index.css    | 37.83 KB  | 7.13 KB  | Styles    |
 
 **Total Initial Load:** ~127 KB gzipped
 **Additional Pages:** Load on demand (2-5 KB each)
@@ -242,16 +250,19 @@ start dist/stats.html # Windows
 ### What the Visualization Shows:
 
 **Treemap View:**
+
 - Boxes sized by module size
 - Nested boxes show dependencies
 - Hover for details
 
 **What to look for:**
+
 1. **Large modules** - Can they be lazy loaded?
 2. **Duplicate code** - Same module imported twice?
 3. **Unused features** - Tree-shaking opportunities?
 
 **Example findings:**
+
 ```
 ❌ Problem: moment.js is 70 KB
 ✅ Solution: Use date-fns (smaller) or native Date
@@ -270,6 +281,7 @@ start dist/stats.html # Windows
 ### 1. Image Optimization
 
 **Best Practices:**
+
 ```javascript
 // Use WebP format
 <img src="image.webp" alt="Description" />
@@ -282,6 +294,7 @@ start dist/stats.html # Windows
 ```
 
 **Tools:**
+
 - Squoosh.app - Compress images online
 - ImageOptim - Desktop app for macOS
 - TinyPNG - Online PNG compressor
@@ -291,11 +304,18 @@ start dist/stats.html # Windows
 ### 2. Font Optimization
 
 **Current (Tailwind uses system fonts):**
+
 ```css
-font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto...
+font-family:
+  system-ui,
+  -apple-system,
+  BlinkMacSystemFont,
+  'Segoe UI',
+  Roboto...;
 ```
 
 **If using custom fonts:**
+
 ```css
 /* Preload critical fonts */
 <link rel="preload" href="/fonts/font.woff2" as="font" type="font/woff2" crossorigin>
@@ -313,14 +333,15 @@ font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto...
 ### 3. Preload Critical Resources
 
 **In index.html:**
+
 ```html
 <head>
   <!-- Preload critical JavaScript -->
-  <link rel="modulepreload" href="/assets/react-vendor.js">
+  <link rel="modulepreload" href="/assets/react-vendor.js" />
 
   <!-- Preconnect to API -->
-  <link rel="preconnect" href="https://api.yourapp.com">
-  <link rel="dns-prefetch" href="https://api.yourapp.com">
+  <link rel="preconnect" href="https://api.yourapp.com" />
+  <link rel="dns-prefetch" href="https://api.yourapp.com" />
 </head>
 ```
 
@@ -329,11 +350,13 @@ font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto...
 ### 4. Service Worker (Future Enhancement)
 
 **Benefits:**
+
 - Offline support
 - Faster repeat visits
 - Background sync
 
 **Setup with Vite PWA plugin:**
+
 ```bash
 npm install -D vite-plugin-pwa
 ```
@@ -345,11 +368,13 @@ npm install -D vite-plugin-pwa
 ### Do's ✅
 
 1. **Lazy load routes**
+
    ```javascript
    const Page = lazy(() => import('./Page'));
    ```
 
 2. **Split vendor code**
+
    ```javascript
    manualChunks: {
      'vendor': ['react', 'react-dom']
@@ -357,6 +382,7 @@ npm install -D vite-plugin-pwa
    ```
 
 3. **Use production builds**
+
    ```bash
    npm run build  # Not npm run dev for production
    ```
@@ -376,18 +402,21 @@ npm install -D vite-plugin-pwa
 ### Don'ts ❌
 
 1. **Don't import entire libraries**
+
    ```javascript
    ❌ import _ from 'lodash';
    ✅ import debounce from 'lodash/debounce';
    ```
 
 2. **Don't block rendering**
+
    ```javascript
    ❌ Synchronous data fetching in render
    ✅ Use Suspense and lazy loading
    ```
 
 3. **Don't ignore bundle size warnings**
+
    ```
    ⚠️  Warning: Chunk exceeds 500 KB
    → Investigate and split the chunk
@@ -408,6 +437,7 @@ npm install -D vite-plugin-pwa
 ### Lighthouse Score
 
 **Run Lighthouse:**
+
 ```bash
 # Install
 npm install -g lighthouse
@@ -421,6 +451,7 @@ lighthouse http://localhost:4173 --view
 ```
 
 **Target Scores:**
+
 - Performance: 90+
 - Accessibility: 90+
 - Best Practices: 90+
@@ -431,11 +462,13 @@ lighthouse http://localhost:4173 --view
 ### Web Vitals
 
 **Core Web Vitals:**
+
 1. **LCP (Largest Contentful Paint)** < 2.5s
 2. **FID (First Input Delay)** < 100ms
 3. **CLS (Cumulative Layout Shift)** < 0.1
 
 **Measure in Chrome DevTools:**
+
 1. Open DevTools
 2. Performance tab
 3. Record page load
@@ -446,6 +479,7 @@ lighthouse http://localhost:4173 --view
 ### Real User Monitoring
 
 **Future Enhancement:**
+
 ```javascript
 // Track performance metrics
 import { getCLS, getFID, getLCP } from 'web-vitals';
@@ -462,6 +496,7 @@ getLCP(console.log);
 ### Initial Load (First Visit)
 
 **Before:**
+
 ```
 index.html         0.64 KB
 bundle.js        ~250 KB (gzipped: ~80 KB)
@@ -472,6 +507,7 @@ Load time:       ~2-3s (3G)
 ```
 
 **After:**
+
 ```
 index.html           0.64 KB
 react-vendor.js      16.11 KB (gzipped)
@@ -496,10 +532,7 @@ Load time:           ~1-1.5s (3G)
 
 ```javascript
 // Preload Dashboard when hovering over link
-<Link
-  to="/dashboard"
-  onMouseEnter={() => import('./pages/Dashboard')}
->
+<Link to="/dashboard" onMouseEnter={() => import('./pages/Dashboard')}>
   Dashboard
 </Link>
 ```
