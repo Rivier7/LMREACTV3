@@ -9,7 +9,7 @@ import SessionExpirationWarning from './components/SessionExpirationWarning';
 // This splits each page into its own chunk, loaded only when needed
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
-const AllLanes = lazy(() => import('./pages/allLanes'));
+const AllLanes = lazy(() => import('./pages/AllLanes'));
 const LaneMappingLanes = lazy(() => import('./pages/LaneMappingLanes'));
 const Edit = lazy(() => import('./pages/edit'));
 const Accounts = lazy(() => import('./pages/Accounts'));
