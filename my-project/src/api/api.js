@@ -1,8 +1,9 @@
-import { API_SERVER_URL } from '../config/api';
+import { API_BASE_URL } from '../config/api';
 
-const BASE_URL = `${API_SERVER_URL}/lanes`;
-const BASE_URL2 = `${API_SERVER_URL}/laneMapping`;
-const BASE_URL3 = `${API_SERVER_URL}/api/flights/validate-leg`;
+// All endpoints now use /api prefix (backend updated)
+const BASE_URL = `${API_BASE_URL}/lanes`;
+const BASE_URL2 = `${API_BASE_URL}/laneMapping`;
+const BASE_URL3 = `${API_BASE_URL}/flights/validate-leg`;
 
 // ✅ Centralized headers function (always attaches JWT)
 const getAuthHeaders = (isFormData = false) => {
@@ -430,7 +431,7 @@ export const getSuggestedRouteByLocation = async payload => {
 // =====================
 // Account API Functions
 // =====================
-const BASE_URL_ACCOUNT = `${API_BASE}/account`;
+const BASE_URL_ACCOUNT = `${API_BASE_URL}/account`;
 
 // Get all accounts
 export const getAllAccounts = async () => {
