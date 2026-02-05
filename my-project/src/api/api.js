@@ -280,6 +280,108 @@ export const postLaneMappingExcel = async file => {
   }
 };
 
+/**
+ * Upload an Excel file with SSE progress tracking.
+ * @param {File|Blob} file - The Excel file to upload.
+ * @param {Function} onProgress - Callback for progress updates.
+ * @param {Function} onError - Callback for error events.
+ * @param {Function} onComplete - Callback when upload completes.
+ * @returns {Promise<Object>} Final response data from the server.
+ */
+export const uploadExcelWithProgress = async (file, { onProgress, onError, onComplete }) => {
+  if (!(file instanceof File || file instanceof Blob)) {
+    throw new TypeError('Invalid file type. Expected File or Blob.');
+  }
+
+  const formData = new FormData();
+  const filename = file.name || 'upload.xlsx';
+  formData.append('file', file, filename);
+
+  const token = localStorage.getItem('token');
+  const headers = {
+    ...(token && { Authorization: `Bearer ${token}` }),
+    Accept: 'text/event-stream',
+  };
+
+  try {
+    const response = await fetch(`${BASE_URL2}/upload-with-progress`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      let errorMessage = 'Upload failed';
+      try {
+        const errorJson = await response.json();
+        errorMessage = errorJson.message || errorMessage;
+      } catch {
+        const errorText = await response.text();
+        if (errorText) errorMessage = errorText;
+      }
+      throw new Error(errorMessage);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalData = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Parse SSE format: "event: <type>\ndata: {...}\n\n"
+      const events = buffer.split('\n\n');
+      buffer = events.pop() || ''; // Keep incomplete event in buffer
+
+      for (const eventBlock of events) {
+        if (!eventBlock.trim()) continue;
+
+        const lines = eventBlock.split('\n');
+        let eventType = 'message';
+        let dataLine = '';
+
+        for (const line of lines) {
+          if (line.startsWith('event:')) {
+            eventType = line.slice(6).trim();
+          } else if (line.startsWith('data:')) {
+            dataLine = line.slice(5).trim();
+          }
+        }
+
+        if (!dataLine) continue;
+
+        try {
+          const data = JSON.parse(dataLine);
+
+          if (eventType === 'error' || data.status === 'error') {
+            onError?.(data);
+            throw new Error(data.message || 'Upload error');
+          } else if (data.status === 'completed') {
+            finalData = data;
+            onComplete?.(data);
+          } else {
+            onProgress?.(data);
+          }
+        } catch (parseError) {
+          if (parseError.message !== 'Upload error') {
+            console.warn('Failed to parse SSE data:', dataLine, parseError);
+          } else {
+            throw parseError;
+          }
+        }
+      }
+    }
+
+    return finalData || { success: true, message: 'Upload completed' };
+  } catch (error) {
+    throw error;
+  }
+};
+
 // ✅ Get a single lane by ID
 export const getLanebyId = async id => {
   const response = await fetch(`${BASE_URL}/${id}`, {
