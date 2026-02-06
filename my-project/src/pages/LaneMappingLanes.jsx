@@ -701,7 +701,7 @@ const LaneMappingLanes = () => {
           {/* Collapsible Column Filters */}
           {showColumnFilters && (
             <div className="mt-3 pt-3 border-t border-gray-200 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              {['originCity', 'originState', 'originCountry', 'destinationCity', 'destinationState', 'destinationCountry', 'itemNumber', 'laneOption'].map(col => (
+              {['originStation', 'destinationStation', 'originCity', 'originState', 'originCountry', 'destinationCity', 'destinationState', 'destinationCountry', 'itemNumber', 'laneOption'].map(col => (
                 <div key={col}>
                   <label className="block text-xs font-medium text-gray-500 mb-1">
                     {columnLabels[col]}
@@ -1062,7 +1062,7 @@ const LaneMappingLanes = () => {
                                         />
                                       ) : col === 'legValidationMessage' ? (
                                         leg.valid === false && leg.validMessage?.length > 0 ? (
-                                          <div className="text-red-600 text-xs max-w-[150px] truncate" title={leg.validMessage.join('; ')}>
+                                          <div className="text-red-600 text-xs max-w-[250px] whitespace-normal break-words">
                                             {leg.validMessage.join('; ')}
                                           </div>
                                         ) : leg.valid === true ? (
