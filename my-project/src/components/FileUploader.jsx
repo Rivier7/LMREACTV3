@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { downloadExcelTemplate, uploadExcelWithProgress } from '../api/api';
 import { laneMappingKeys } from '../hooks/useLaneMappingQueries';
+import ErrorMessage from './ErrorMessage';
 
 export default function FileUploader() {
   const [file, setFile] = useState(null);
@@ -245,12 +246,16 @@ export default function FileUploader() {
 
       {/* Error Message */}
       {uploadStatus === 'error' && (
-        <div className="flex items-center gap-2 text-red-600 font-bold">
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
-          </svg>
-          {errorMessage || 'There was an error uploading the file.'}
-        </div>
+        <ErrorMessage
+          message={errorMessage || 'There was an error uploading the file.'}
+          title="Upload Error"
+          severity="error"
+          onDismiss={() => {
+            setUploadStatus(null);
+            setErrorMessage('');
+          }}
+          className="max-w-xl"
+        />
       )}
     </div>
   );
