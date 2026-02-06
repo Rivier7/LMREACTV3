@@ -145,7 +145,7 @@ function Lane({ lane, onDelete }) {
                       <td className="px-3 py-2 text-gray-700">{leg.originStation} → {leg.destinationStation}</td>
                       <td className="px-3 py-2 text-gray-600">{leg.departureTime}</td>
                       <td className="px-3 py-2 text-gray-600">{leg.arrivalTime}</td>
-                      <td className="px-3 py-2 text-gray-600 text-xs">{leg.flightOperatingdays || 'N/A'}</td>
+                      <td className="px-3 py-2 text-gray-600 text-xs">{leg.flightOperatingDays || 'N/A'}</td>
                       <td className="px-3 py-2 text-center">
                         {leg.valid === true ? (
                           <CheckCircle className="w-4 h-4 text-green-500 inline-block" />
@@ -161,22 +161,30 @@ function Lane({ lane, onDelete }) {
             </table>
 
             {/* Aircraft by Day */}
-            <div className="px-4 py-3 bg-slate-50 border-t border-gray-200">
-              <div className="text-xs font-medium text-gray-600 mb-2">Aircraft by Day</div>
-              <div className="flex flex-wrap gap-2">
-                {['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'].map(day => {
-                  const aircraft = lane.legs?.[0]?.aircraftByDay?.[day];
-                  const dayAbbr = { MONDAY: 'Mon', TUESDAY: 'Tue', WEDNESDAY: 'Wed', THURSDAY: 'Thu', FRIDAY: 'Fri', SATURDAY: 'Sat', SUNDAY: 'Sun' }[day];
-                  return (
-                    <div key={day} className="flex items-center gap-1.5 px-2 py-1 bg-white border border-gray-200 rounded">
-                      <span className="text-xs font-medium text-gray-500">{dayAbbr}</span>
-                      <span className={`text-xs font-semibold ${aircraft ? 'text-gray-800' : 'text-gray-300'}`}>
-                        {aircraft || '-'}
-                      </span>
+            <div className="px-4 py-3 bg-slate-50 border-t border-gray-200 space-y-3">
+              {[...lane.legs]
+                .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
+                .map((leg, idx) => (
+                  <div key={leg.sequence || idx}>
+                    <div className="text-xs font-medium text-gray-600 mb-1">
+                      Aircraft by Day — {leg.flightNumber || `Leg ${idx + 1}`}
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="flex flex-wrap gap-2">
+                      {['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'].map(day => {
+                        const aircraft = leg.aircraftByDay?.[day];
+                        const dayAbbr = { MONDAY: 'Mon', TUESDAY: 'Tue', WEDNESDAY: 'Wed', THURSDAY: 'Thu', FRIDAY: 'Fri', SATURDAY: 'Sat', SUNDAY: 'Sun' }[day];
+                        return (
+                          <div key={day} className="flex items-center gap-1.5 px-2 py-1 bg-white border border-gray-200 rounded">
+                            <span className="text-xs font-medium text-gray-500">{dayAbbr}</span>
+                            <span className={`text-xs font-semibold ${aircraft ? 'text-gray-800' : 'text-gray-300'}`}>
+                              {aircraft || '-'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
             </div>
           </div>
         )}
