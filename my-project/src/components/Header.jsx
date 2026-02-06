@@ -37,6 +37,11 @@ const Header = () => {
                 Accounts
               </Link>
             </li>
+            <li>
+              <Link to="/flights" className="text-lg hover:text-blue-500 transition-colors">
+                Flight Search
+              </Link>
+            </li>
           </ul>
         </nav>
       </div>

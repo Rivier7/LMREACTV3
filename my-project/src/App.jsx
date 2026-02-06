@@ -14,6 +14,7 @@ const LaneMappingLanes = lazy(() => import('./pages/LaneMappingLanes'));
 const Edit = lazy(() => import('./pages/edit'));
 const Accounts = lazy(() => import('./pages/Accounts'));
 const AccountDetail = lazy(() => import('./pages/AccountDetail'));
+const FlightSearch = lazy(() => import('./pages/FlightSearch'));
 
 // Loading component shown while lazy components load
 const PageLoader = () => (
@@ -102,6 +103,17 @@ function App() {
                 <ErrorBoundary fallback={<PageErrorFallback />}>
                   <PrivateRoute>
                     <AccountDetail />
+                  </PrivateRoute>
+                </ErrorBoundary>
+              }
+            />
+
+            <Route
+              path="/flights"
+              element={
+                <ErrorBoundary fallback={<PageErrorFallback />}>
+                  <PrivateRoute>
+                    <FlightSearch />
                   </PrivateRoute>
                 </ErrorBoundary>
               }

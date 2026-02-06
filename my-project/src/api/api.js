@@ -604,3 +604,13 @@ export const removeLaneMappingFromAccount = async laneMappingId => {
   if (!response.ok) throw new Error(`Failed to remove lane mapping ${laneMappingId} from account`);
   return await response.json();
 };
+
+// Search flights between two airports
+export const searchFlights = async (origin, destination) => {
+  const response = await fetch(
+    `${API_BASE_URL}/flights/search/airports/${encodeURIComponent(origin)}/to/${encodeURIComponent(destination)}`,
+    { headers: getAuthHeaders() }
+  );
+  if (!response.ok) throw new Error(`No flights found from ${origin} to ${destination}`);
+  return await response.json();
+};
