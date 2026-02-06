@@ -93,8 +93,9 @@ export function useDeleteAccount() {
 
   return useMutation({
     mutationFn: deleteAccountById,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: accountKeys.all });
+    onSuccess: (_, deletedId) => {
+      queryClient.removeQueries({ queryKey: accountKeys.detail(deletedId) });
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() });
     },
     onError: error => {
       console.error('Failed to delete account:', error);

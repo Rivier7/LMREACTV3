@@ -493,7 +493,9 @@ const LaneMappingLanes = () => {
     return Object.entries(filters).every(([field, value]) => {
       if (!value || field === 'quickFilter') return true;
       if (field === 'valid') {
-        return lane.valid?.toString() === value;
+        if (value === 'true') return lane.valid === true;
+        if (value === 'false') return lane.valid !== true;
+        return true;
       }
       return lane[field]?.toString().toLowerCase().includes(value.toLowerCase());
     });
@@ -746,10 +748,12 @@ const LaneMappingLanes = () => {
                 </button>
 
                 {/* Route Display */}
-                <div className="flex items-center gap-3 min-w-[280px]">
+                <div className="flex items-center gap-3 min-w-[400px]">
                   <div className="text-center">
                     <div className="font-bold text-gray-900">{lane.originStation || '---'}</div>
-                    <div className="text-xs text-gray-500">{lane.originCity}</div>
+                    <div className="text-xs text-gray-500">
+                      {[lane.originCity, lane.originState, lane.originCountry].filter(Boolean).join(', ') || '---'}
+                    </div>
                   </div>
                   <div className="flex items-center px-2">
                     <div className="w-6 h-px bg-gray-300"></div>
@@ -758,7 +762,9 @@ const LaneMappingLanes = () => {
                   </div>
                   <div className="text-center">
                     <div className="font-bold text-gray-900">{lane.destinationStation || '---'}</div>
-                    <div className="text-xs text-gray-500">{lane.destinationCity}</div>
+                    <div className="text-xs text-gray-500">
+                      {[lane.destinationCity, lane.destinationState, lane.destinationCountry].filter(Boolean).join(', ') || '---'}
+                    </div>
                   </div>
                 </div>
 
