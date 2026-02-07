@@ -36,7 +36,19 @@ function FlightSearch() {
     setDestination(origin);
   };
 
-  const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  // Day labels using unique abbreviations to distinguish all 7 days
+  const DAY_LABELS = ['M', 'Tu', 'W', 'Th', 'F', 'Sa', 'Su'];
+
+  // Parse operatingDays into a Set for efficient lookup
+  // Handles both comma-separated strings ("M,Tu,W") and arrays from JSON
+  const parseOperatingDays = operatingDays => {
+    if (!operatingDays) return new Set();
+    if (Array.isArray(operatingDays)) return new Set(operatingDays);
+    if (typeof operatingDays === 'string') {
+      return new Set(operatingDays.split(',').map(d => d.trim()));
+    }
+    return new Set();
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -172,21 +184,24 @@ function FlightSearch() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex gap-1">
-                              {DAY_LABELS.map((dayLabel, dayIdx) => {
-                                const isActive = flight.operatingDays?.[dayIdx] === dayLabel;
-                                return (
-                                  <span
-                                    key={dayIdx}
-                                    className={`w-6 h-6 flex items-center justify-center rounded text-xs font-semibold ${
-                                      isActive
-                                        ? 'bg-blue-600 text-white'
-                                        : 'bg-gray-100 text-gray-300'
-                                    }`}
-                                  >
-                                    {dayLabel}
-                                  </span>
-                                );
-                              })}
+                              {(() => {
+                                const operatingDaysSet = parseOperatingDays(flight.operatingDays);
+                                return DAY_LABELS.map((dayLabel, dayIdx) => {
+                                  const isActive = operatingDaysSet.has(dayLabel);
+                                  return (
+                                    <span
+                                      key={dayIdx}
+                                      className={`min-w-6 h-6 px-1 flex items-center justify-center rounded text-xs font-semibold ${
+                                        isActive
+                                          ? 'bg-blue-600 text-white'
+                                          : 'bg-gray-100 text-gray-300'
+                                      }`}
+                                    >
+                                      {dayLabel}
+                                    </span>
+                                  );
+                                });
+                              })()}
                             </div>
                           </td>
                         </tr>

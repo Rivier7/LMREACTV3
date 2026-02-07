@@ -818,7 +818,7 @@ const Edit = () => {
                           <p className="text-gray-500 text-xs">
                             {leg.departureTime} - {leg.arrivalTime}
                           </p>
-                          <p className="text-gray-500 text-xs">Days: {leg.flightOperatingdays}</p>
+                          <p className="text-gray-500 text-xs">Days: {leg.flightOperatingDays}</p>
                         </div>
                       ))}
                   </div>
