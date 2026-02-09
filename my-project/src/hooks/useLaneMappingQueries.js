@@ -5,6 +5,7 @@ import {
   getLaneMappingById,
   deleteLaneMappingById,
   postLaneMappingExcel,
+  updateLaneMappingName,
 } from '../api/api';
 
 /**

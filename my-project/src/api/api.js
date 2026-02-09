@@ -427,6 +427,17 @@ export const deleteLaneMappingById = async id => {
   return await response.json();
 };
 
+// ✅ Update lane mapping name
+export const updateLaneMappingName = async (id, name) => {
+  const response = await fetch(`${BASE_URL2}/${id}/name`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ name }),
+  });
+  if (!response.ok) throw new Error(`Failed to update lane mapping name with ID ${id}`);
+  return await response.json();
+};
+
 
 export const deleteLaneById = async id => {
   const response = await fetch(`${BASE_URL}/delete/${id}`, {
