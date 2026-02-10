@@ -16,7 +16,9 @@ import {
   Filter,
   X,
   FileText,
+  Pencil,
 } from 'lucide-react';
+import EditLaneMappingModal from '../components/EditLaneMappingModal';
 import {
   getLanesByLaneMappingId,
   updateLane,
@@ -44,6 +46,7 @@ const LaneMappingLanes = () => {
   const [selectedRouteIndex, setSelectedRouteIndex] = useState(null);
   const [routeLaneId, setRouteLaneId] = useState(null);
   const [savedLaneId, setSavedLaneId] = useState(null);
+  const [showEditNameModal, setShowEditNameModal] = useState(false);
 
   const handleSuggestRoute = async laneId => {
     try {
