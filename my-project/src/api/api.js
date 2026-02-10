@@ -107,6 +107,23 @@ export const getTAT = async (updatedLane, legs) => {
   return text;
 };
 
+export const calculateAllTAT = async (laneMappingId) => {
+  const response = await fetch(`${BASE_URL2}/${laneMappingId}/calculate-tat`, {
+    method: 'POST',
+    headers: {
+      ...getAuthHeaders(),
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'Failed to calculate TAT for all lanes');
+  }
+
+  return await response.json();
+};
+
 export const updateLaneMappingLanes = async (id, updatedLanes) => {
   const response = await fetch(`${BASE_URL2}/updateLanes/${id}`, {
     method: 'PUT',

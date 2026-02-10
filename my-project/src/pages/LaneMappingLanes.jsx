@@ -28,6 +28,7 @@ import {
   getSuggestedRoute,
   getSuggestedRouteByLocation,
   getTAT,
+  calculateAllTAT,
   deleteLaneById,
 } from '../api/api.js';
 
@@ -47,6 +48,7 @@ const LaneMappingLanes = () => {
   const [routeLaneId, setRouteLaneId] = useState(null);
   const [savedLaneId, setSavedLaneId] = useState(null);
   const [showEditNameModal, setShowEditNameModal] = useState(false);
+  const [tatMessage, setTatMessage] = useState(null);
 
   const handleSuggestRoute = async laneId => {
     try {
@@ -434,6 +436,26 @@ const LaneMappingLanes = () => {
     }
   };
 
+  const computeAllTAT = async () => {
+    setLoading(true);
+    setTatMessage(null);
+    try {
+      const result = await calculateAllTAT(laneMappingId);
+      if (result.status === 'success') {
+        setTatMessage(`TAT calculated: ${result.data.processed} lanes processed, ${result.data.skipped} skipped`);
+        const freshLanes = await getLanesByLaneMappingId(laneMappingId);
+        setLanes(freshLanes.map(lane => ({ ...lane, hasBeenUpdated: false })));
+        setTimeout(() => setTatMessage(null), 5000);
+      } else {
+        setError(result.message || 'Failed to calculate TAT for all lanes');
+      }
+    } catch (err) {
+      setError('Error calculating TAT for all lanes.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const validateAllLanes = async () => {
     setLoading(true);
     try {
@@ -507,6 +529,12 @@ const LaneMappingLanes = () => {
       if (field === 'valid') {
         if (value === 'true') return lane.valid === true;
         if (value === 'false') return lane.valid !== true;
+        return true;
+      }
+      if (field === 'tatStatus') {
+        const tat = (lane.tatToConsigneeDuration || '').toString().trim().toLowerCase();
+        if (value === 'tbd') return !tat || tat === 'tbd';
+        if (value === 'calculated') return tat && tat !== 'tbd';
         return true;
       }
       return lane[field]?.toString().toLowerCase().includes(value.toLowerCase());
@@ -635,6 +663,24 @@ const LaneMappingLanes = () => {
         </div>
       </div>
 
+      {/* TAT Success Display */}
+      {tatMessage && (
+        <div className="bg-green-50 border-b border-green-200 px-6 py-3">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-2 text-green-700">
+              <CheckCircle size={18} />
+              {tatMessage}
+            </div>
+            <button
+              onClick={() => setTatMessage(null)}
+              className="text-green-700 hover:text-green-900 p-1"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Error Display */}
       {error && !loading && (
         <div className="bg-red-50 border-b border-red-200 px-6 py-3">
@@ -708,6 +754,14 @@ const LaneMappingLanes = () => {
             >
               Validate All
             </button>
+            <button
+              onClick={computeAllTAT}
+              disabled={loading}
+              className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition disabled:opacity-50"
+            >
+              <Clock size={14} />
+              Calculate All TAT
+            </button>
             {(filters.quickFilter || activeFilterCount > 0) && (
               <button
                 onClick={handleClearFilters}
@@ -740,6 +794,21 @@ const LaneMappingLanes = () => {
                   </select>
                 </div>
               ))}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  TAT Status
+                </label>
+                <select
+                  value={filters.tatStatus || ''}
+                  onChange={e => setFilters(prev => ({ ...prev, tatStatus: e.target.value }))}
+                  className={`w-full px-3 py-1.5 text-sm border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${filters.tatStatus ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+                    }`}
+                >
+                  <option value="">All</option>
+                  <option value="tbd">TBD Only</option>
+                  <option value="calculated">Calculated Only</option>
+                </select>
+              </div>
             </div>
           )}
         </div>
