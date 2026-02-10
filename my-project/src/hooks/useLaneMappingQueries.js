@@ -95,3 +95,22 @@ export function useUploadLaneMappingExcel() {
     },
   });
 }
+
+/**
+ * Update lane mapping name
+ * Automatically invalidates lane mapping queries on success
+ */
+export function useUpdateLaneMappingName() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, name }) => updateLaneMappingName(id, name),
+    onSuccess: () => {
+      // Invalidate all lane mapping queries to show updated name
+      queryClient.invalidateQueries({ queryKey: laneMappingKeys.all });
+    },
+    onError: error => {
+      console.error('Failed to update lane mapping name:', error);
+    },
+  });
+}
