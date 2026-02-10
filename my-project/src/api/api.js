@@ -65,6 +65,10 @@ export const updateLane = async (id, updatedLane, legs) => {
       } catch {
         errorMessage = await response.text();
       }
+      // Treat "No changes detected" as a successful no-op (e.g. TAT already saved by calculateTAT)
+      if (errorMessage && errorMessage.toLowerCase().includes('no changes detected')) {
+        return { notModified: true };
+      }
       throw new Error(`Failed to update lane with ID ${id}: ${errorMessage}`);
     }
 
