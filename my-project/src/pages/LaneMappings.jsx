@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getLaneMappingExcel, getAllLaneMappings } from '../api/api';
 import LaneMappingModel from '../components/LaneMappingModel';
+import EditLaneMappingModal from '../components/EditLaneMappingModal';
 import FileUploader from '../components/FileUploader';
 import Header from '../components/Header';
 
@@ -11,6 +12,7 @@ const LaneMappings = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [selectedLaneMappingId, setSelectedLaneMappingId] = useState(null);
 
   const handleSelectLaneMapping = laneMappingId => {
@@ -40,6 +42,16 @@ const LaneMappings = () => {
   const handleDeleteClick = id => {
     setSelectedLaneMappingId(id);
     setShowRemoveModal(true);
+  };
+
+  const handleEditClick = id => {
+    setSelectedLaneMappingId(id);
+    setShowEditModal(true);
+  };
+
+  const handleEditSuccess = async () => {
+    setShowEditModal(false);
+    await loadLaneMappings();
   };
 
   const handleRemoveLaneMapping = async id => {
@@ -124,22 +136,41 @@ const LaneMappings = () => {
                     className="relative flex flex-col items-center gap-3 p-4 bg-white rounded-lg shadow hover:shadow-lg transition-shadow"
                     aria-labelledby={`laneMapping-${laneMapping.id}-name`}
                   >
-                    {/* Delete Button */}
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteClick(laneMapping.id)}
-                      aria-label={`Delete lane mapping ${laneMapping.name}`}
-                      className="absolute top-3 right-3 w-8 h-8 rounded-full bg-red-100 text-red-700 flex items-center justify-center hover:bg-red-200 focus:outline-none"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                        aria-hidden="true"
+                    {/* Action Buttons */}
+                    <div className="absolute top-3 right-3 flex gap-2">
+                      {/* Edit Button */}
+                      <button
+                        type="button"
+                        onClick={() => handleEditClick(laneMapping.id)}
+                        aria-label={`Edit lane mapping ${laneMapping.name}`}
+                        className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center hover:bg-blue-200 focus:outline-none"
                       >
-                        <path fillRule="evenodd" d="M6 6l8 8M14 6L6 14" clipRule="evenodd" />
-                      </svg>
-                    </button>
+                        <svg
+                          className="w-4 h-4"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                          aria-hidden="true"
+                        >
+                          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                        </svg>
+                      </button>
+                      {/* Delete Button */}
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteClick(laneMapping.id)}
+                        aria-label={`Delete lane mapping ${laneMapping.name}`}
+                        className="w-8 h-8 rounded-full bg-red-100 text-red-700 flex items-center justify-center hover:bg-red-200 focus:outline-none"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                          aria-hidden="true"
+                        >
+                          <path fillRule="evenodd" d="M6 6l8 8M14 6L6 14" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
 
                     {/* Avatar */}
                     <div
@@ -199,6 +230,15 @@ const LaneMappings = () => {
             laneMappingId={selectedLaneMappingId}
             onClose={() => setShowRemoveModal(false)}
             onRemove={handleRemoveLaneMapping}
+          />
+        )}
+
+        {/* Edit modal */}
+        {showEditModal && (
+          <EditLaneMappingModal
+            laneMappingId={selectedLaneMappingId}
+            onClose={() => setShowEditModal(false)}
+            onSuccess={handleEditSuccess}
           />
         )}
       </main>
