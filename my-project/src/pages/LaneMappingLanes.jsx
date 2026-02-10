@@ -424,7 +424,7 @@ const LaneMappingLanes = () => {
       const tatTime = await getTAT(laneToCalculate, laneToCalculate.legs || []);
       setLanes(current =>
         current.map(lane =>
-          lane.id === laneId ? { ...lane, tatToConsigneeDuration: tatTime } : lane
+          lane.id === laneId ? { ...lane, tatToConsigneeDuration: tatTime, hasBeenUpdated: true } : lane
         )
       );
     } catch (error) {
