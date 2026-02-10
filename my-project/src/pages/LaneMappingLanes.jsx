@@ -600,7 +600,16 @@ const LaneMappingLanes = () => {
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div>
             <p className="text-blue-200 text-sm font-medium">{laneMapping?.accountName || 'Account'}</p>
-            <h1 className="text-2xl font-bold">{laneMapping?.name || 'Lane Mapping'} Lanes</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold">{laneMapping?.name || 'Lane Mapping'} Lanes</h1>
+              <button
+                onClick={() => setShowEditNameModal(true)}
+                className="p-1.5 rounded-full bg-blue-500 hover:bg-blue-400 transition"
+                aria-label="Edit lane mapping name"
+              >
+                <Pencil size={14} />
+              </button>
+            </div>
             <p className="text-blue-100 text-sm mt-1">
               {filteredLanes.length} lane{filteredLanes.length !== 1 ? 's' : ''} displayed
               {lanes.length > 0 && lanes.length !== filteredLanes.length && ` of ${lanes.length} total`}
