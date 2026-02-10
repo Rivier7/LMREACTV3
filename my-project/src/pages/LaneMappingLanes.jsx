@@ -228,6 +228,15 @@ const LaneMappingLanes = () => {
     fetchLaneMapping();
   }, [laneMappingId]);
 
+  const handleEditNameSuccess = async () => {
+    try {
+      const data = await getLaneMappingById(laneMappingId);
+      setLaneMapping(data);
+    } catch (error) {
+      console.error('Error refetching lane mapping:', error);
+    }
+  };
+
   const hourColumns = [
     'driveToAirportDuration',
     'customClearance',
@@ -1311,6 +1320,15 @@ const LaneMappingLanes = () => {
           )}
         </div>
       </div>
+
+      {/* Edit Lane Mapping Name Modal */}
+      {showEditNameModal && (
+        <EditLaneMappingModal
+          laneMappingId={laneMappingId}
+          onClose={() => setShowEditNameModal(false)}
+          onSuccess={handleEditNameSuccess}
+        />
+      )}
     </div>
   );
 };
