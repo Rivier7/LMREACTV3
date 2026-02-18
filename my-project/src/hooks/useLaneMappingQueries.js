@@ -6,6 +6,8 @@ import {
   deleteLaneMappingById,
   postLaneMappingExcel,
   updateLaneMappingName,
+  uploadDraftExcel,
+  validateLaneMapping,
 } from '../api/api';
 
 /**
@@ -92,6 +94,42 @@ export function useUploadLaneMappingExcel() {
     },
     onError: error => {
       console.error('Failed to upload Excel:', error);
+    },
+  });
+}
+
+/**
+ * Upload draft Excel file (no validation)
+ * Automatically invalidates lane mapping queries on success
+ */
+export function useUploadDraftExcel() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: uploadDraftExcel,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: laneMappingKeys.all });
+    },
+    onError: error => {
+      console.error('Failed to upload draft Excel:', error);
+    },
+  });
+}
+
+/**
+ * Validate all lanes in a lane mapping (bulk)
+ * Automatically invalidates lane mapping queries on success
+ */
+export function useValidateLaneMapping() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: validateLaneMapping,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: laneMappingKeys.all });
+    },
+    onError: error => {
+      console.error('Failed to validate lane mapping:', error);
     },
   });
 }

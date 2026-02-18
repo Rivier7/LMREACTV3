@@ -1,10 +1,66 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getLaneMappingExcel, getAllLaneMappings } from '../api/api';
+import { getLaneMappingExcel, getAllLaneMappings, validateLaneMapping } from '../api/api';
 import LaneMappingModel from '../components/LaneMappingModel';
 import EditLaneMappingModal from '../components/EditLaneMappingModal';
 import FileUploader from '../components/FileUploader';
 import Header from '../components/Header';
+
+/**
+ * Determine the overall validation status for a lane mapping based on its lanes.
+ * Returns 'all_valid' | 'has_invalid' | 'pending' | 'unknown'
+ */
+const getValidationSummary = laneMapping => {
+  const lanes = laneMapping.lanes;
+  if (!lanes || lanes.length === 0) return 'unknown';
+
+  let hasPending = false;
+  let hasInvalid = false;
+
+  for (const lane of lanes) {
+    const status = lane.validationStatus;
+    if (status === 'PENDING') hasPending = true;
+    else if (status === 'INVALID') hasInvalid = true;
+  }
+
+  if (hasInvalid) return 'has_invalid';
+  if (hasPending) return 'pending';
+  return 'all_valid';
+};
+
+const ValidationBadge = ({ summary }) => {
+  switch (summary) {
+    case 'all_valid':
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700">
+          <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+          </svg>
+          All Validated
+        </span>
+      );
+    case 'pending':
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700">
+          <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+          </svg>
+          Pending Validation
+        </span>
+      );
+    case 'has_invalid':
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700">
+          <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+          </svg>
+          Has Invalid
+        </span>
+      );
+    default:
+      return null;
+  }
+};
 
 const LaneMappings = () => {
   const navigate = useNavigate();
@@ -14,6 +70,7 @@ const LaneMappings = () => {
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedLaneMappingId, setSelectedLaneMappingId] = useState(null);
+  const [validatingIds, setValidatingIds] = useState(new Set());
 
   const handleSelectLaneMapping = laneMappingId => {
     navigate(`/laneMappingLanes/${laneMappingId}`);
@@ -60,6 +117,23 @@ const LaneMappings = () => {
     await loadLaneMappings();
   };
 
+  const handleValidate = async id => {
+    setValidatingIds(prev => new Set(prev).add(id));
+    try {
+      await validateLaneMapping(id);
+      await loadLaneMappings();
+    } catch (error) {
+      console.error('Validation failed:', error);
+      alert(error.message || 'Validation failed');
+    } finally {
+      setValidatingIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  };
+
   return (
     <>
       <Header />
@@ -94,7 +168,6 @@ const LaneMappings = () => {
                 placeholder="Filter lane mappings"
                 className="outline-none text-sm text-gray-700 placeholder-gray-400"
                 aria-label="Filter lane mappings"
-                // onChange can be wired later
               />
             </div>
           </div>
@@ -103,7 +176,7 @@ const LaneMappings = () => {
         {/* Status */}
         {loading && (
           <div className="w-full py-12 flex justify-center">
-            <p className="text-gray-600">Loading lane mappings…</p>
+            <p className="text-gray-600">Loading lane mappings...</p>
           </div>
         )}
 
@@ -130,6 +203,9 @@ const LaneMappings = () => {
                   .slice(0, 2)
                   .join('')
                   .toUpperCase();
+                const validationSummary = getValidationSummary(laneMapping);
+                const isValidating = validatingIds.has(laneMapping.id);
+                const hasPendingLanes = validationSummary === 'pending';
                 return (
                   <article
                     key={laneMapping.id}
@@ -190,32 +266,64 @@ const LaneMappings = () => {
                     </h2>
                     <p className="text-xs text-gray-400">ID: {laneMapping.id}</p>
 
-                    {/* Actions */}
-                    <div className="mt-3 w-full flex gap-2">
-                      <button
-                        onClick={() => getLaneMappingExcel(laneMapping.id)}
-                        className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 focus:outline-none"
-                        aria-label={`Download excel for ${laneMapping.name}`}
-                      >
-                        <svg
-                          className="w-4 h-4"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                          aria-hidden="true"
-                        >
-                          <path d="M3 14a1 1 0 011-1h3v-4h6v4h3a1 1 0 110 2H4a1 1 0 01-1-1z" />
-                          <path d="M9 3h2v6H9V3z" />
-                        </svg>
-                        Download
-                      </button>
+                    {/* Validation Status Badge */}
+                    <ValidationBadge summary={validationSummary} />
 
-                      <button
-                        onClick={() => handleSelectLaneMapping?.(laneMapping.id)}
-                        className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-700 hover:bg-gray-50 focus:outline-none"
-                        aria-label={`Select ${laneMapping.name}`}
-                      >
-                        Select
-                      </button>
+                    {/* Actions */}
+                    <div className="mt-3 w-full flex flex-col gap-2">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => getLaneMappingExcel(laneMapping.id)}
+                          className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 focus:outline-none"
+                          aria-label={`Download excel for ${laneMapping.name}`}
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                            aria-hidden="true"
+                          >
+                            <path d="M3 14a1 1 0 011-1h3v-4h6v4h3a1 1 0 110 2H4a1 1 0 01-1-1z" />
+                            <path d="M9 3h2v6H9V3z" />
+                          </svg>
+                          Download
+                        </button>
+
+                        <button
+                          onClick={() => handleSelectLaneMapping?.(laneMapping.id)}
+                          className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-700 hover:bg-gray-50 focus:outline-none"
+                          aria-label={`Select ${laneMapping.name}`}
+                        >
+                          Select
+                        </button>
+                      </div>
+
+                      {/* Validate button - only shown for pending lanes */}
+                      {hasPendingLanes && (
+                        <button
+                          onClick={() => handleValidate(laneMapping.id)}
+                          disabled={isValidating}
+                          className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-amber-500 text-white rounded-md text-sm hover:bg-amber-600 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                          aria-label={`Validate lanes for ${laneMapping.name}`}
+                        >
+                          {isValidating ? (
+                            <>
+                              <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                              </svg>
+                              Validating...
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                              Validate All Lanes
+                            </>
+                          )}
+                        </button>
+                      )}
                     </div>
                   </article>
                 );

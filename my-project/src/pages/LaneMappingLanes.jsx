@@ -30,6 +30,8 @@ import {
   getTAT,
   calculateAllTAT,
   deleteLaneById,
+  validateLaneMapping,
+  validateSingleLane,
 } from '../api/api.js';
 
 const LaneMappingLanes = () => {
@@ -49,6 +51,9 @@ const LaneMappingLanes = () => {
   const [savedLaneId, setSavedLaneId] = useState(null);
   const [showEditNameModal, setShowEditNameModal] = useState(false);
   const [tatMessage, setTatMessage] = useState(null);
+  const [bulkValidating, setBulkValidating] = useState(false);
+  const [validatingLaneIds, setValidatingLaneIds] = useState(new Set());
+  const [validationMessage, setValidationMessage] = useState(null);
 
   const handleSuggestRoute = async laneId => {
     try {
@@ -494,6 +499,59 @@ const LaneMappingLanes = () => {
     }
   };
 
+  const hasPendingLanes = lanes.some(l => l.validationStatus === 'PENDING');
+
+  const handleBulkValidate = async () => {
+    setBulkValidating(true);
+    setValidationMessage(null);
+    try {
+      const result = await validateLaneMapping(laneMappingId);
+      const data = result.data || result;
+      setValidationMessage(
+        `Validation completed: ${data.valid || 0} valid, ${data.invalid || 0} invalid, ${data.skipped || 0} skipped`
+      );
+      const freshLanes = await getLanesByLaneMappingId(laneMappingId);
+      setLanes(freshLanes.map(lane => ({ ...lane, hasBeenUpdated: false })));
+      setTimeout(() => setValidationMessage(null), 5000);
+    } catch (err) {
+      setError(err.message || 'Bulk validation failed');
+    } finally {
+      setBulkValidating(false);
+    }
+  };
+
+  const handleValidateSingleLane = async laneId => {
+    setValidatingLaneIds(prev => new Set(prev).add(laneId));
+    try {
+      const result = await validateSingleLane(laneId);
+      setLanes(current =>
+        current.map(lane =>
+          lane.id === laneId
+            ? { ...lane, validationStatus: result.validationStatus || (result.valid ? 'VALID' : 'INVALID'), valid: result.valid }
+            : lane
+        )
+      );
+    } catch (err) {
+      alert(err.message || 'Lane validation failed');
+    } finally {
+      setValidatingLaneIds(prev => {
+        const next = new Set(prev);
+        next.delete(laneId);
+        return next;
+      });
+    }
+  };
+
+  const getValidationStatusDisplay = lane => {
+    const status = lane.validationStatus;
+    if (status === 'PENDING') return { label: 'Pending', color: 'bg-amber-100 text-amber-700', icon: Clock };
+    if (status === 'VALID') return { label: 'Valid', color: 'bg-green-100 text-green-700', icon: CheckCircle };
+    if (status === 'INVALID') return { label: 'Invalid', color: 'bg-red-100 text-red-700', icon: XCircle };
+    // Fallback to legacy boolean
+    if (lane.valid === true) return { label: 'Valid', color: 'bg-green-100 text-green-700', icon: CheckCircle };
+    return { label: 'Invalid', color: 'bg-red-100 text-red-700', icon: XCircle };
+  };
+
   const toggleLaneExpansion = laneId => {
     setExpandedLanes(prev => ({ ...prev, [laneId]: !prev[laneId] }));
   };
@@ -530,6 +588,9 @@ const LaneMappingLanes = () => {
         if (value === 'true') return lane.valid === true;
         if (value === 'false') return lane.valid !== true;
         return true;
+      }
+      if (field === 'validationStatus') {
+        return lane.validationStatus === value;
       }
       if (field === 'tatStatus') {
         const tat = (lane.tatToConsigneeDuration || '').toString().trim().toLowerCase();
@@ -681,6 +742,24 @@ const LaneMappingLanes = () => {
         </div>
       )}
 
+      {/* Validation Success Display */}
+      {validationMessage && (
+        <div className="bg-green-50 border-b border-green-200 px-6 py-3">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-2 text-green-700">
+              <CheckCircle size={18} />
+              {validationMessage}
+            </div>
+            <button
+              onClick={() => setValidationMessage(null)}
+              className="text-green-700 hover:text-green-900 p-1"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Error Display */}
       {error && !loading && (
         <div className="bg-red-50 border-b border-red-200 px-6 py-3">
@@ -732,6 +811,16 @@ const LaneMappingLanes = () => {
               <option value="true">Valid</option>
               <option value="false">Invalid</option>
             </select>
+            <select
+              value={filters.validationStatus || ''}
+              onChange={e => setFilters(prev => ({ ...prev, validationStatus: e.target.value }))}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+              <option value="">All Validation</option>
+              <option value="PENDING">Pending</option>
+              <option value="VALID">Valid</option>
+              <option value="INVALID">Invalid</option>
+            </select>
             <button
               onClick={() => setShowColumnFilters(!showColumnFilters)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${showColumnFilters || activeFilterCount > 0
@@ -754,6 +843,28 @@ const LaneMappingLanes = () => {
             >
               Validate All
             </button>
+            {hasPendingLanes && (
+              <button
+                onClick={handleBulkValidate}
+                disabled={bulkValidating || loading}
+                className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition disabled:opacity-50"
+              >
+                {bulkValidating ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Validating...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle size={14} />
+                    Validate Pending Lanes
+                  </>
+                )}
+              </button>
+            )}
             <button
               onClick={computeAllTAT}
               disabled={loading}
@@ -891,17 +1002,16 @@ const LaneMappingLanes = () => {
                       Saved!
                     </span>
                   )}
-                  {lane.valid ? (
-                    <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
-                      <CheckCircle size={14} />
-                      Valid
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold">
-                      <XCircle size={14} />
-                      Invalid
-                    </span>
-                  )}
+                  {(() => {
+                    const vs = getValidationStatusDisplay(lane);
+                    const StatusIcon = vs.icon;
+                    return (
+                      <span className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${vs.color}`}>
+                        <StatusIcon size={14} />
+                        {vs.label}
+                      </span>
+                    );
+                  })()}
                 </div>
 
                 {/* Action Buttons */}
@@ -914,6 +1024,24 @@ const LaneMappingLanes = () => {
                   >
                     <CheckCircle size={16} />
                   </button>
+                  {lane.validationStatus === 'PENDING' && (
+                    <button
+                      onClick={() => handleValidateSingleLane(lane.id)}
+                      disabled={validatingLaneIds.has(lane.id) || loading}
+                      className="flex items-center gap-1 px-2 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-medium hover:bg-amber-600 transition disabled:opacity-50"
+                      title="Validate this lane"
+                    >
+                      {validatingLaneIds.has(lane.id) ? (
+                        <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                      ) : (
+                        <CheckCircle size={12} />
+                      )}
+                      Validate
+                    </button>
+                  )}
                   <button
                     onClick={() => computeTATForLane(lane.id)}
                     disabled={loading}

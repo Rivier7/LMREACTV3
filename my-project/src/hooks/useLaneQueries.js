@@ -11,6 +11,7 @@ import {
   updateLaneMappingLanes,
   validateLanes,
   validateFlight,
+  validateSingleLane,
   getSuggestedRoute,
   getSuggestedRouteByLocation,
   getTAT,
@@ -218,6 +219,24 @@ export function useGetSuggestedRoute() {
 export function useGetSuggestedRouteByLocation() {
   return useMutation({
     mutationFn: getSuggestedRouteByLocation,
+  });
+}
+
+/**
+ * Validate a single lane
+ * Invalidates lane mapping lanes on success
+ */
+export function useValidateSingleLane() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: validateSingleLane,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: laneKeys.all });
+    },
+    onError: error => {
+      console.error('Failed to validate lane:', error);
+    },
   });
 }
 

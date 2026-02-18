@@ -637,6 +637,96 @@ export const removeLaneMappingFromAccount = async laneMappingId => {
   return await response.json();
 };
 
+// ✅ Upload draft Excel (no validation)
+export const uploadDraftExcel = async file => {
+  if (!(file instanceof File || file instanceof Blob)) {
+    throw new TypeError('Invalid file type. Expected File or Blob.');
+  }
+
+  const formData = new FormData();
+  const filename = file.name || 'upload.xlsx';
+  formData.append('file', file, filename);
+
+  const headers = getAuthHeaders(true);
+  if (headers['Content-Type']) {
+    delete headers['Content-Type'];
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+  try {
+    const response = await fetch(`${BASE_URL2}/upload-draft`, {
+      method: 'POST',
+      headers,
+      body: formData,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      let errorMessage = 'Draft upload failed';
+      try {
+        const errorJson = await response.json();
+        errorMessage = errorJson.message || errorMessage;
+      } catch {
+        const errorText = await response.text();
+        if (errorText) errorMessage = errorText;
+      }
+      throw new Error(errorMessage);
+    }
+
+    return await response.json();
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('Upload timed out after 30 seconds');
+    }
+    throw error;
+  }
+};
+
+// ✅ Validate all lanes in a lane mapping (bulk)
+export const validateLaneMapping = async id => {
+  const response = await fetch(`${BASE_URL2}/${id}/validate`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    let errorMessage = 'Validation failed';
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.message || errorMessage;
+    } catch {
+      const errorText = await response.text();
+      if (errorText) errorMessage = errorText;
+    }
+    throw new Error(errorMessage);
+  }
+  return await response.json();
+};
+
+// ✅ Validate a single lane
+export const validateSingleLane = async id => {
+  const response = await fetch(`${BASE_URL}/${id}/validate`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    let errorMessage = 'Lane validation failed';
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.message || errorMessage;
+    } catch {
+      const errorText = await response.text();
+      if (errorText) errorMessage = errorText;
+    }
+    throw new Error(errorMessage);
+  }
+  return await response.json();
+};
+
 // Search flights between two airports
 export const searchFlights = async (origin, destination) => {
   const response = await fetch(

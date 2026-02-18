@@ -17,18 +17,32 @@ function Lane({ lane, onDelete }) {
   };
 
   const isDirectDrive = lane.serviceLevel === 'DIRECT DRIVE';
-  const isValid = lane.valid === true;
   const hasLegs = lane.legs && lane.legs.length > 0;
+
+  // 3-state validation status with backward compatibility
+  const validationStatus = lane.validationStatus || (lane.valid === true ? 'VALID' : lane.valid === false ? 'INVALID' : 'PENDING');
+  const isPending = validationStatus === 'PENDING';
+  const isValid = validationStatus === 'VALID';
+
+  const headerBg = isPending
+    ? 'bg-amber-50 border-amber-200'
+    : isValid
+      ? 'bg-green-50 border-green-100'
+      : 'bg-red-50 border-red-100';
+
+  const StatusIcon = isPending ? AlertCircle : isValid ? CheckCircle : XCircle;
+  const statusIconColor = isPending ? 'text-amber-500' : isValid ? 'text-green-600' : 'text-red-600';
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
       {/* Compact Header */}
-      <div className={`px-4 py-2.5 border-b flex items-center justify-between ${isValid ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
+      <div className={`px-4 py-2.5 border-b flex items-center justify-between ${headerBg}`}>
         <div className="flex items-center gap-3">
-          {isValid ? (
-            <CheckCircle className="w-5 h-5 text-green-600" />
-          ) : (
-            <XCircle className="w-5 h-5 text-red-600" />
+          <StatusIcon className={`w-5 h-5 ${statusIconColor}`} />
+          {isPending && (
+            <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+              Pending
+            </span>
           )}
           <span className="font-semibold text-gray-900">{lane.accountName}</span>
           {lane.laneMappingName && (
