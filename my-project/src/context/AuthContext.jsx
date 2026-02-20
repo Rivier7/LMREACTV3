@@ -7,7 +7,7 @@ const AuthContext = createContext();
 const EXPIRATION_WARNING_MS = 5 * 60 * 1000;
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(localStorage.getItem('token') || null);
+  const [token, setToken] = useState(localStorage.getItem('token') || '');
   const [showExpirationWarning, setShowExpirationWarning] = useState(false);
 
   // Function to check if token is expired

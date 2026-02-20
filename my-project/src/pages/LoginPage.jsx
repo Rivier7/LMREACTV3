@@ -115,8 +115,10 @@ function LoginPage() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="mx-auto w-12 h-12 bg-gray-900 rounded-xl flex items-center justify-center mb-4">
-              <Lock className="w-6 h-6 text-white" />
+            <div className="flex justify-center mb-5">
+              <div className="bg-gray-950 rounded-2xl p-4 inline-flex items-center justify-center shadow-lg">
+                <img src="/logo.png" alt="Marken" className="h-16 w-auto object-contain" />
+              </div>
             </div>
             <h2 className="text-2xl font-semibold text-gray-900">
               {stage === 'verify' ? 'Verify Code' : 'Login'}
