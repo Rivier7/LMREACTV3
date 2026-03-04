@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Edit3, Plane, Truck, CheckCircle, XCircle, AlertCircle, Trash2 } from 'lucide-react';
+import { Edit3, Plane, Truck, CheckCircle, XCircle, AlertCircle, Trash2, Clock, Calendar, User } from 'lucide-react';
 
 function Lane({ lane, onDelete }) {
   const navigate = useNavigate();
@@ -19,8 +19,19 @@ function Lane({ lane, onDelete }) {
   const isDirectDrive = lane.serviceLevel === 'DIRECT DRIVE';
   const hasLegs = lane.legs && lane.legs.length > 0;
 
-  // 3-state validation status with backward compatibility
-  const validationStatus = lane.validationStatus || (lane.valid === true ? 'VALID' : lane.valid === false ? 'INVALID' : 'PENDING');
+  const validationStatus = lane.validationStatus || 'PENDING';
+
+  const formatDateTime = val => {
+    if (!val) return null;
+    const d = new Date(val);
+    return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  };
+
+  const formatDate = val => {
+    if (!val) return null;
+    const d = new Date(val);
+    return d.toLocaleDateString(undefined, { dateStyle: 'medium' });
+  };
   const isPending = validationStatus === 'PENDING';
   const isValid = validationStatus === 'VALID';
 
@@ -208,6 +219,30 @@ function Lane({ lane, onDelete }) {
           <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
             <AlertCircle className="w-4 h-4" />
             <span>Direct Drive - Ground transportation only</span>
+          </div>
+        )}
+
+        {/* Metadata Footer */}
+        {(lane.lastValidatedAt || lane.lastUpdate || lane.lastUpdatedBy) && (
+          <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-gray-500">
+            {lane.lastValidatedAt && (
+              <span className="flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-gray-400" />
+                Validated: <span className="font-medium text-gray-700 ml-0.5">{formatDateTime(lane.lastValidatedAt)}</span>
+              </span>
+            )}
+            {lane.lastUpdate && (
+              <span className="flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                Updated: <span className="font-medium text-gray-700 ml-0.5">{formatDate(lane.lastUpdate)}</span>
+              </span>
+            )}
+            {lane.lastUpdatedBy && (
+              <span className="flex items-center gap-1">
+                <User className="w-3.5 h-3.5 text-gray-400" />
+                By: <span className="font-medium text-gray-700 ml-0.5">{lane.lastUpdatedBy}</span>
+              </span>
+            )}
           </div>
         )}
       </div>

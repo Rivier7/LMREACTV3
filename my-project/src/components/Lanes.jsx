@@ -38,7 +38,7 @@ function Lanes({ lanes, onDelete }) {
         (!filters.destinationCity || lane.destinationCity === filters.destinationCity) &&
         (!filters.itemNumber || lane.itemNumber === filters.itemNumber) &&
         (!filters.laneOption || lane.laneOption === filters.laneOption) &&
-        (filters.valid === '' || lane.valid === (filters.valid === 'true'))
+        (filters.valid === '' || (filters.valid === 'true' ? lane.validationStatus === 'VALID' : lane.validationStatus !== 'VALID'))
       );
     });
     setFilteredLanes(result);
@@ -134,7 +134,7 @@ function Lanes({ lanes, onDelete }) {
                 const tempFiltered = lanes.filter(lane => {
                   return Object.entries(tempFilters).every(([key, val]) => {
                     if (key === 'valid') {
-                      return !val || lane.valid === (val === 'true');
+                      return !val || (val === 'true' ? lane.validationStatus === 'VALID' : lane.validationStatus !== 'VALID');
                     }
                     if (key === 'laneMappingName') {
                       return !val || getLaneMappingName(lane) === val;

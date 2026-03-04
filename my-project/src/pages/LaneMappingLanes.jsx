@@ -17,6 +17,8 @@ import {
   X,
   FileText,
   Pencil,
+  Calendar,
+  User,
 } from 'lucide-react';
 import EditLaneMappingModal from '../components/EditLaneMappingModal';
 import {
@@ -547,9 +549,17 @@ const LaneMappingLanes = () => {
     if (status === 'PENDING') return { label: 'Pending', color: 'bg-amber-100 text-amber-700', icon: Clock };
     if (status === 'VALID') return { label: 'Valid', color: 'bg-green-100 text-green-700', icon: CheckCircle };
     if (status === 'INVALID') return { label: 'Invalid', color: 'bg-red-100 text-red-700', icon: XCircle };
-    // Fallback to legacy boolean
-    if (lane.valid === true) return { label: 'Valid', color: 'bg-green-100 text-green-700', icon: CheckCircle };
-    return { label: 'Invalid', color: 'bg-red-100 text-red-700', icon: XCircle };
+    return { label: 'Pending', color: 'bg-amber-100 text-amber-700', icon: Clock };
+  };
+
+  const formatDateTime = val => {
+    if (!val) return null;
+    return new Date(val).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  };
+
+  const formatDate = val => {
+    if (!val) return null;
+    return new Date(val).toLocaleDateString(undefined, { dateStyle: 'medium' });
   };
 
   const toggleLaneExpansion = laneId => {
@@ -585,12 +595,13 @@ const LaneMappingLanes = () => {
     return Object.entries(filters).every(([field, value]) => {
       if (!value || field === 'quickFilter') return true;
       if (field === 'valid') {
-        if (value === 'true') return lane.valid === true;
-        if (value === 'false') return lane.valid !== true;
+        const isValid = lane.validationStatus === 'VALID';
+        if (value === 'true') return isValid;
+        if (value === 'false') return !isValid;
         return true;
       }
       if (field === 'validationStatus') {
-        return lane.validationStatus === value;
+        return (lane.validationStatus || 'PENDING') === value;
       }
       if (field === 'tatStatus') {
         const tat = (lane.tatToConsigneeDuration || '').toString().trim().toLowerCase();
@@ -1012,6 +1023,12 @@ const LaneMappingLanes = () => {
                       </span>
                     );
                   })()}
+                  {lane.lastValidatedAt && (
+                    <span className="flex items-center gap-1 text-xs text-gray-400">
+                      <Clock size={12} />
+                      {formatDateTime(lane.lastValidatedAt)}
+                    </span>
+                  )}
                 </div>
 
                 {/* Action Buttons */}
@@ -1405,6 +1422,30 @@ const LaneMappingLanes = () => {
                       placeholder="Enter any additional notes here..."
                     />
                   </div>
+
+                  {/* Lane History */}
+                  {(lane.lastValidatedAt || lane.lastUpdate || lane.lastUpdatedBy) && (
+                    <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 bg-white rounded-lg border border-gray-200 text-xs text-gray-500">
+                      {lane.lastValidatedAt && (
+                        <span className="flex items-center gap-1.5">
+                          <Clock size={13} className="text-gray-400" />
+                          Last validated: <span className="font-medium text-gray-700 ml-0.5">{formatDateTime(lane.lastValidatedAt)}</span>
+                        </span>
+                      )}
+                      {lane.lastUpdate && (
+                        <span className="flex items-center gap-1.5">
+                          <Calendar size={13} className="text-gray-400" />
+                          Last updated: <span className="font-medium text-gray-700 ml-0.5">{formatDate(lane.lastUpdate)}</span>
+                        </span>
+                      )}
+                      {lane.lastUpdatedBy && (
+                        <span className="flex items-center gap-1.5">
+                          <User size={13} className="text-gray-400" />
+                          By: <span className="font-medium text-gray-700 ml-0.5">{lane.lastUpdatedBy}</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   {/* Suggested Routes */}
                   {showSuggestedRoute && suggestedRoutes.length > 0 && routeLaneId === lane.id && (
