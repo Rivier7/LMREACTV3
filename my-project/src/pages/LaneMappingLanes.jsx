@@ -19,21 +19,22 @@ import {
   Pencil,
   Calendar,
   User,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import EditLaneMappingModal from '../components/EditLaneMappingModal';
 import {
   getLanesByLaneMappingId,
-  updateLane,
   getLaneMappingById,
-  validateFlight,
-  updateLaneMappingLanes,
+updateLaneMappingLanes,
   getSuggestedRoute,
   getSuggestedRouteByLocation,
   getTAT,
   calculateAllTAT,
   deleteLaneById,
-  validateLaneMapping,
-  validateSingleLane,
+  validateLaneMappingWithProgress,
+  validateAndSaveLane,
+  syncLaneSchedule,
 } from '../api/api.js';
 
 const LaneMappingLanes = () => {
@@ -53,9 +54,13 @@ const LaneMappingLanes = () => {
   const [savedLaneId, setSavedLaneId] = useState(null);
   const [showEditNameModal, setShowEditNameModal] = useState(false);
   const [tatMessage, setTatMessage] = useState(null);
-  const [bulkValidating, setBulkValidating] = useState(false);
-  const [validatingLaneIds, setValidatingLaneIds] = useState(new Set());
-  const [validationMessage, setValidationMessage] = useState(null);
+  const [syncToast, setSyncToast] = useState(null);
+  const [syncingLaneIds, setSyncingLaneIds] = useState(new Set());
+  const [validationProgress, setValidationProgress] = useState(null);
+  // null = idle, { status, percentage, currentLane, totalLanes, validCount, invalidCount, scheduleMismatchCount, message } = active/done
+  const [validateAndSavingLaneIds, setValidateAndSavingLaneIds] = useState(new Set());
+  const [laneValidationErrors, setLaneValidationErrors] = useState({});
+  // { [laneId]: { laneErrors: string[], legErrors: { [sequence]: string[] } } }
 
   const handleSuggestRoute = async laneId => {
     try {
@@ -66,10 +71,11 @@ const LaneMappingLanes = () => {
         return;
       }
 
+      const sortedLegs = [...lane.legs].sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
       const payload = {
         itemNumber: lane.itemNumber,
-        originAirport: lane.legs[0]?.originStation,
-        destinationAirport: lane.legs[lane.legs.length - 1]?.destinationStation,
+        originAirport: sortedLegs[0]?.originStation,
+        destinationAirport: sortedLegs.at(-1)?.destinationStation,
         collectionTime: lane.pickUpTime,
       };
 
@@ -266,6 +272,7 @@ const LaneMappingLanes = () => {
         lane.id === laneId ? { ...lane, [field]: finalValue, hasBeenUpdated: true } : lane
       )
     );
+    setLaneValidationErrors(prev => ({ ...prev, [laneId]: null }));
   };
 
   const handleLegChange = (laneId, legId, field, value) => {
@@ -309,12 +316,13 @@ const LaneMappingLanes = () => {
             ...lane,
             legs: lane.legs.map(leg => (leg.id === legId ? { ...leg, [field]: value } : leg)),
             hasBeenUpdated: true,
-            originStation: lane.legs[0]?.originStation || '',
-            destinationStation: lane.legs[lane.legs.length - 1]?.destinationStation || '',
+            originStation: [...lane.legs].sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))[0]?.originStation || '',
+            destinationStation: [...lane.legs].sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0)).at(-1)?.destinationStation || '',
           }
           : lane
       )
     );
+    setLaneValidationErrors(prev => ({ ...prev, [laneId]: null }));
   };
 
   const handleAddLeg = laneId => {
@@ -383,47 +391,6 @@ const LaneMappingLanes = () => {
     }
   };
 
-  const validateLegs = async laneId => {
-    setLoading(true);
-    try {
-      const laneToValidate = lanes.find(l => l.id === laneId);
-      if (!laneToValidate || !laneToValidate.legs) return;
-
-      const validatedLegs = await Promise.all(
-        laneToValidate.legs.map(async leg => {
-          try {
-            const result = await validateFlight(leg);
-            const updatedLeg = {
-              ...leg,
-              valid: result.valid,
-              message: result.message,
-              validMessage: result.mismatchedFields || [],
-              flightOperatingDays: result.operatingDays,
-              aircraftByDay: result.aircraftByDay || null,
-            };
-            return updatedLeg;
-          } catch (error) {
-            return {
-              ...leg,
-              valid: false,
-              validMessage: [error.message || 'Validation failed'],
-            };
-          }
-        })
-      );
-
-      const isLaneValid = validatedLegs.every(leg => leg.valid);
-      setLanes(current =>
-        current.map(lane =>
-          lane.id === laneId ? { ...lane, legs: validatedLegs, valid: isLaneValid, hasBeenUpdated: true } : lane
-        )
-      );
-    } catch (err) {
-      setError('Error validating flight legs.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const computeTATForLane = async laneId => {
     setLoading(true);
@@ -463,80 +430,103 @@ const LaneMappingLanes = () => {
     }
   };
 
-  const validateAllLanes = async () => {
-    setLoading(true);
-    try {
-      const validatedLanesPromises = lanes.map(async lane => {
-        if (!lane.legs || lane.legs.length === 0) return { ...lane, valid: true };
-        const validatedLegs = await Promise.all(
-          lane.legs.map(async leg => {
-            try {
-              const result = await validateFlight(leg);
-              return {
-                ...leg,
-                valid: result.valid,
-                message: result.message,
-                validMessage: result.mismatchedFields || [],
-                flightOperatingDays: result.operatingDays,
-                aircraftByDay: result.aircraftByDay || null,
-              };
-            } catch (error) {
-              return {
-                ...leg,
-                valid: false,
-                validMessage: [error.message || 'Validation failed'],
-              };
-            }
-          })
-        );
-        const isLaneValid = validatedLegs.every(leg => leg.valid);
-        return { ...lane, legs: validatedLegs, valid: isLaneValid, hasBeenUpdated: true };
-      });
-      const newLanes = await Promise.all(validatedLanesPromises);
-      setLanes(newLanes);
-    } catch (err) {
-      setError('Error validating all flight legs.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const hasPendingLanes = lanes.some(l => l.validationStatus === 'PENDING');
-
   const handleBulkValidate = async () => {
-    setBulkValidating(true);
-    setValidationMessage(null);
+    setValidationProgress({ status: 'validating', percentage: 0, currentLane: 0, totalLanes: 0, validCount: 0, invalidCount: 0, scheduleMismatchCount: 0, message: 'Starting validation...' });
     try {
-      const result = await validateLaneMapping(laneMappingId);
-      const data = result.data || result;
-      setValidationMessage(
-        `Validation completed: ${data.valid || 0} valid, ${data.invalid || 0} invalid, ${data.skipped || 0} skipped`
-      );
-      const freshLanes = await getLanesByLaneMappingId(laneMappingId);
-      setLanes(freshLanes.map(lane => ({ ...lane, hasBeenUpdated: false })));
-      setTimeout(() => setValidationMessage(null), 5000);
+      await validateLaneMappingWithProgress(laneMappingId, {
+        onProgress: data => setValidationProgress({ ...data, status: 'validating' }),
+        onComplete: async data => {
+          setValidationProgress({ ...data, status: 'completed' });
+          const freshLanes = await getLanesByLaneMappingId(laneMappingId);
+          setLanes(freshLanes.map(lane => ({ ...lane, hasBeenUpdated: false })));
+        },
+        onError: data => setValidationProgress({ ...data, status: 'error' }),
+      });
     } catch (err) {
-      setError(err.message || 'Bulk validation failed');
-    } finally {
-      setBulkValidating(false);
+      setValidationProgress(prev => ({ ...prev, status: 'error', message: err.message || 'Validation failed' }));
     }
   };
 
-  const handleValidateSingleLane = async laneId => {
-    setValidatingLaneIds(prev => new Set(prev).add(laneId));
+  // Merge sync result into legs — updates times AND validity
+  const mergeSyncLegs = (laneLegs, resultLegs) => {
+    if (!resultLegs?.length) return laneLegs;
+    return laneLegs.map(leg => {
+      const updated = resultLegs.find(r => r.legId === leg.id);
+      if (!updated) return leg;
+      return {
+        ...leg,
+        valid: updated.valid,
+        validMessage: updated.validationMessages || [],
+        departureTime: updated.departureTime ?? leg.departureTime,
+        arrivalTime: updated.arrivalTime ?? leg.arrivalTime,
+      };
+    });
+  };
+
+  const handleValidateAndSave = async laneId => {
+    setValidateAndSavingLaneIds(prev => new Set(prev).add(laneId));
+    setLaneValidationErrors(prev => ({ ...prev, [laneId]: null }));
     try {
-      const result = await validateSingleLane(laneId);
+      const lane = lanes.find(l => l.id === laneId);
+      if (!lane) return;
+      const result = await validateAndSaveLane(laneId, lane, lane.legs || []);
+      setLanes(current =>
+        current.map(l => {
+          if (l.id !== laneId) return l;
+          if (result.lane) return { ...result.lane, hasBeenUpdated: false };
+          return { ...l, hasBeenUpdated: false };
+        })
+      );
+      setSavedLaneId(laneId);
+      setTimeout(() => setSavedLaneId(null), 3000);
+    } catch (err) {
+      if (err.status === 422 && err.validationResult) {
+        const legErrorsMap = {};
+        (err.validationResult.legErrors || []).forEach(le => {
+          legErrorsMap[le.sequence] = le.messages;
+        });
+        setLaneValidationErrors(prev => ({
+          ...prev,
+          [laneId]: {
+            laneErrors: err.validationResult.laneErrors || [],
+            legErrors: legErrorsMap,
+          },
+        }));
+        setExpandedLanes(prev => ({ ...prev, [laneId]: true }));
+      } else {
+        alert(err.message || 'Validate and save failed');
+      }
+    } finally {
+      setValidateAndSavingLaneIds(prev => {
+        const next = new Set(prev);
+        next.delete(laneId);
+        return next;
+      });
+    }
+  };
+
+  const handleSyncSchedule = async laneId => {
+    setSyncingLaneIds(prev => new Set(prev).add(laneId));
+    try {
+      const result = await syncLaneSchedule(laneId);
       setLanes(current =>
         current.map(lane =>
           lane.id === laneId
-            ? { ...lane, validationStatus: result.validationStatus || (result.valid ? 'VALID' : 'INVALID'), valid: result.valid }
+            ? {
+                ...lane,
+                validationStatus: result.validationStatus,
+                syncMessage: null,
+                legs: mergeSyncLegs(lane.legs || [], result.legs),
+              }
             : lane
         )
       );
+      setSyncToast('Times updated successfully!');
+      setTimeout(() => setSyncToast(null), 4000);
     } catch (err) {
-      alert(err.message || 'Lane validation failed');
+      alert(err.message || 'Schedule sync failed');
     } finally {
-      setValidatingLaneIds(prev => {
+      setSyncingLaneIds(prev => {
         const next = new Set(prev);
         next.delete(laneId);
         return next;
@@ -549,6 +539,7 @@ const LaneMappingLanes = () => {
     if (status === 'PENDING') return { label: 'Pending', color: 'bg-amber-100 text-amber-700', icon: Clock };
     if (status === 'VALID') return { label: 'Valid', color: 'bg-green-100 text-green-700', icon: CheckCircle };
     if (status === 'INVALID') return { label: 'Invalid', color: 'bg-red-100 text-red-700', icon: XCircle };
+    if (status === 'SCHEDULE_MISMATCH') return { label: 'Outdated Schedule', color: 'bg-orange-100 text-orange-700', icon: AlertTriangle };
     return { label: 'Pending', color: 'bg-amber-100 text-amber-700', icon: Clock };
   };
 
@@ -594,12 +585,6 @@ const LaneMappingLanes = () => {
 
     return Object.entries(filters).every(([field, value]) => {
       if (!value || field === 'quickFilter') return true;
-      if (field === 'valid') {
-        const isValid = lane.validationStatus === 'VALID';
-        if (value === 'true') return isValid;
-        if (value === 'false') return !isValid;
-        return true;
-      }
       if (field === 'validationStatus') {
         return (lane.validationStatus || 'PENDING') === value;
       }
@@ -650,29 +635,6 @@ const LaneMappingLanes = () => {
     setRouteLaneId(null);
   };
 
-  const handleSubmit = async id => {
-    setLoading(true);
-    try {
-      const updatedLane = lanes.find(l => l.id === id);
-      if (!updatedLane) return;
-
-      await updateLane(updatedLane.id, updatedLane, updatedLane.legs || []);
-
-      const freshLane = await getLanesByLaneMappingId(laneMappingId, id);
-      if (freshLane && freshLane.length > 0) {
-        setLanes(current =>
-          current.map(l => (l.id === id ? { ...freshLane[0], hasBeenUpdated: false } : l))
-        );
-      }
-
-      setSavedLaneId(id);
-      setTimeout(() => setSavedLaneId(null), 3000);
-    } catch (error) {
-      alert(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleDeleteLane = async id => {
     if (!window.confirm('Are you sure you want to delete this lane? This action cannot be undone.')) {
@@ -753,20 +715,81 @@ const LaneMappingLanes = () => {
         </div>
       )}
 
-      {/* Validation Success Display */}
-      {validationMessage && (
+      {/* Sync Schedule Toast */}
+      {syncToast && (
         <div className="bg-green-50 border-b border-green-200 px-6 py-3">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-2 text-green-700">
               <CheckCircle size={18} />
-              {validationMessage}
+              {syncToast}
             </div>
-            <button
-              onClick={() => setValidationMessage(null)}
-              className="text-green-700 hover:text-green-900 p-1"
-            >
+            <button onClick={() => setSyncToast(null)} className="text-green-700 hover:text-green-900 p-1">
               <X size={18} />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Validation Progress */}
+      {validationProgress && (
+        <div className={`border-b px-6 py-4 ${validationProgress.status === 'error' ? 'bg-red-50 border-red-200' : validationProgress.status === 'completed' ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-sm font-semibold ${validationProgress.status === 'error' ? 'text-red-700' : validationProgress.status === 'completed' ? 'text-green-700' : 'text-blue-700'}`}>
+                {validationProgress.status === 'validating' && 'Validating Lanes...'}
+                {validationProgress.status === 'completed' && 'Validation Complete'}
+                {validationProgress.status === 'error' && 'Validation Failed'}
+              </span>
+              <div className="flex items-center gap-3">
+                {validationProgress.status !== 'validating' && (
+                  <button
+                    onClick={() => setValidationProgress(null)}
+                    className="text-gray-500 hover:text-gray-700 p-1"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {validationProgress.status !== 'error' && (
+              <>
+                {/* Progress Bar */}
+                <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2 overflow-hidden">
+                  <div
+                    className={`h-2.5 rounded-full transition-all duration-300 ${validationProgress.status === 'completed' ? 'bg-green-500' : 'bg-blue-500'}`}
+                    style={{ width: `${validationProgress.percentage ?? 0}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-xs text-gray-600">
+                  <span>{validationProgress.message || `${validationProgress.currentLane ?? 0}/${validationProgress.totalLanes ?? 0} lanes validated`}</span>
+                  <span className="font-medium">{validationProgress.percentage ?? 0}%</span>
+                </div>
+                <div className="flex items-center gap-4 mt-2 text-xs">
+                  <span className="flex items-center gap-1 text-green-700">
+                    <CheckCircle size={13} /> Valid: <strong>{validationProgress.validCount ?? 0}</strong>
+                  </span>
+                  <span className="flex items-center gap-1 text-red-700">
+                    <XCircle size={13} /> Invalid: <strong>{validationProgress.invalidCount ?? 0}</strong>
+                  </span>
+                  <span className="flex items-center gap-1 text-orange-600">
+                    <AlertTriangle size={13} /> Outdated: <strong>{validationProgress.scheduleMismatchCount ?? 0}</strong>
+                  </span>
+                </div>
+              </>
+            )}
+
+            {validationProgress.status === 'error' && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-red-600">{validationProgress.message}</span>
+                <button
+                  onClick={() => { setValidationProgress(null); handleBulkValidate(); }}
+                  className="text-xs px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -814,15 +837,6 @@ const LaneMappingLanes = () => {
               className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"
             />
             <select
-              value={filters.valid || ''}
-              onChange={e => setFilters(prev => ({ ...prev, valid: e.target.value }))}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-            >
-              <option value="">All Status</option>
-              <option value="true">Valid</option>
-              <option value="false">Invalid</option>
-            </select>
-            <select
               value={filters.validationStatus || ''}
               onChange={e => setFilters(prev => ({ ...prev, validationStatus: e.target.value }))}
               className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
@@ -831,6 +845,7 @@ const LaneMappingLanes = () => {
               <option value="PENDING">Pending</option>
               <option value="VALID">Valid</option>
               <option value="INVALID">Invalid</option>
+              <option value="SCHEDULE_MISMATCH">Outdated Schedule</option>
             </select>
             <button
               onClick={() => setShowColumnFilters(!showColumnFilters)}
@@ -848,34 +863,25 @@ const LaneMappingLanes = () => {
               )}
             </button>
             <button
-              onClick={validateAllLanes}
-              disabled={loading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition disabled:opacity-50"
+              onClick={handleBulkValidate}
+              disabled={validationProgress?.status === 'validating' || loading}
+              className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition disabled:opacity-50"
             >
-              Validate All
+              {validationProgress?.status === 'validating' ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Validating...
+                </>
+              ) : (
+                <>
+                  <CheckCircle size={14} />
+                  Validate All Lanes
+                </>
+              )}
             </button>
-            {hasPendingLanes && (
-              <button
-                onClick={handleBulkValidate}
-                disabled={bulkValidating || loading}
-                className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition disabled:opacity-50"
-              >
-                {bulkValidating ? (
-                  <>
-                    <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    Validating...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle size={14} />
-                    Validate Pending Lanes
-                  </>
-                )}
-              </button>
-            )}
             <button
               onClick={computeAllTAT}
               disabled={loading}
@@ -1029,26 +1035,42 @@ const LaneMappingLanes = () => {
                       {formatDateTime(lane.lastValidatedAt)}
                     </span>
                   )}
+                  {lane.syncMessage && lane.validationStatus === 'SCHEDULE_MISMATCH' && (
+                    <span className="flex items-center gap-1 text-xs text-orange-600 bg-orange-50 border border-orange-200 rounded px-2 py-0.5 max-w-xs truncate" title={lane.syncMessage}>
+                      <AlertTriangle size={11} />
+                      {lane.syncMessage}
+                    </span>
+                  )}
                 </div>
 
                 {/* Action Buttons */}
                 <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                  <button
-                    onClick={() => validateLegs(lane.id)}
-                    disabled={loading}
-                    className="p-2 hover:bg-green-100 rounded-lg transition-colors text-green-600 disabled:opacity-50"
-                    title="Validate Legs"
-                  >
-                    <CheckCircle size={16} />
-                  </button>
-                  {lane.validationStatus === 'PENDING' && (
+                  {lane.validationStatus === 'SCHEDULE_MISMATCH' && (
                     <button
-                      onClick={() => handleValidateSingleLane(lane.id)}
-                      disabled={validatingLaneIds.has(lane.id) || loading}
-                      className="flex items-center gap-1 px-2 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-medium hover:bg-amber-600 transition disabled:opacity-50"
-                      title="Validate this lane"
+                      onClick={() => handleSyncSchedule(lane.id)}
+                      disabled={syncingLaneIds.has(lane.id) || loading}
+                      className="flex items-center gap-1 px-2 py-1.5 bg-orange-500 text-white rounded-lg text-xs font-medium hover:bg-orange-600 transition disabled:opacity-50"
+                      title="Sync flight schedule"
                     >
-                      {validatingLaneIds.has(lane.id) ? (
+                      {syncingLaneIds.has(lane.id) ? (
+                        <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                      ) : (
+                        <RefreshCw size={12} />
+                      )}
+                      Update Times
+                    </button>
+                  )}
+                  {lane.validationStatus !== 'SCHEDULE_MISMATCH' && (
+                    <button
+                      onClick={() => handleValidateAndSave(lane.id)}
+                      disabled={validateAndSavingLaneIds.has(lane.id) || loading}
+                      className="flex items-center gap-1 px-2 py-1.5 h-7 whitespace-nowrap shrink-0 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition disabled:opacity-50"
+                      title="Validate and save this lane"
+                    >
+                      {validateAndSavingLaneIds.has(lane.id) ? (
                         <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
@@ -1056,7 +1078,7 @@ const LaneMappingLanes = () => {
                       ) : (
                         <CheckCircle size={12} />
                       )}
-                      Validate
+                      Validate & Save
                     </button>
                   )}
                   <button
@@ -1084,18 +1106,6 @@ const LaneMappingLanes = () => {
                     <MapPin size={16} />
                   </button>
                   <button
-                    onClick={() => handleSubmit(lane.id)}
-                    disabled={!lane.hasBeenUpdated || loading}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition ${lane.hasBeenUpdated
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      }`}
-                    title="Save this lane"
-                  >
-                    <Save size={14} />
-                    Save
-                  </button>
-                  <button
                     onClick={() => handleDeleteLane(lane.id)}
                     disabled={loading}
                     className="p-2 hover:bg-red-100 rounded-lg transition-colors text-red-600 disabled:opacity-50"
@@ -1109,6 +1119,19 @@ const LaneMappingLanes = () => {
               {/* Expanded Detail Panel */}
               {expandedLanes[lane.id] && (
                 <div className="border-t border-gray-200 bg-gray-50 px-6 py-5">
+                  {/* Validation Errors (from Validate & Save 422) */}
+                  {laneValidationErrors[lane.id]?.laneErrors?.length > 0 && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-xs font-semibold text-red-700 mb-1 flex items-center gap-1">
+                        <XCircle size={13} /> Validation Errors
+                      </p>
+                      <ul className="list-disc list-inside space-y-0.5">
+                        {laneValidationErrors[lane.id].laneErrors.map((msg, i) => (
+                          <li key={i} className="text-xs text-red-600">{msg}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   {/* Location Details */}
                   <div className="mb-6">
                     <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
@@ -1280,7 +1303,7 @@ const LaneMappingLanes = () => {
                             </tr>
                           </thead>
                           <tbody>
-                            {lane.legs.map((leg, legIdx) => (
+                            {[...lane.legs].sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0)).map((leg, legIdx) => (
                               <React.Fragment key={leg.id || legIdx}>
                                 <tr
                                   className={`border-b border-gray-100 ${legIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
@@ -1296,15 +1319,25 @@ const LaneMappingLanes = () => {
                                           className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
                                         />
                                       ) : col === 'legValidationMessage' ? (
-                                        leg.valid === false && leg.validMessage?.length > 0 ? (
-                                          <div className="text-red-600 text-xs max-w-[250px] whitespace-normal break-words">
-                                            {leg.validMessage.join('; ')}
-                                          </div>
-                                        ) : leg.valid === true ? (
-                                          <CheckCircle size={16} className="text-green-500" />
-                                        ) : (
-                                          <span className="text-gray-400 text-xs">Pending</span>
-                                        )
+                                        (() => {
+                                          const legErrs = laneValidationErrors[lane.id]?.legErrors?.[leg.sequence];
+                                          if (legErrs?.length > 0) {
+                                            return (
+                                              <div className="text-red-600 text-xs max-w-[250px] whitespace-normal break-words">
+                                                {legErrs.join('; ')}
+                                              </div>
+                                            );
+                                          }
+                                          if (leg.valid === false && leg.validMessage?.length > 0) {
+                                            return (
+                                              <div className="text-red-600 text-xs max-w-[250px] whitespace-normal break-words">
+                                                {leg.validMessage.join('; ')}
+                                              </div>
+                                            );
+                                          }
+                                          if (leg.valid === true) return <CheckCircle size={16} className="text-green-500" />;
+                                          return <span className="text-gray-400 text-xs">Pending</span>;
+                                        })()
                                       ) : (
                                         <input
                                           type="text"

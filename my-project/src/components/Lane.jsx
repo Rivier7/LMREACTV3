@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Edit3, Plane, Truck, CheckCircle, XCircle, AlertCircle, Trash2, Clock, Calendar, User } from 'lucide-react';
+import { Edit3, Plane, Truck, CheckCircle, XCircle, AlertCircle, Trash2, Clock, Calendar, User, AlertTriangle } from 'lucide-react';
 
 function Lane({ lane, onDelete }) {
   const navigate = useNavigate();
@@ -34,15 +34,18 @@ function Lane({ lane, onDelete }) {
   };
   const isPending = validationStatus === 'PENDING';
   const isValid = validationStatus === 'VALID';
+  const isScheduleMismatch = validationStatus === 'SCHEDULE_MISMATCH';
 
   const headerBg = isPending
     ? 'bg-amber-50 border-amber-200'
     : isValid
       ? 'bg-green-50 border-green-100'
-      : 'bg-red-50 border-red-100';
+      : isScheduleMismatch
+        ? 'bg-orange-50 border-orange-200'
+        : 'bg-red-50 border-red-100';
 
-  const StatusIcon = isPending ? AlertCircle : isValid ? CheckCircle : XCircle;
-  const statusIconColor = isPending ? 'text-amber-500' : isValid ? 'text-green-600' : 'text-red-600';
+  const StatusIcon = isPending ? AlertCircle : isValid ? CheckCircle : isScheduleMismatch ? AlertTriangle : XCircle;
+  const statusIconColor = isPending ? 'text-amber-500' : isValid ? 'text-green-600' : isScheduleMismatch ? 'text-orange-500' : 'text-red-600';
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
@@ -53,6 +56,11 @@ function Lane({ lane, onDelete }) {
           {isPending && (
             <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
               Pending
+            </span>
+          )}
+          {isScheduleMismatch && (
+            <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
+              Outdated Schedule
             </span>
           )}
           <span className="font-semibold text-gray-900">{lane.accountName}</span>

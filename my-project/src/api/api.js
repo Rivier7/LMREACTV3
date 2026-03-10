@@ -707,6 +707,130 @@ export const validateLaneMapping = async id => {
   return await response.json();
 };
 
+// ✅ Validate all lanes with SSE progress stream
+export const validateLaneMappingWithProgress = async (id, { onProgress, onComplete, onError }) => {
+  const token = localStorage.getItem('token');
+  const headers = {
+    ...(token && { Authorization: `Bearer ${token}` }),
+    Accept: 'text/event-stream',
+  };
+
+  const response = await fetch(`${BASE_URL2}/${id}/validate-with-progress`, {
+    method: 'POST',
+    headers,
+  });
+
+  if (!response.ok) {
+    let errorMessage = 'Validation failed';
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.message || errorMessage;
+    } catch {
+      const errorText = await response.text();
+      if (errorText) errorMessage = errorText;
+    }
+    throw new Error(errorMessage);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const events = buffer.split('\n\n');
+    buffer = events.pop() || '';
+
+    for (const eventBlock of events) {
+      if (!eventBlock.trim()) continue;
+
+      const lines = eventBlock.split('\n');
+      let dataLine = '';
+
+      for (const line of lines) {
+        if (line.startsWith('data:')) {
+          dataLine = line.slice(5).trim();
+        }
+      }
+
+      if (!dataLine) continue;
+
+      try {
+        const data = JSON.parse(dataLine);
+        if (data.status === 'error') {
+          onError?.(data);
+          return;
+        } else if (data.status === 'completed') {
+          onComplete?.(data);
+        } else {
+          onProgress?.(data);
+        }
+      } catch {
+        // skip malformed event
+      }
+    }
+  }
+};
+
+// ✅ Sync lane schedule (for SCHEDULE_MISMATCH lanes)
+export const syncLaneSchedule = async id => {
+  const response = await fetch(`${BASE_URL}/${id}/sync-schedule`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    let errorMessage = 'Sync failed';
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.message || errorMessage;
+    } catch {
+      const errorText = await response.text();
+      if (errorText) errorMessage = errorText;
+    }
+    throw new Error(errorMessage);
+  }
+  return await response.json();
+};
+
+// ✅ Validate and save a lane in one step
+export const validateAndSaveLane = async (id, updatedLane, legs) => {
+  const laneWithMapping = {
+    ...updatedLane,
+    laneMappingId: updatedLane.laneMappingId || updatedLane.laneMapping?.id,
+  };
+
+  const response = await fetch(`${BASE_URL}/${id}/validate-and-save`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ updatedLane: laneWithMapping, legs }),
+  });
+
+  if (response.status === 422) {
+    const data = await response.json();
+    const err = new Error('Validation failed');
+    err.status = 422;
+    err.validationResult = data.validationResult;
+    throw err;
+  }
+
+  if (!response.ok) {
+    let errorMessage = 'Validate and save failed';
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.message || errorMessage;
+    } catch {
+      const errorText = await response.text();
+      if (errorText) errorMessage = errorText;
+    }
+    throw new Error(errorMessage);
+  }
+
+  return await response.json();
+};
+
 // ✅ Validate a single lane
 export const validateSingleLane = async id => {
   const response = await fetch(`${BASE_URL}/${id}/validate`, {
