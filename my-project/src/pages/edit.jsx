@@ -1138,12 +1138,12 @@ const Edit = () => {
             {hasFlightLegs && (
               <div>
                 <label className="block mb-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                  Custom Clearance
+                  Post Arrival Handling
                 </label>
                 <input
                   type="text"
-                  name="customClearance"
-                  value={updatedLane.customClearance || ''}
+                  name="postArrivalHandlingTime"
+                  value={updatedLane.postArrivalHandlingTime || ''}
                   onChange={handleHourChange}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg"
                   placeholder="e.g. 3hr"

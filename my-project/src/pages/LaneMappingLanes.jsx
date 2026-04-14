@@ -21,6 +21,7 @@ import {
   User,
   AlertTriangle,
   RefreshCw,
+  Search,
 } from 'lucide-react';
 import EditLaneMappingModal from '../components/EditLaneMappingModal';
 import {
@@ -35,6 +36,9 @@ updateLaneMappingLanes,
   validateLaneMappingWithProgress,
   validateAndSaveLane,
   syncLaneSchedule,
+  getCachedFlights,
+  getViableFlights,
+  applySuggestedTimes,
 } from '../api/api.js';
 
 const LaneMappingLanes = () => {
@@ -60,7 +64,13 @@ const LaneMappingLanes = () => {
   // null = idle, { status, percentage, currentLane, totalLanes, validCount, invalidCount, scheduleMismatchCount, message } = active/done
   const [validateAndSavingLaneIds, setValidateAndSavingLaneIds] = useState(new Set());
   const [laneValidationErrors, setLaneValidationErrors] = useState({});
-  // { [laneId]: { laneErrors: string[], legErrors: { [sequence]: string[] } } }
+  // { [laneId]: { laneErrors: string[], legErrors: { [sequence]: { errors: string[], suggestedAlternatives: AlternativeFlightDTO[] } } } }
+  const [viableFlights, setViableFlights] = useState({});
+  // { [`${laneId}-${sequence}`]: { loading, flights, error } }
+  const [openViableFlightsKey, setOpenViableFlightsKey] = useState(null);
+  const [scheduleMismatchData, setScheduleMismatchData] = useState({});
+  // { [laneId]: { hasSuggestedTimes, applySuggestedTimesMessage, legs: [{ legId, sequence, flightNumber, departureTime, arrivalTime, suggestedDepartureTime, suggestedArrivalTime }] } }
+  const [applyingTimesLaneIds, setApplyingTimesLaneIds] = useState(new Set());
 
   const handleSuggestRoute = async laneId => {
     try {
@@ -145,7 +155,7 @@ const LaneMappingLanes = () => {
     driveToAirportDuration: 'Drive to Airport',
     originStation: 'Origin Station',
     destinationStation: 'Destination Station',
-    customClearance: 'Custom Clearance',
+    postArrivalHandlingTime: 'Post Arrival Handling',
     driveToDestination: 'Drive to Destination',
     actualDeliveryTimeBasedOnReceiving: 'Delivery Time',
     tatToConsigneeDuration: 'TAT Duration',
@@ -254,7 +264,7 @@ const LaneMappingLanes = () => {
 
   const hourColumns = [
     'driveToAirportDuration',
-    'customClearance',
+    'postArrivalHandlingTime',
     'driveToDestination',
     'tatToConsigneeDuration',
   ];
@@ -477,13 +487,45 @@ const LaneMappingLanes = () => {
           return { ...l, hasBeenUpdated: false };
         })
       );
-      setSavedLaneId(laneId);
-      setTimeout(() => setSavedLaneId(null), 3000);
+      if (result.validationStatus === 'SCHEDULE_MISMATCH') {
+        setScheduleMismatchData(prev => ({
+          ...prev,
+          [laneId]: {
+            hasSuggestedTimes: result.hasSuggestedTimes ?? false,
+            applySuggestedTimesMessage: result.applySuggestedTimesMessage || 'Click to apply the suggested times from the current flight schedule.',
+            legs: result.legs || [],
+          },
+        }));
+        setExpandedLanes(prev => ({ ...prev, [laneId]: true }));
+      } else if (result.validationStatus === 'INVALID' && result.validationResult) {
+        const legErrorsMap = {};
+        (result.validationResult.legErrors || []).forEach(le => {
+          legErrorsMap[le.sequence] = {
+            errors: le.errors || [],
+            suggestedAlternatives: le.suggestedAlternatives || [],
+          };
+        });
+        setLaneValidationErrors(prev => ({
+          ...prev,
+          [laneId]: {
+            laneErrors: result.validationResult.laneErrors || [],
+            legErrors: legErrorsMap,
+          },
+        }));
+        setExpandedLanes(prev => ({ ...prev, [laneId]: true }));
+      } else {
+        setScheduleMismatchData(prev => { const next = { ...prev }; delete next[laneId]; return next; });
+        setSavedLaneId(laneId);
+        setTimeout(() => setSavedLaneId(null), 3000);
+      }
     } catch (err) {
       if (err.status === 422 && err.validationResult) {
         const legErrorsMap = {};
         (err.validationResult.legErrors || []).forEach(le => {
-          legErrorsMap[le.sequence] = le.messages;
+          legErrorsMap[le.sequence] = {
+            errors: le.messages || le.errors || [],
+            suggestedAlternatives: le.suggestedAlternatives || [],
+          };
         });
         setLaneValidationErrors(prev => ({
           ...prev,
@@ -502,6 +544,31 @@ const LaneMappingLanes = () => {
         next.delete(laneId);
         return next;
       });
+    }
+  };
+
+  const handleApplySuggestedTimes = async laneId => {
+    setApplyingTimesLaneIds(prev => new Set(prev).add(laneId));
+    try {
+      const result = await applySuggestedTimes(laneId);
+      setLanes(current =>
+        current.map(lane => {
+          if (lane.id !== laneId) return lane;
+          return {
+            ...lane,
+            validationStatus: result.validationStatus ?? lane.validationStatus,
+            syncMessage: null,
+            legs: result.legs?.length ? mergeSyncLegs(lane.legs || [], result.legs) : lane.legs,
+          };
+        })
+      );
+      setScheduleMismatchData(prev => { const next = { ...prev }; delete next[laneId]; return next; });
+      setSyncToast('Flight times updated successfully!');
+      setTimeout(() => setSyncToast(null), 4000);
+    } catch (err) {
+      alert(err.message || 'Failed to apply suggested times');
+    } finally {
+      setApplyingTimesLaneIds(prev => { const next = new Set(prev); next.delete(laneId); return next; });
     }
   };
 
@@ -534,6 +601,53 @@ const LaneMappingLanes = () => {
     }
   };
 
+  const handleSearchViableFlights = async (laneId, legSequence, origin, destination, pickupTime, driveToAirportDuration) => {
+    const key = `${laneId}-${legSequence}`;
+    if (openViableFlightsKey === key) {
+      setOpenViableFlightsKey(null);
+      return;
+    }
+    setOpenViableFlightsKey(key);
+    setViableFlights(prev => ({ ...prev, [key]: { loading: true, flights: [], error: null } }));
+    try {
+      let flights;
+      if (pickupTime && driveToAirportDuration) {
+        const driveMinutes = (parseInt(driveToAirportDuration) || 0) * 60;
+        flights = await getViableFlights(origin, destination, pickupTime, driveMinutes);
+      } else {
+        flights = await getCachedFlights(origin, destination);
+      }
+      setViableFlights(prev => ({ ...prev, [key]: { loading: false, flights, error: null } }));
+    } catch (err) {
+      setViableFlights(prev => ({ ...prev, [key]: { loading: false, flights: [], error: err.message } }));
+    }
+  };
+
+  const applyAlternative = (laneId, legSequence, alt) => {
+    setLanes(current =>
+      current.map(lane =>
+        lane.id === laneId
+          ? {
+              ...lane,
+              hasBeenUpdated: true,
+              legs: lane.legs.map(leg =>
+                leg.sequence === legSequence
+                  ? {
+                      ...leg,
+                      flightNumber: alt.flightNumber,
+                      departureTime: alt.departureTime,
+                      arrivalTime: alt.arrivalTime,
+                      flightOperatingDays: alt.operatingDays,
+                    }
+                  : leg
+              ),
+            }
+          : lane
+      )
+    );
+    setLaneValidationErrors(prev => ({ ...prev, [laneId]: null }));
+  };
+
   const getValidationStatusDisplay = lane => {
     const status = lane.validationStatus;
     if (status === 'PENDING') return { label: 'Pending', color: 'bg-amber-100 text-amber-700', icon: Clock };
@@ -541,6 +655,13 @@ const LaneMappingLanes = () => {
     if (status === 'INVALID') return { label: 'Invalid', color: 'bg-red-100 text-red-700', icon: XCircle };
     if (status === 'SCHEDULE_MISMATCH') return { label: 'Outdated Schedule', color: 'bg-orange-100 text-orange-700', icon: AlertTriangle };
     return { label: 'Pending', color: 'bg-amber-100 text-amber-700', icon: Clock };
+  };
+
+  const getLaneErrorMessages = lane => {
+    if (!lane?.errorMessages || !Array.isArray(lane.errorMessages) || lane.errorMessages.length === 0) {
+      return null;
+    }
+    return lane.errorMessages;
   };
 
   const formatDateTime = val => {
@@ -984,10 +1105,35 @@ const LaneMappingLanes = () => {
                       {[lane.destinationCity, lane.destinationState, lane.destinationCountry].filter(Boolean).join(', ') || '---'}
                     </div>
                   </div>
+
+                      <div>
+                {lane.legs?.length > 0 && (
+                  <div className="flex flex-col gap-1">
+                    {lane.legs.map((leg, index) => (
+                      <span
+                        key={index}
+                        className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-full inline-flex items-center"
+                      >
+                        {leg.flightNumber || 'No Flight'}
+
+                        {leg.originStation && leg.destinationStation && (
+                          <>
+                            <span className="mx-1">|</span>
+                            {leg.originStation}
+                            <span className="mx-1">→</span>
+                            {leg.destinationStation}
+                          </>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                     </div>
+                  
                 </div>
 
                 {/* Info Pills */}
-                <div className="flex items-center gap-2 flex-1">
+                <div className="flex items-center gap-2 flex-1 flex-wrap">
                   <span className="px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-medium">
                     Item: {lane.itemNumber || '-'}
                   </span>
@@ -1008,7 +1154,7 @@ const LaneMappingLanes = () => {
                 </div>
 
                 {/* Status Badge */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {lane.hasBeenUpdated && (
                     <span className="px-2 py-1 rounded bg-amber-100 text-amber-700 text-xs font-medium">
                       Unsaved
@@ -1029,6 +1175,11 @@ const LaneMappingLanes = () => {
                       </span>
                     );
                   })()}
+                  {getLaneErrorMessages(lane) && (
+                    <span className="px-2 py-1 rounded-full bg-red-100 text-red-700 text-xs font-medium">
+                      Errors: {getLaneErrorMessages(lane).length}
+                    </span>
+                  )}
                   {lane.lastValidatedAt && (
                     <span className="flex items-center gap-1 text-xs text-gray-400">
                       <Clock size={12} />
@@ -1045,12 +1196,30 @@ const LaneMappingLanes = () => {
 
                 {/* Action Buttons */}
                 <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                  {lane.validationStatus === 'SCHEDULE_MISMATCH' && scheduleMismatchData[lane.id]?.hasSuggestedTimes && (
+                    <button
+                      onClick={() => handleApplySuggestedTimes(lane.id)}
+                      disabled={applyingTimesLaneIds.has(lane.id) || loading}
+                      className="flex items-center gap-1 px-2 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition disabled:opacity-50"
+                      title="Apply suggested flight times"
+                    >
+                      {applyingTimesLaneIds.has(lane.id) ? (
+                        <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                      ) : (
+                        <CheckCircle size={12} />
+                      )}
+                      Apply Suggested
+                    </button>
+                  )}
                   {lane.validationStatus === 'SCHEDULE_MISMATCH' && (
                     <button
                       onClick={() => handleSyncSchedule(lane.id)}
                       disabled={syncingLaneIds.has(lane.id) || loading}
                       className="flex items-center gap-1 px-2 py-1.5 bg-orange-500 text-white rounded-lg text-xs font-medium hover:bg-orange-600 transition disabled:opacity-50"
-                      title="Sync flight schedule"
+                      title="Sync flight schedule from API"
                     >
                       {syncingLaneIds.has(lane.id) ? (
                         <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -1060,7 +1229,7 @@ const LaneMappingLanes = () => {
                       ) : (
                         <RefreshCw size={12} />
                       )}
-                      Update Times
+                      Sync Schedule
                     </button>
                   )}
                   {lane.validationStatus !== 'SCHEDULE_MISMATCH' && (
@@ -1119,6 +1288,99 @@ const LaneMappingLanes = () => {
               {/* Expanded Detail Panel */}
               {expandedLanes[lane.id] && (
                 <div className="border-t border-gray-200 bg-gray-50 px-6 py-5">
+                  {/* Schedule Mismatch Banner */}
+                  {scheduleMismatchData[lane.id] && (
+                    <div className="mb-4 p-4 bg-amber-50 border border-amber-300 rounded-lg">
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-semibold text-amber-800">Flight times don't match current schedule</p>
+                            {scheduleMismatchData[lane.id].applySuggestedTimesMessage && (
+                              <p className="text-xs text-amber-700 mt-0.5">{scheduleMismatchData[lane.id].applySuggestedTimesMessage}</p>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setScheduleMismatchData(prev => { const next = { ...prev }; delete next[lane.id]; return next; })}
+                          className="p-1 text-amber-500 hover:text-amber-700 shrink-0"
+                          title="Dismiss"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                      {scheduleMismatchData[lane.id].legs?.some(l => l.suggestedDepartureTime || l.suggestedArrivalTime) && (
+                        <div className="mb-3 overflow-x-auto">
+                          <table className="text-xs w-full">
+                            <thead>
+                              <tr className="text-amber-700 border-b border-amber-200">
+                                <th className="text-left pb-1.5 pr-4 font-medium">Leg</th>
+                                <th className="text-left pb-1.5 pr-4 font-medium">Flight</th>
+                                <th className="text-left pb-1.5 pr-4 font-medium">Current Dep → Arr</th>
+                                <th className="text-left pb-1.5 font-medium">Suggested Dep → Arr</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {scheduleMismatchData[lane.id].legs.map((leg, i) => (
+                                <tr key={i} className="border-b border-amber-100">
+                                  <td className="py-1.5 pr-4 font-medium">{leg.sequence}</td>
+                                  <td className="py-1.5 pr-4">{leg.flightNumber}</td>
+                                  <td className="py-1.5 pr-4">
+                                    <span className={leg.suggestedDepartureTime || leg.suggestedArrivalTime ? 'line-through text-gray-400' : ''}>
+                                      {leg.departureTime} → {leg.arrivalTime}
+                                    </span>
+                                  </td>
+                                  <td className="py-1.5">
+                                    {(leg.suggestedDepartureTime || leg.suggestedArrivalTime) ? (
+                                      <span className="text-green-700 font-medium">
+                                        {leg.suggestedDepartureTime ?? leg.departureTime} → {leg.suggestedArrivalTime ?? leg.arrivalTime}
+                                      </span>
+                                    ) : (
+                                      <span className="text-gray-400 italic">no change</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        {scheduleMismatchData[lane.id].hasSuggestedTimes && (
+                          <button
+                            onClick={() => handleApplySuggestedTimes(lane.id)}
+                            disabled={applyingTimesLaneIds.has(lane.id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition disabled:opacity-50"
+                          >
+                            {applyingTimesLaneIds.has(lane.id) ? (
+                              <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                              </svg>
+                            ) : (
+                              <CheckCircle size={12} />
+                            )}
+                            Apply All Suggested Times
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleSyncSchedule(lane.id)}
+                          disabled={syncingLaneIds.has(lane.id)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 text-white rounded-lg text-xs font-medium hover:bg-orange-600 transition disabled:opacity-50"
+                        >
+                          <RefreshCw size={12} />
+                          Sync from Schedule API
+                        </button>
+                        <button
+                          onClick={() => setScheduleMismatchData(prev => { const next = { ...prev }; delete next[lane.id]; return next; })}
+                          className="px-3 py-1.5 border border-gray-300 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-100 transition"
+                        >
+                          Edit Manually
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Validation Errors (from Validate & Save 422) */}
                   {laneValidationErrors[lane.id]?.laneErrors?.length > 0 && (
                     <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -1132,6 +1394,21 @@ const LaneMappingLanes = () => {
                       </ul>
                     </div>
                   )}
+
+                  {/* Lane Error Messages (from backend lane property) — hidden when validation errors already shown to avoid duplication */}
+                  {getLaneErrorMessages(lane) && !laneValidationErrors[lane.id]?.laneErrors?.length && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-xs font-semibold text-red-700 mb-1 flex items-center gap-1">
+                        <XCircle size={13} /> Lane Error Messages
+                      </p>
+                      <ul className="list-disc list-inside space-y-0.5">
+                        {getLaneErrorMessages(lane).map((msg, i) => (
+                          <li key={i} className="text-xs text-red-600">{msg}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
                   {/* Location Details */}
                   <div className="mb-6">
                     <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
@@ -1321,10 +1598,53 @@ const LaneMappingLanes = () => {
                                       ) : col === 'legValidationMessage' ? (
                                         (() => {
                                           const legErrs = laneValidationErrors[lane.id]?.legErrors?.[leg.sequence];
-                                          if (legErrs?.length > 0) {
+                                          if (legErrs?.errors?.length > 0) {
+                                            const hasNoFlightError = legErrs.errors.some(e => e.toLowerCase().includes('no flight schedule'));
+                                            const hasSuggestions = hasNoFlightError && legErrs.suggestedAlternatives?.length > 0;
                                             return (
-                                              <div className="text-red-600 text-xs max-w-[250px] whitespace-normal break-words">
-                                                {legErrs.join('; ')}
+                                              <div>
+                                                <div className="text-red-600 text-xs max-w-[250px] whitespace-normal break-words">
+                                                  {legErrs.errors.join('; ')}
+                                                </div>
+                                                {hasSuggestions && (
+                                                  <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg min-w-[320px]">
+                                                    <p className="text-xs font-semibold text-blue-700 mb-1.5">
+                                                      Available flights for {legErrs.suggestedAlternatives[0].origin} → {legErrs.suggestedAlternatives[0].destination}:
+                                                    </p>
+                                                    <table className="w-full text-xs">
+                                                      <thead>
+                                                        <tr className="text-gray-500">
+                                                          <th className="text-left pb-1 pr-2 font-medium">Flight</th>
+                                                          <th className="text-left pb-1 pr-2 font-medium">Dep</th>
+                                                          <th className="text-left pb-1 pr-2 font-medium">Arr</th>
+                                                          <th className="text-left pb-1 pr-2 font-medium">Days</th>
+                                                          <th></th>
+                                                        </tr>
+                                                      </thead>
+                                                      <tbody>
+                                                        {legErrs.suggestedAlternatives.map((alt, idx) => (
+                                                          <tr key={idx} className="border-t border-blue-100">
+                                                            <td className="py-1 pr-2 font-medium">{alt.flightNumber}</td>
+                                                            <td className="py-1 pr-2">{alt.departureTime}</td>
+                                                            <td className="py-1 pr-2">{alt.arrivalTime}</td>
+                                                            <td className="py-1 pr-2">{alt.operatingDays}</td>
+                                                            <td className="py-1">
+                                                              <button
+                                                                onClick={() => applyAlternative(lane.id, leg.sequence, alt)}
+                                                                className="px-2 py-0.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition whitespace-nowrap"
+                                                              >
+                                                                Select
+                                                              </button>
+                                                            </td>
+                                                          </tr>
+                                                        ))}
+                                                      </tbody>
+                                                    </table>
+                                                  </div>
+                                                )}
+                                                {hasNoFlightError && !hasSuggestions && (
+                                                  <p className="mt-1 text-xs text-gray-500 italic">No alternative flights found for this route.</p>
+                                                )}
                                               </div>
                                             );
                                           }
@@ -1349,13 +1669,24 @@ const LaneMappingLanes = () => {
                                     </td>
                                   ))}
                                   <td className="px-3 py-2">
-                                    <button
-                                      onClick={() => handleRemoveLeg(lane.id, leg.id)}
-                                      className="p-1.5 hover:bg-red-100 text-red-600 rounded transition"
-                                      title="Remove leg"
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        onClick={() => handleRemoveLeg(lane.id, leg.id)}
+                                        className="p-1.5 hover:bg-red-100 text-red-600 rounded transition"
+                                        title="Remove leg"
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                      {leg.originStation && leg.destinationStation && (
+                                        <button
+                                          onClick={() => handleSearchViableFlights(lane.id, leg.sequence, leg.originStation, leg.destinationStation, lane.pickUpTime, lane.driveToAirportDuration)}
+                                          className={`p-1.5 rounded transition ${openViableFlightsKey === `${lane.id}-${leg.sequence}` ? 'bg-blue-100 text-blue-700' : 'hover:bg-blue-100 text-blue-500'}`}
+                                          title="Find available flights"
+                                        >
+                                          <Search size={14} />
+                                        </button>
+                                      )}
+                                    </div>
                                   </td>
                                 </tr>
                                 {/* Aircraft by Day row */}
@@ -1372,6 +1703,71 @@ const LaneMappingLanes = () => {
                                     </div>
                                   </td>
                                 </tr>
+                                {/* Viable Flights panel */}
+                                {openViableFlightsKey === `${lane.id}-${leg.sequence}` && (
+                                  <tr className="border-b border-blue-200 bg-blue-50/40">
+                                    <td colSpan={legColumns.length + 1} className="px-3 py-3">
+                                      {(() => {
+                                        const vf = viableFlights[`${lane.id}-${leg.sequence}`];
+                                        if (!vf || vf.loading) {
+                                          return (
+                                            <div className="flex items-center gap-2 text-xs text-blue-600">
+                                              <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                              </svg>
+                                              Searching flights for {leg.originStation} → {leg.destinationStation}...
+                                            </div>
+                                          );
+                                        }
+                                        if (vf.error) {
+                                          return <p className="text-xs text-red-600">{vf.error}</p>;
+                                        }
+                                        if (!vf.flights?.length) {
+                                          return <p className="text-xs text-gray-500 italic">No flights found for {leg.originStation} → {leg.destinationStation}.</p>;
+                                        }
+                                        return (
+                                          <div>
+                                            <p className="text-xs font-semibold text-blue-700 mb-1.5">
+                                              {lane.pickUpTime && lane.driveToAirportDuration
+                                                ? `Viable flights (pickup ${lane.pickUpTime} + ${lane.driveToAirportDuration} drive) for ${leg.originStation} → ${leg.destinationStation}:`
+                                                : `All flights for ${leg.originStation} → ${leg.destinationStation}:`}
+                                            </p>
+                                            <table className="text-xs w-full max-w-2xl">
+                                              <thead>
+                                                <tr className="text-gray-500">
+                                                  <th className="text-left pb-1 pr-3 font-medium">Flight</th>
+                                                  <th className="text-left pb-1 pr-3 font-medium">Dep</th>
+                                                  <th className="text-left pb-1 pr-3 font-medium">Arr</th>
+                                                  <th className="text-left pb-1 pr-3 font-medium">Days</th>
+                                                  <th></th>
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {vf.flights.map((f, fi) => (
+                                                  <tr key={fi} className="border-t border-blue-100">
+                                                    <td className="py-1 pr-3 font-medium">{f.flightNumber}</td>
+                                                    <td className="py-1 pr-3">{f.departureTime}</td>
+                                                    <td className="py-1 pr-3">{f.arrivalTime}</td>
+                                                    <td className="py-1 pr-3">{f.operatingDays}</td>
+                                                    <td className="py-1">
+                                                      <button
+                                                        onClick={() => { applyAlternative(lane.id, leg.sequence, f); setOpenViableFlightsKey(null); }}
+                                                        className="px-2 py-0.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition whitespace-nowrap"
+                                                      >
+                                                        Select
+                                                      </button>
+                                                    </td>
+                                                  </tr>
+                                                ))}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        );
+                                      })()}
+                                    </td>
+                                  </tr>
+                                )}
                               </React.Fragment>
                             ))}
                           </tbody>
@@ -1400,11 +1796,11 @@ const LaneMappingLanes = () => {
                     <div className="bg-white rounded-lg border border-gray-200 p-3">
                       <div className="grid grid-cols-4 gap-3">
                         <div>
-                          <label className="block text-xs text-gray-500 mb-1">Custom Clearance</label>
+                          <label className="block text-xs text-gray-500 mb-1">Post Arrival Handling</label>
                           <input
                             type="text"
-                            value={lane.customClearance || ''}
-                            onChange={e => handleLaneChange(lane.id, 'customClearance', e.target.value)}
+                            value={lane.postArrivalHandlingTime || ''}
+                            onChange={e => handleLaneChange(lane.id, 'postArrivalHandlingTime', e.target.value)}
                             placeholder="e.g. 3hr"
                             className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />

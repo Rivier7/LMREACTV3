@@ -860,3 +860,42 @@ export const searchFlights = async (origin, destination) => {
   if (!response.ok) throw new Error(`No flights found from ${origin} to ${destination}`);
   return await response.json();
 };
+
+// Apply pre-stored suggested flight times (fast, no external API call)
+export const applySuggestedTimes = async (laneId) => {
+  const response = await fetch(
+    `${BASE_URL}/${laneId}/apply-suggested-times`,
+    { method: 'POST', headers: getAuthHeaders() }
+  );
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.message || `Failed to apply suggested times for lane ${laneId}`);
+  }
+  return await response.json();
+};
+
+// Get all cached flights for a route
+export const getCachedFlights = async (origin, destination) => {
+  const response = await fetch(
+    `${API_BASE_URL}/flights/cached/${encodeURIComponent(origin)}/to/${encodeURIComponent(destination)}`,
+    { headers: getAuthHeaders() }
+  );
+  if (!response.ok) throw new Error(`Failed to load flights for ${origin} → ${destination}`);
+  return await response.json();
+};
+
+// Get viable flights based on pickup time and drive duration
+export const getViableFlights = async (origin, destination, pickupTime, driveMinutes, bufferMinutes = 0, maxResults = 10) => {
+  const params = new URLSearchParams({
+    pickupTime,
+    driveMinutes: driveMinutes.toString(),
+    bufferMinutes: bufferMinutes.toString(),
+    maxResults: maxResults.toString(),
+  });
+  const response = await fetch(
+    `${API_BASE_URL}/flights/viable/${encodeURIComponent(origin)}/to/${encodeURIComponent(destination)}?${params}`,
+    { headers: getAuthHeaders() }
+  );
+  if (!response.ok) throw new Error(`Failed to load viable flights for ${origin} → ${destination}`);
+  return await response.json();
+};
