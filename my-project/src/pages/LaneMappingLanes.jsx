@@ -50,6 +50,7 @@ const LaneMappingLanes = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expandedLanes, setExpandedLanes] = useState({});
+  const [expandedNotes, setExpandedNotes] = useState({});
   const [filters, setFilters] = useState({});
   const [showColumnFilters, setShowColumnFilters] = useState(false);
   const [showSuggestedRoute, setShowSuggestedRoute] = useState(false);
@@ -1182,7 +1183,7 @@ const LaneMappingLanes = () => {
 
               {/* Expanded Detail Panel */}
               {expandedLanes[lane.id] && (
-                <div className="border-t border-gray-200 bg-gray-50 px-6 py-5">
+                <div className="border-t border-gray-200 bg-gray-50 px-5 py-3">
                   {/* Schedule Mismatch Banner */}
                   {scheduleMismatchData[lane.id] && (
                     <div className="mb-4 p-4 bg-amber-50 border border-amber-300 rounded-lg">
@@ -1305,9 +1306,9 @@ const LaneMappingLanes = () => {
                   )}
 
                   {/* Location Details */}
-                  <div className="mb-6">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                      <MapPin size={16} className="text-gray-500" />
+                  <div className="mb-3">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                      <MapPin size={13} className="text-gray-400" />
                       Location Details
                     </h3>
                     <div className="grid grid-cols-2 gap-4">
@@ -1442,10 +1443,10 @@ const LaneMappingLanes = () => {
                   </div>
 
                   {/* Flight Legs */}
-                  <div className="mb-6">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center justify-between">
-                      <span className="flex items-center gap-2">
-                        <Plane size={16} className="text-gray-500" />
+                  <div className="mb-3">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Plane size={13} className="text-gray-400" />
                         Flight Legs
                       </span>
                       <div className="flex items-center gap-2">
@@ -1785,9 +1786,9 @@ const LaneMappingLanes = () => {
                   </div>
 
                   {/* Post-Route Details */}
-                  <div className="mb-6">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                      <Clock size={16} className="text-gray-500" />
+                  <div className="mb-3">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                      <Clock size={13} className="text-gray-400" />
                       Post-Route Details
                     </h3>
                     <div className="bg-white rounded-lg border border-gray-200 p-3">
