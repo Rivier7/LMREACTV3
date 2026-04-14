@@ -22,6 +22,7 @@ import {
   AlertTriangle,
   RefreshCw,
   Search,
+  Truck,
 } from 'lucide-react';
 import EditLaneMappingModal from '../components/EditLaneMappingModal';
 import {
@@ -55,6 +56,7 @@ const LaneMappingLanes = () => {
   const [suggestedRoutes, setSuggestedRoutes] = useState([]);
   const [selectedRouteIndex, setSelectedRouteIndex] = useState(null);
   const [routeLaneId, setRouteLaneId] = useState(null);
+  const [suggestSource, setSuggestSource] = useState(null); // 'airport' | 'location'
   const [savedLaneId, setSavedLaneId] = useState(null);
   const [showEditNameModal, setShowEditNameModal] = useState(false);
   const [tatMessage, setTatMessage] = useState(null);
@@ -73,6 +75,8 @@ const LaneMappingLanes = () => {
   const [applyingTimesLaneIds, setApplyingTimesLaneIds] = useState(new Set());
 
   const handleSuggestRoute = async laneId => {
+    setRouteLaneId(laneId);
+    setSuggestSource('airport');
     try {
       setSuggestError(null);
       const lane = lanes.find(l => l.id === laneId);
@@ -96,7 +100,6 @@ const LaneMappingLanes = () => {
 
       const results = await getSuggestedRoute(payload);
       setSuggestedRoutes(results);
-      setRouteLaneId(laneId);
       setSelectedRouteIndex(null);
       setShowSuggestedRoute(true);
     } catch (error) {
@@ -105,10 +108,13 @@ const LaneMappingLanes = () => {
       else if (error.response?.data?.error) message = error.response.data.error;
       setSuggestedRoutes([]);
       setSuggestError(message);
+      setExpandedLanes(prev => ({ ...prev, [laneId]: true }));
     }
   };
 
   const handleSuggestRouteByLocation = async laneId => {
+    setRouteLaneId(laneId);
+    setSuggestSource('location');
     try {
       setSuggestError(null);
       const lane = lanes.find(l => l.id === laneId);
@@ -139,6 +145,7 @@ const LaneMappingLanes = () => {
       else if (error.response?.data?.error) message = error.response.data.error;
       setSuggestedRoutes([]);
       setSuggestError(message);
+      setExpandedLanes(prev => ({ ...prev, [laneId]: true }));
     }
   };
 
@@ -549,6 +556,7 @@ const LaneMappingLanes = () => {
 
   const handleApplySuggestedTimes = async laneId => {
     setApplyingTimesLaneIds(prev => new Set(prev).add(laneId));
+    setScheduleMismatchData(prev => { const next = { ...prev }; delete next[laneId]; return next; });
     try {
       const result = await applySuggestedTimes(laneId);
       setLanes(current =>
@@ -562,7 +570,6 @@ const LaneMappingLanes = () => {
           };
         })
       );
-      setScheduleMismatchData(prev => { const next = { ...prev }; delete next[laneId]; return next; });
       setSyncToast('Flight times updated successfully!');
       setTimeout(() => setSyncToast(null), 4000);
     } catch (err) {
@@ -574,6 +581,7 @@ const LaneMappingLanes = () => {
 
   const handleSyncSchedule = async laneId => {
     setSyncingLaneIds(prev => new Set(prev).add(laneId));
+    setScheduleMismatchData(prev => { const next = { ...prev }; delete next[laneId]; return next; });
     try {
       const result = await syncLaneSchedule(laneId);
       setLanes(current =>
@@ -925,26 +933,6 @@ const LaneMappingLanes = () => {
         </div>
       )}
 
-      {/* Suggest Error Display */}
-      {suggestError && (
-        <div className="bg-yellow-50 border-b border-yellow-200 px-6 py-3">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-3 text-yellow-800">
-              <Lightbulb size={18} />
-              <div>
-                <p className="font-semibold">Route Suggestion Error</p>
-                <p className="text-sm">{suggestError}</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setSuggestError(null)}
-              className="text-yellow-700 hover:text-yellow-900 p-1"
-            >
-              <X size={18} />
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Filter Bar */}
       <div className="bg-white border-b border-gray-200 px-6 py-3 shadow-sm">
@@ -1087,7 +1075,7 @@ const LaneMappingLanes = () => {
                 </button>
 
                 {/* Route Display */}
-                <div className="flex items-center gap-3 min-w-[400px]">
+                <div className="flex items-center gap-3 shrink-0">
                   <div className="text-center">
                     <div className="font-bold text-gray-900">{lane.originStation || '---'}</div>
                     <div className="text-xs text-gray-500">
@@ -1106,55 +1094,40 @@ const LaneMappingLanes = () => {
                     </div>
                   </div>
 
-                      <div>
-                {lane.legs?.length > 0 && (
-                  <div className="flex flex-col gap-1">
-                    {lane.legs.map((leg, index) => (
-                      <span
-                        key={index}
-                        className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-full inline-flex items-center"
-                      >
-                        {leg.flightNumber || 'No Flight'}
-
-                        {leg.originStation && leg.destinationStation && (
-                          <>
-                            <span className="mx-1">|</span>
-                            {leg.originStation}
-                            <span className="mx-1">→</span>
-                            {leg.destinationStation}
-                          </>
-                        )}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                     </div>
-                  
                 </div>
 
-                {/* Info Pills */}
-                <div className="flex items-center gap-2 flex-1 flex-wrap">
-                  <span className="px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-medium">
-                    Item: {lane.itemNumber || '-'}
+                {/* Info Row */}
+                <div className="flex items-center gap-0 flex-1 min-w-0 divide-x divide-gray-200 text-xs whitespace-nowrap overflow-hidden">
+                  <span className="pr-3">
+                    <span className="text-gray-500">Item</span>{' '}
+                    <span className="font-semibold text-gray-900">{lane.itemNumber || '—'}</span>
                   </span>
-                  <span className="px-2.5 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-medium">
-                    Opt: {lane.laneOption || '-'}
+                  <span className="px-3">
+                    <span className="text-gray-500">Opt</span>{' '}
+                    <span className="font-semibold text-gray-900">{lane.laneOption || '—'}</span>
                   </span>
-                  <span className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-medium">
-                    Pickup: {lane.pickUpTime || '-'}
+                  <span className="px-3">
+                    <span className="text-gray-500">Pickup</span>{' '}
+                    <span className="font-semibold text-gray-900">{lane.pickUpTime || '—'}</span>
                   </span>
-                  <span className="px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700 text-xs font-medium">
-                    TAT: {lane.tatToConsigneeDuration || '-'}
+                  <span className="px-3">
+                    <span className="text-gray-500">Delivery</span>{' '}
+                    <span className="font-semibold text-gray-900">{lane.actualDeliveryTimeBasedOnReceiving || '—'}</span>
+                  </span>
+                  <span className="px-3">
+                    <span className="text-gray-500">TAT</span>{' '}
+                    <span className="font-semibold text-gray-900">{lane.tatToConsigneeDuration || '—'}</span>
                   </span>
                   {lane.legs?.length > 0 && (
-                    <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">
-                      {lane.legs.length} leg{lane.legs.length !== 1 ? 's' : ''}
+                    <span className="px-3">
+                      <span className="font-semibold text-gray-900">{lane.legs.length}</span>{' '}
+                      <span className="text-gray-500">leg{lane.legs.length !== 1 ? 's' : ''}</span>
                     </span>
                   )}
                 </div>
 
                 {/* Status Badge */}
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2 shrink-0">
                   {lane.hasBeenUpdated && (
                     <span className="px-2 py-1 rounded bg-amber-100 text-amber-700 text-xs font-medium">
                       Unsaved
@@ -1181,7 +1154,7 @@ const LaneMappingLanes = () => {
                     </span>
                   )}
                   {lane.lastValidatedAt && (
-                    <span className="flex items-center gap-1 text-xs text-gray-400">
+                    <span className="flex items-center gap-1 text-xs text-gray-500">
                       <Clock size={12} />
                       {formatDateTime(lane.lastValidatedAt)}
                     </span>
@@ -1257,22 +1230,6 @@ const LaneMappingLanes = () => {
                     title="Calculate TAT"
                   >
                     <Clock size={16} />
-                  </button>
-                  <button
-                    onClick={() => handleSuggestRoute(lane.id)}
-                    disabled={loading}
-                    className="p-2 hover:bg-purple-100 rounded-lg transition-colors text-purple-600 disabled:opacity-50"
-                    title="Suggest Route (Airport)"
-                  >
-                    <Lightbulb size={16} />
-                  </button>
-                  <button
-                    onClick={() => handleSuggestRouteByLocation(lane.id)}
-                    disabled={loading}
-                    className="p-2 hover:bg-teal-100 rounded-lg transition-colors text-teal-600 disabled:opacity-50"
-                    title="Suggest Route (Location)"
-                  >
-                    <MapPin size={16} />
                   </button>
                   <button
                     onClick={() => handleDeleteLane(lane.id)}
@@ -1553,14 +1510,115 @@ const LaneMappingLanes = () => {
                         <Plane size={16} className="text-gray-500" />
                         Flight Legs
                       </span>
-                      <button
-                        onClick={() => handleAddLeg(lane.id)}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition"
-                      >
-                        <Plus size={14} />
-                        Add Leg
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleSuggestRoute(lane.id)}
+                          disabled={loading}
+                          className="flex items-center gap-1 px-3 py-1.5 border border-purple-300 text-purple-700 text-xs font-medium rounded-lg hover:bg-purple-50 active:bg-purple-200 active:scale-95 active:border-purple-400 transition-all disabled:opacity-50"
+                          title="Suggest Route by Airport"
+                        >
+                          <Lightbulb size={13} />
+                          Suggest (Airport)
+                        </button>
+                        <button
+                          onClick={() => handleSuggestRouteByLocation(lane.id)}
+                          disabled={loading}
+                          className="flex items-center gap-1 px-3 py-1.5 border border-teal-300 text-teal-700 text-xs font-medium rounded-lg hover:bg-teal-50 active:bg-teal-200 active:scale-95 active:border-teal-400 transition-all disabled:opacity-50"
+                          title="Suggest Route by Location"
+                        >
+                          <MapPin size={13} />
+                          Suggest (Location)
+                        </button>
+                        <button
+                          onClick={() => handleAddLeg(lane.id)}
+                          disabled={(lane.legs?.length ?? 0) >= 3}
+                          title={(lane.legs?.length ?? 0) >= 3 ? 'Maximum of 3 legs allowed' : undefined}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <Plus size={14} />
+                          Add Leg
+                        </button>
+                      </div>
                     </h3>
+                    {suggestError && routeLaneId === lane.id && (
+                      <div className="mb-3 flex items-start justify-between gap-2 rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-2.5 text-xs text-yellow-800">
+                        <div className="flex items-center gap-2">
+                          <Lightbulb size={14} className="shrink-0 text-yellow-600" />
+                          <span>{suggestError}</span>
+                        </div>
+                        <button onClick={() => setSuggestError(null)} className="shrink-0 text-yellow-500 hover:text-yellow-700">
+                          <X size={14} />
+                        </button>
+                      </div>
+                    )}
+                    {showSuggestedRoute && suggestedRoutes.length > 0 && routeLaneId === lane.id && (
+                      <div className="mb-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className={`flex items-center gap-2 text-xs font-semibold ${suggestSource === 'location' ? 'text-teal-700' : 'text-purple-700'}`}>
+                            {suggestSource === 'location' ? <MapPin size={14} className="text-teal-500" /> : <Lightbulb size={14} className="text-purple-500" />}
+                            Suggested Routes
+                            <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${suggestSource === 'location' ? 'bg-teal-100 text-teal-700' : 'bg-purple-100 text-purple-700'}`}>
+                              {suggestSource === 'location' ? 'by Location' : 'by Airport'}
+                            </span>
+                          </span>
+                          <button
+                            onClick={() => {
+                              setShowSuggestedRoute(false);
+                              setSuggestedRoutes([]);
+                              setSelectedRouteIndex(null);
+                              setRouteLaneId(null);
+                              setSuggestSource(null);
+                            }}
+                            className="text-gray-400 hover:text-gray-600"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          {suggestedRoutes.map((routePattern, routeIndex) => (
+                            <div
+                              key={routeIndex}
+                              className={`border-2 rounded-xl p-4 transition-all cursor-pointer ${selectedRouteIndex === routeIndex
+                                ? 'border-green-500 bg-green-50 shadow-md'
+                                : 'border-gray-200 bg-white hover:border-purple-300 hover:shadow-sm'
+                                }`}
+                              onClick={() => setSelectedRouteIndex(routeIndex)}
+                            >
+                              <p className="text-xs font-bold text-gray-800 mb-1">Option {routeIndex + 1}</p>
+                              <p className="text-xs text-gray-500 mb-3">
+                                {routePattern.originStation} → {routePattern.destinationStation}
+                              </p>
+                              <div className="space-y-1.5 mb-3 max-h-40 overflow-y-auto">
+                                {routePattern.legs
+                                  .sort((a, b) => a.sequence - b.sequence)
+                                  .map((leg, i) => (
+                                    <div key={i} className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs">
+                                      <p className="font-semibold text-gray-700">{leg.flightNumber}</p>
+                                      <p className="text-gray-500">{leg.originStation} → {leg.destinationStation} · {leg.departureTime} – {leg.arrivalTime}</p>
+                                    </div>
+                                  ))}
+                              </div>
+                              <button
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  if (selectedRouteIndex === routeIndex) {
+                                    applyRoute(routePattern);
+                                  } else {
+                                    setSelectedRouteIndex(routeIndex);
+                                  }
+                                }}
+                                className={`w-full px-3 py-1.5 rounded-lg text-xs font-semibold transition ${selectedRouteIndex === routeIndex
+                                  ? 'bg-green-600 text-white hover:bg-green-700'
+                                  : 'bg-blue-600 text-white hover:bg-blue-700'
+                                  }`}
+                              >
+                                {selectedRouteIndex === routeIndex ? 'Apply This Route' : 'Select'}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {lane.legs && lane.legs.length > 0 ? (
                       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                         <table className="w-full text-sm">
@@ -1779,7 +1837,8 @@ const LaneMappingLanes = () => {
                         <p className="text-gray-500 text-sm">No flight legs defined</p>
                         <button
                           onClick={() => handleAddLeg(lane.id)}
-                          className="mt-3 text-blue-600 text-sm font-medium hover:text-blue-700"
+                          disabled={(lane.legs?.length ?? 0) >= 3}
+                          className="mt-3 text-blue-600 text-sm font-medium hover:text-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           Add your first leg
                         </button>
@@ -1876,94 +1935,59 @@ const LaneMappingLanes = () => {
                     </div>
                   )}
 
-                  {/* Suggested Routes */}
-                  {showSuggestedRoute && suggestedRoutes.length > 0 && routeLaneId === lane.id && (
-                    <div className="mb-6">
-                      <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center justify-between">
-                        <span className="flex items-center gap-2">
-                          <Lightbulb size={16} className="text-purple-500" />
-                          Suggested Routes
-                        </span>
-                        <button
-                          onClick={() => {
-                            setShowSuggestedRoute(false);
-                            setSuggestedRoutes([]);
-                            setSelectedRouteIndex(null);
-                            setRouteLaneId(null);
-                          }}
-                          className="text-gray-500 hover:text-gray-700"
-                        >
-                          <X size={18} />
-                        </button>
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {suggestedRoutes.map((routePattern, routeIndex) => (
-                          <div
-                            key={routeIndex}
-                            className={`border-2 rounded-xl p-4 transition-all cursor-pointer ${selectedRouteIndex === routeIndex
-                              ? 'border-green-500 bg-green-50 shadow-md'
-                              : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-sm'
-                              }`}
-                            onClick={() => setSelectedRouteIndex(routeIndex)}
-                          >
-                            <div className="mb-3">
-                              <p className="text-sm font-bold text-gray-800">Option {routeIndex + 1}</p>
-                              <p className="text-xs text-gray-600 mt-1">
-                                {routePattern.originStation} → {routePattern.destinationStation}
-                              </p>
-                            </div>
 
-                            <div className="space-y-2 mb-4 max-h-40 overflow-y-auto">
-                              {routePattern.legs
-                                .sort((a, b) => a.sequence - b.sequence)
-                                .map((leg, i) => (
-                                  <div
-                                    key={i}
-                                    className="bg-gray-50 border border-gray-200 rounded-lg p-2 text-xs"
-                                  >
-                                    <p className="font-semibold text-gray-700">
-                                      Leg {leg.sequence}: {leg.flightNumber}
-                                    </p>
-                                    <p className="text-gray-600">
-                                      {leg.originStation} → {leg.destinationStation}
-                                    </p>
-                                    <p className="text-gray-500">
-                                      {leg.departureTime} - {leg.arrivalTime}
-                                    </p>
-                                  </div>
-                                ))}
-                            </div>
-
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (selectedRouteIndex === routeIndex) {
-                                  applyRoute(routePattern);
-                                } else {
-                                  setSelectedRouteIndex(routeIndex);
-                                }
-                              }}
-                              className={`w-full px-4 py-2 rounded-lg text-sm font-semibold transition ${selectedRouteIndex === routeIndex
-                                ? 'bg-green-600 text-white hover:bg-green-700'
-                                : 'bg-blue-600 text-white hover:bg-blue-700'
-                                }`}
-                            >
-                              {selectedRouteIndex === routeIndex ? 'Apply This Route' : 'Select'}
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {suggestError && routeLaneId === lane.id && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">
-                      <strong>Error:</strong> {suggestError}
-                    </div>
-                  )}
                 </div>
               )}
+                {lane.serviceLevel?.trim().toUpperCase() === 'DIRECT DRIVE' ? (
+                  <div className="mx-4 mb-3 mt-1 flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+                    <span className="text-sm font-semibold text-gray-700">
+                      {[lane.originCity, lane.originState, lane.originCountry].filter(Boolean).join(', ') || lane.originStation || '—'}
+                    </span>
+                    <span className="text-gray-300 font-light">·→</span>
+                    <div className="flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-1.5">
+                      <Truck size={15} className="text-orange-600 shrink-0" />
+                      <span className="text-sm font-bold text-orange-700">Direct Drive</span>
+                    </div>
+                    <span className="text-gray-300 font-light">·→</span>
+                    <span className="text-sm font-semibold text-gray-700">
+                      {[lane.destinationCity, lane.destinationState, lane.destinationCountry].filter(Boolean).join(', ') || lane.destinationStation || '—'}
+                    </span>
+                  </div>
+                ) : lane.legs?.length > 0 && (
+                  <div className="mx-4 mb-3 mt-1 flex items-center flex-wrap gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+                    {[...lane.legs]
+                      .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
+                      .map((leg, idx, arr) => {
+                        const palette = [
+                          { bg: 'bg-blue-50', border: 'border-blue-200', num: 'text-blue-700' },
+                          { bg: 'bg-violet-50', border: 'border-violet-200', num: 'text-violet-700' },
+                          { bg: 'bg-emerald-50', border: 'border-emerald-200', num: 'text-emerald-700' },
+                          { bg: 'bg-amber-50', border: 'border-amber-200', num: 'text-amber-700' },
+                        ];
+                        const c = palette[idx % palette.length];
+                        return (
+                          <React.Fragment key={leg.id ?? idx}>
+                            <div className={`flex items-center gap-2 rounded-lg border ${c.bg} ${c.border} px-3 py-2`}>
+                              <span className={`text-sm font-bold ${c.num}`}>{leg.originStation || '—'}</span>
+                              <span className="text-gray-300">·</span>
+                              <span className={`text-sm font-bold ${c.num}`}>{leg.flightNumber || '—'}</span>
+                              <span className="text-gray-300">|</span>
+                              <span className="text-sm text-gray-600">ETD {leg.departureTime || '—'}</span>
+                              <Plane size={14} className="text-gray-400 shrink-0" />
+                              <span className="text-sm text-gray-600">ETA {leg.arrivalTime || '—'}</span>
+                              <span className="text-gray-300">·</span>
+                              <span className={`text-sm font-bold ${c.num}`}>{leg.destinationStation || '—'}</span>
+                            </div>
+                            {idx < arr.length - 1 && (
+                              <span className="text-gray-400 text-base select-none">›</span>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                  </div>
+                )}
             </div>
+            
           ))}
 
           {filteredLanes.length === 0 && !loading && (
@@ -1986,6 +2010,7 @@ const LaneMappingLanes = () => {
             </div>
           )}
         </div>
+
       </div>
 
       {/* Edit Lane Mapping Name Modal */}
