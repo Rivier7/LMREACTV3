@@ -23,6 +23,7 @@ import {
   RefreshCw,
   Search,
   Truck,
+  PackageCheck,
 } from 'lucide-react';
 import EditLaneMappingModal from '../components/EditLaneMappingModal';
 import {
@@ -935,22 +936,22 @@ const LaneMappingLanes = () => {
 
 
       {/* Filter Bar */}
-      <div className="bg-white border-b border-gray-200 px-6 py-3 shadow-sm">
+      <div className="bg-white border-b border-gray-200 px-6 py-2 shadow-sm">
         <div className="max-w-7xl mx-auto">
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
             <input
               type="text"
               placeholder="Search lanes..."
               value={filters.quickFilter || ''}
               onChange={e => setFilters({ ...filters, quickFilter: e.target.value })}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-52"
             />
             <select
               value={filters.validationStatus || ''}
               onChange={e => setFilters(prev => ({ ...prev, validationStatus: e.target.value }))}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             >
-              <option value="">All Validation</option>
+              <option value="">All Statuses</option>
               <option value="PENDING">Pending</option>
               <option value="VALID">Valid</option>
               <option value="INVALID">Invalid</option>
@@ -958,88 +959,65 @@ const LaneMappingLanes = () => {
             </select>
             <button
               onClick={() => setShowColumnFilters(!showColumnFilters)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${showColumnFilters || activeFilterCount > 0
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${showColumnFilters || activeFilterCount > 0
                 ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
                 }`}
             >
-              <Filter size={16} />
-              Column Filters
+              <Filter size={13} />
+              Filters
               {activeFilterCount > 0 && (
-                <span className="bg-blue-600 text-white text-xs px-1.5 py-0.5 rounded-full">
-                  {activeFilterCount}
-                </span>
+                <span className="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">{activeFilterCount}</span>
               )}
             </button>
             <button
               onClick={handleBulkValidate}
               disabled={validationProgress?.status === 'validating' || loading}
-              className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition disabled:opacity-50"
+              className="flex items-center gap-1 px-3 py-1.5 bg-orange-500 text-white rounded-lg text-xs font-medium hover:bg-orange-600 transition disabled:opacity-50"
             >
               {validationProgress?.status === 'validating' ? (
-                <>
-                  <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Validating...
-                </>
+                <><svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg> Validating...</>
               ) : (
-                <>
-                  <CheckCircle size={14} />
-                  Validate All Lanes
-                </>
+                <><CheckCircle size={13} /> Validate All</>
               )}
             </button>
             <button
               onClick={computeAllTAT}
               disabled={loading}
-              className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition disabled:opacity-50"
+              className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition disabled:opacity-50"
             >
-              <Clock size={14} />
-              Calculate All TAT
+              <Clock size={13} />
+              Calc TAT
             </button>
             {(filters.quickFilter || activeFilterCount > 0) && (
-              <button
-                onClick={handleClearFilters}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition flex items-center gap-1"
-              >
-                <X size={14} />
-                Clear
+              <button onClick={handleClearFilters} className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200 transition flex items-center gap-1">
+                <X size={13} /> Clear
               </button>
             )}
           </div>
 
           {/* Collapsible Column Filters */}
           {showColumnFilters && (
-            <div className="mt-3 pt-3 border-t border-gray-200 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            <div className="mt-2 pt-2 border-t border-gray-200 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
               {['originStation', 'destinationStation', 'originCity', 'originState', 'originCountry', 'destinationCity', 'destinationState', 'destinationCountry', 'itemNumber', 'laneOption'].map(col => (
                 <div key={col}>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">
-                    {columnLabels[col]}
-                  </label>
+                  <label className="block text-[10px] font-medium text-gray-500 mb-0.5">{columnLabels[col]}</label>
                   <select
                     value={filters[col] || ''}
                     onChange={e => setFilters(prev => ({ ...prev, [col]: e.target.value }))}
-                    className={`w-full px-3 py-1.5 text-sm border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${filters[col] ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
-                      }`}
+                    className={`w-full px-2 py-1 text-xs border rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${filters[col] ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}`}
                   >
                     <option value="">All</option>
-                    {getUniqueValues(col).map(v => (
-                      <option key={v} value={v}>{v}</option>
-                    ))}
+                    {getUniqueValues(col).map(v => <option key={v} value={v}>{v}</option>)}
                   </select>
                 </div>
               ))}
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  TAT Status
-                </label>
+                <label className="block text-[10px] font-medium text-gray-500 mb-0.5">TAT Status</label>
                 <select
                   value={filters.tatStatus || ''}
                   onChange={e => setFilters(prev => ({ ...prev, tatStatus: e.target.value }))}
-                  className={`w-full px-3 py-1.5 text-sm border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${filters.tatStatus ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
-                    }`}
+                  className={`w-full px-2 py-1 text-xs border rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${filters.tatStatus ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}`}
                 >
                   <option value="">All</option>
                   <option value="tbd">TBD Only</option>
@@ -1057,8 +1035,7 @@ const LaneMappingLanes = () => {
           {filteredLanes.map(lane => (
             <div
               key={lane.id}
-              className={`bg-white rounded-xl border shadow-sm transition-all ${lane.hasBeenUpdated ? 'border-amber-300 ring-1 ring-amber-200' : 'border-gray-200'
-                } ${expandedLanes[lane.id] ? 'shadow-md' : 'hover:shadow-md'}`}
+              className={`bg-white rounded-xl border shadow-md transition-all overflow-hidden ${lane.hasBeenUpdated ? 'border-amber-300 ring-1 ring-amber-200' : expandedLanes[lane.id] ? 'border-blue-400 ring-1 ring-blue-100' : 'border-gray-200 hover:border-gray-300'} hover:shadow-lg ${expandedLanes[lane.id] ? 'border-l-4 border-l-blue-500' : 'hover:border-l-4 hover:border-l-blue-300'}`}
             >
               {/* Summary Row */}
               <div
@@ -1075,169 +1052,130 @@ const LaneMappingLanes = () => {
                 </button>
 
                 {/* Route Display */}
-                <div className="flex items-center gap-3 shrink-0">
-                  <div className="text-center">
-                    <div className="font-bold text-gray-900">{lane.originStation || '---'}</div>
-                    <div className="text-xs text-gray-500">
-                      {[lane.originCity, lane.originState, lane.originCountry].filter(Boolean).join(', ') || '---'}
+                <div className="flex items-center gap-4 shrink-0">
+                  <div>
+                    <div className="text-2xl font-bold text-slate-900 tracking-wide leading-none">{lane.originStation || '---'}</div>
+                    <div className="text-xs text-slate-500 mt-0.5">{[lane.originCity, lane.originState, lane.originCountry].filter(Boolean).join(', ') || '---'}</div>
+                  </div>
+                  <div className="flex items-center gap-2 group">
+                    <div className="h-px w-8 bg-slate-300 group-hover:bg-blue-300 transition-colors" />
+                    <div className="h-9 w-9 rounded-full bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center shadow-sm shrink-0 group-hover:bg-blue-100 group-hover:border-blue-400 transition-colors">
+                      <Plane size={15} />
                     </div>
+                    <div className="h-px w-8 bg-slate-300 group-hover:bg-blue-300 transition-colors" />
                   </div>
-                  <div className="flex items-center px-2">
-                    <div className="w-6 h-px bg-gray-300"></div>
-                    <Plane size={16} className="text-blue-500 mx-1" />
-                    <div className="w-6 h-px bg-gray-300"></div>
+                  <div>
+                    <div className="text-2xl font-bold text-slate-900 tracking-wide leading-none">{lane.destinationStation || '---'}</div>
+                    <div className="text-xs text-slate-500 mt-0.5">{[lane.destinationCity, lane.destinationState, lane.destinationCountry].filter(Boolean).join(', ') || '---'}</div>
                   </div>
-                  <div className="text-center">
-                    <div className="font-bold text-gray-900">{lane.destinationStation || '---'}</div>
-                    <div className="text-xs text-gray-500">
-                      {[lane.destinationCity, lane.destinationState, lane.destinationCountry].filter(Boolean).join(', ') || '---'}
-                    </div>
-                  </div>
-
                 </div>
 
-                {/* Info Row */}
-                <div className="flex items-center gap-0 flex-1 min-w-0 divide-x divide-gray-200 text-xs whitespace-nowrap overflow-hidden">
-                  <span className="pr-3">
-                    <span className="text-gray-500">Item</span>{' '}
-                    <span className="font-semibold text-gray-900">{lane.itemNumber || '—'}</span>
-                  </span>
-                  <span className="px-3">
-                    <span className="text-gray-500">Opt</span>{' '}
-                    <span className="font-semibold text-gray-900">{lane.laneOption || '—'}</span>
-                  </span>
-                  <span className="px-3">
-                    <span className="text-gray-500">Pickup</span>{' '}
-                    <span className="font-semibold text-gray-900">{lane.pickUpTime || '—'}</span>
-                  </span>
-                  <span className="px-3">
-                    <span className="text-gray-500">Delivery</span>{' '}
-                    <span className="font-semibold text-gray-900">{lane.actualDeliveryTimeBasedOnReceiving || '—'}</span>
-                  </span>
-                  <span className="px-3">
-                    <span className="text-gray-500">TAT</span>{' '}
-                    <span className="font-semibold text-gray-900">{lane.tatToConsigneeDuration || '—'}</span>
-                  </span>
-                  {lane.legs?.length > 0 && (
-                    <span className="px-3">
-                      <span className="font-semibold text-gray-900">{lane.legs.length}</span>{' '}
-                      <span className="text-gray-500">leg{lane.legs.length !== 1 ? 's' : ''}</span>
-                    </span>
-                  )}
-                </div>
-
-                {/* Status Badge */}
-                <div className="flex items-center gap-2 shrink-0">
-                  {lane.hasBeenUpdated && (
-                    <span className="px-2 py-1 rounded bg-amber-100 text-amber-700 text-xs font-medium">
-                      Unsaved
-                    </span>
-                  )}
-                  {savedLaneId === lane.id && (
-                    <span className="px-2 py-1 rounded bg-green-100 text-green-700 text-xs font-medium animate-pulse">
-                      Saved!
-                    </span>
-                  )}
+                {/* Info Cards */}
+                <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-hidden">
                   {(() => {
-                    const vs = getValidationStatusDisplay(lane);
-                    const StatusIcon = vs.icon;
-                    return (
-                      <span className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${vs.color}`}>
-                        <StatusIcon size={14} />
-                        {vs.label}
-                      </span>
-                    );
+                    const opt = lane.laneOption?.toLowerCase();
+                    const optCls = opt === 'primary'     ? 'bg-green-100 border-green-400 text-green-600'
+                                 : opt === 'secondary'   ? 'bg-amber-100 border-amber-400 text-amber-600'
+                                 : opt === 'alternative' ? 'bg-gray-100 border-gray-400 text-gray-500'
+                                 :                        'bg-gray-50 border-gray-300 text-gray-400';
+                    const optVal = opt === 'primary'     ? 'text-green-800 font-bold'
+                                 : opt === 'secondary'   ? 'text-amber-800 font-bold'
+                                 :                        'text-gray-700';
+                    return [
+                      { label: 'Item',     value: lane.itemNumber,                         cls: 'bg-gray-50 border-gray-200 text-gray-400', val: 'text-gray-700' },
+                      { label: 'Option',   value: lane.laneOption,                         cls: optCls, val: optVal },
+                      { label: 'Pickup',   value: lane.pickUpTime,                         cls: 'bg-gray-50 border-gray-200 text-gray-400', val: 'text-gray-700' },
+                      { label: 'Delivery', value: lane.actualDeliveryTimeBasedOnReceiving, cls: 'bg-gray-50 border-gray-200 text-gray-400', val: 'text-gray-700' },
+                      { label: 'TAT',      value: lane.tatToConsigneeDuration,             cls: 'bg-gray-50 border-gray-200 text-gray-400', val: 'text-gray-700 font-bold' },
+                    ].map(({ label, value, cls, val }) => (
+                      <div key={label} className={`rounded-xl px-2.5 py-1 border shrink-0 ${cls}`}>
+                        <div className={`text-[10px] uppercase tracking-wide leading-none ${cls.split(' ')[2]}`}>{label}</div>
+                        <div className={`text-xs mt-0.5 font-semibold leading-none ${val}`}>{value || '—'}</div>
+                      </div>
+                    ));
                   })()}
-                  {getLaneErrorMessages(lane) && (
-                    <span className="px-2 py-1 rounded-full bg-red-100 text-red-700 text-xs font-medium">
-                      Errors: {getLaneErrorMessages(lane).length}
-                    </span>
-                  )}
-                  {lane.lastValidatedAt && (
-                    <span className="flex items-center gap-1 text-xs text-gray-500">
-                      <Clock size={12} />
-                      {formatDateTime(lane.lastValidatedAt)}
-                    </span>
-                  )}
-                  {lane.syncMessage && lane.validationStatus === 'SCHEDULE_MISMATCH' && (
-                    <span className="flex items-center gap-1 text-xs text-orange-600 bg-orange-50 border border-orange-200 rounded px-2 py-0.5 max-w-xs truncate" title={lane.syncMessage}>
-                      <AlertTriangle size={11} />
-                      {lane.syncMessage}
-                    </span>
-                  )}
                 </div>
 
-                {/* Action Buttons */}
-                <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                {/* Status + Actions */}
+                <div className="flex items-center gap-2 shrink-0" onClick={e => e.stopPropagation()}>
+                  {/* Status badges group */}
+                  <div className="flex items-center gap-1.5">
+                    {lane.hasBeenUpdated && (
+                      <span className="px-2 py-0.5 rounded-md bg-orange-100 text-orange-700 text-xs font-medium">Unsaved</span>
+                    )}
+                    {savedLaneId === lane.id && (
+                      <span className="px-2 py-0.5 rounded-md bg-green-100 text-green-700 text-xs font-medium animate-pulse">Saved!</span>
+                    )}
+                    {(() => {
+                      const vs = getValidationStatusDisplay(lane);
+                      const StatusIcon = vs.icon;
+                      return (
+                        <span className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold ${vs.color}`}>
+                          <StatusIcon size={12} />
+                          {vs.label}
+                        </span>
+                      );
+                    })()}
+                    {getLaneErrorMessages(lane) && (
+                      <span className="px-2 py-0.5 rounded-md bg-red-100 text-red-700 text-xs font-medium">
+                        {getLaneErrorMessages(lane).length} error{getLaneErrorMessages(lane).length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {lane.lastValidatedAt && (
+                      <span className="flex items-center gap-1 text-xs text-gray-400">
+                        <Clock size={11} />
+                        {formatDateTime(lane.lastValidatedAt)}
+                      </span>
+                    )}
+                    {lane.syncMessage && lane.validationStatus === 'SCHEDULE_MISMATCH' && (
+                      <span className="flex items-center gap-1 text-xs text-orange-600 bg-orange-50 border border-orange-200 rounded px-2 py-0.5 max-w-[180px] truncate" title={lane.syncMessage}>
+                        <AlertTriangle size={11} />
+                        {lane.syncMessage}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Primary action */}
                   {lane.validationStatus === 'SCHEDULE_MISMATCH' && scheduleMismatchData[lane.id]?.hasSuggestedTimes && (
                     <button
                       onClick={() => handleApplySuggestedTimes(lane.id)}
                       disabled={applyingTimesLaneIds.has(lane.id) || loading}
-                      className="flex items-center gap-1 px-2 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition disabled:opacity-50"
-                      title="Apply suggested flight times"
+                      className="flex items-center gap-1 px-2.5 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition disabled:opacity-50"
                     >
-                      {applyingTimesLaneIds.has(lane.id) ? (
-                        <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                      ) : (
-                        <CheckCircle size={12} />
-                      )}
-                      Apply Suggested
+                      {applyingTimesLaneIds.has(lane.id) ? <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg> : <CheckCircle size={12} />}
+                      Apply
                     </button>
                   )}
                   {lane.validationStatus === 'SCHEDULE_MISMATCH' && (
                     <button
                       onClick={() => handleSyncSchedule(lane.id)}
                       disabled={syncingLaneIds.has(lane.id) || loading}
-                      className="flex items-center gap-1 px-2 py-1.5 bg-orange-500 text-white rounded-lg text-xs font-medium hover:bg-orange-600 transition disabled:opacity-50"
-                      title="Sync flight schedule from API"
+                      className="flex items-center gap-1 px-2.5 py-1.5 bg-orange-500 text-white rounded-lg text-xs font-medium hover:bg-orange-600 transition disabled:opacity-50"
                     >
-                      {syncingLaneIds.has(lane.id) ? (
-                        <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                      ) : (
-                        <RefreshCw size={12} />
-                      )}
-                      Sync Schedule
+                      {syncingLaneIds.has(lane.id) ? <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg> : <RefreshCw size={12} />}
+                      Sync
                     </button>
                   )}
                   {lane.validationStatus !== 'SCHEDULE_MISMATCH' && (
                     <button
                       onClick={() => handleValidateAndSave(lane.id)}
                       disabled={validateAndSavingLaneIds.has(lane.id) || loading}
-                      className="flex items-center gap-1 px-2 py-1.5 h-7 whitespace-nowrap shrink-0 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition disabled:opacity-50"
-                      title="Validate and save this lane"
+                      className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition disabled:opacity-50 whitespace-nowrap"
                     >
-                      {validateAndSavingLaneIds.has(lane.id) ? (
-                        <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                      ) : (
-                        <CheckCircle size={12} />
-                      )}
+                      {validateAndSavingLaneIds.has(lane.id) ? <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg> : <CheckCircle size={12} />}
                       Validate & Save
                     </button>
                   )}
-                  <button
-                    onClick={() => computeTATForLane(lane.id)}
-                    disabled={loading}
-                    className="p-2 hover:bg-blue-100 rounded-lg transition-colors text-blue-600 disabled:opacity-50"
-                    title="Calculate TAT"
-                  >
-                    <Clock size={16} />
+
+                  {/* Divider */}
+                  <div className="w-px h-5 bg-gray-200 mx-1" />
+
+                  {/* Utility icons pushed right */}
+                  <button onClick={() => computeTATForLane(lane.id)} disabled={loading} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-blue-600 disabled:opacity-50" title="Calculate TAT">
+                    <Clock size={15} />
                   </button>
-                  <button
-                    onClick={() => handleDeleteLane(lane.id)}
-                    disabled={loading}
-                    className="p-2 hover:bg-red-100 rounded-lg transition-colors text-red-600 disabled:opacity-50"
-                    title="Delete Lane"
-                  >
-                    <Trash2 size={16} />
+                  <button onClick={() => handleDeleteLane(lane.id)} disabled={loading} className="p-1.5 hover:bg-red-50 rounded-lg transition-colors text-gray-400 hover:text-red-600 disabled:opacity-50" title="Delete Lane">
+                    <Trash2 size={15} />
                   </button>
                 </div>
               </div>
@@ -1938,54 +1876,83 @@ const LaneMappingLanes = () => {
 
                 </div>
               )}
-                {lane.serviceLevel?.trim().toUpperCase() === 'DIRECT DRIVE' ? (
-                  <div className="mx-4 mb-3 mt-1 flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
-                    <span className="text-sm font-semibold text-gray-700">
-                      {[lane.originCity, lane.originState, lane.originCountry].filter(Boolean).join(', ') || lane.originStation || '—'}
-                    </span>
-                    <span className="text-gray-300 font-light">·→</span>
-                    <div className="flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-1.5">
-                      <Truck size={15} className="text-orange-600 shrink-0" />
-                      <span className="text-sm font-bold text-orange-700">Direct Drive</span>
-                    </div>
-                    <span className="text-gray-300 font-light">·→</span>
-                    <span className="text-sm font-semibold text-gray-700">
-                      {[lane.destinationCity, lane.destinationState, lane.destinationCountry].filter(Boolean).join(', ') || lane.destinationStation || '—'}
-                    </span>
-                  </div>
-                ) : lane.legs?.length > 0 && (
-                  <div className="mx-4 mb-3 mt-1 flex items-center flex-wrap gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
-                    {[...lane.legs]
-                      .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
-                      .map((leg, idx, arr) => {
-                        const palette = [
-                          { bg: 'bg-blue-50', border: 'border-blue-200', num: 'text-blue-700' },
-                          { bg: 'bg-violet-50', border: 'border-violet-200', num: 'text-violet-700' },
-                          { bg: 'bg-emerald-50', border: 'border-emerald-200', num: 'text-emerald-700' },
-                          { bg: 'bg-amber-50', border: 'border-amber-200', num: 'text-amber-700' },
-                        ];
-                        const c = palette[idx % palette.length];
-                        return (
-                          <React.Fragment key={leg.id ?? idx}>
-                            <div className={`flex items-center gap-2 rounded-lg border ${c.bg} ${c.border} px-3 py-2`}>
-                              <span className={`text-sm font-bold ${c.num}`}>{leg.originStation || '—'}</span>
-                              <span className="text-gray-300">·</span>
-                              <span className={`text-sm font-bold ${c.num}`}>{leg.flightNumber || '—'}</span>
-                              <span className="text-gray-300">|</span>
-                              <span className="text-sm text-gray-600">ETD {leg.departureTime || '—'}</span>
-                              <Plane size={14} className="text-gray-400 shrink-0" />
-                              <span className="text-sm text-gray-600">ETA {leg.arrivalTime || '—'}</span>
-                              <span className="text-gray-300">·</span>
-                              <span className={`text-sm font-bold ${c.num}`}>{leg.destinationStation || '—'}</span>
+                {(() => {
+                  const isDirectDrive = lane.serviceLevel?.trim().toUpperCase() === 'DIRECT DRIVE';
+                  const sortedLegs = [...(lane.legs || [])].sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
+                  if (!isDirectDrive && sortedLegs.length === 0) return null;
+
+                  const originCity = [lane.originCity, lane.originState, lane.originCountry].filter(Boolean).join(', ');
+                  const destCity   = [lane.destinationCity, lane.destinationState, lane.destinationCountry].filter(Boolean).join(', ');
+
+                  // Build flat items: alternating { type:'node' } and { type:'connector', flight? }
+                  const items = [];
+                  const addNode = n => items.push({ type: 'node', ...n });
+                  const addConn = (flight = null) => items.push({ type: 'connector', flight });
+
+                  addNode({ icon: 'truck', label: 'PICKUP', labelTop: true, cityLine: originCity || lane.originStation });
+
+                  if (isDirectDrive) {
+                    addConn();
+                    addNode({ icon: 'drive', label: 'DIRECT DRIVE', labelTop: true });
+                  } else {
+                    sortedLegs.forEach((leg, i) => {
+                      addConn();
+                      addNode({ time: leg.departureTime, icon: 'dep', label: 'ETD', station: leg.originStation });
+                      addConn(leg.flightNumber);
+                      const isLast = i === sortedLegs.length - 1;
+                      addNode({ time: leg.arrivalTime, icon: isLast ? 'arr' : 'connect', label: isLast ? 'ETA' : 'CONNECT', station: leg.destinationStation });
+                    });
+                  }
+                  addConn();
+                  addNode({ time: lane.actualDeliveryTimeBasedOnReceiving, icon: 'delivery', label: 'DELIVERY', cityLine: destCity || lane.destinationStation });
+
+                  return (
+                    <div className="border-t-2 border-gray-200 bg-gray-50 overflow-hidden">
+                      <div className="flex items-center px-4 py-4 w-full">
+                        {items.map((item, i) => {
+                          if (item.type === 'connector') return (
+                            <div key={i} className="flex-1 flex flex-col items-center gap-1 min-w-0">
+                              {item.flight
+                                ? <span className="px-3 py-1 rounded-full bg-blue-100 border border-blue-200 text-base font-bold text-blue-700 whitespace-nowrap">{item.flight}</span>
+                                : <div className="h-5" />}
+                              <div className="w-full h-[3px] bg-blue-200 rounded-full" />
                             </div>
-                            {idx < arr.length - 1 && (
-                              <span className="text-gray-400 text-base select-none">›</span>
-                            )}
-                          </React.Fragment>
-                        );
-                      })}
-                  </div>
-                )}
+                          );
+                          const node = item;
+                          return (
+                          <div key={i} className="flex flex-col items-center z-10 min-w-[64px] max-w-[96px]">
+                            {/* Above circle */}
+                            <div className="mb-1.5 text-center h-6 flex items-end justify-center">
+                              {node.labelTop
+                                ? <div className={`text-[10px] font-bold tracking-widest uppercase ${node.icon === 'drive' ? 'text-red-500' : 'text-slate-500'}`}>{node.label}</div>
+                                : node.time
+                                  ? <div className="text-xs font-semibold text-blue-600 whitespace-nowrap">{node.time}</div>
+                                  : null}
+                            </div>
+
+                            {/* Circle */}
+                            <div className={`h-9 w-9 rounded-full border-2 flex items-center justify-center shadow-sm bg-white shrink-0 ${node.icon === 'drive' ? 'border-red-400' : 'border-blue-400'}`}>
+                              {node.icon === 'truck'    && <Truck size={15} className="text-blue-500" />}
+                              {node.icon === 'dep'      && <Plane size={14} className="text-blue-500" />}
+                              {node.icon === 'arr'      && <Plane size={14} className="text-blue-500 rotate-45" />}
+                              {node.icon === 'connect'  && <RefreshCw size={13} className="text-blue-400" />}
+                              {node.icon === 'drive'    && <Truck size={15} className="text-red-500" />}
+                              {node.icon === 'delivery' && <PackageCheck size={15} className="text-blue-500" />}
+                            </div>
+
+                            {/* Below circle */}
+                            <div className="mt-1.5 text-center">
+                              {!node.labelTop && <div className={`text-[10px] font-bold tracking-widest uppercase ${node.icon === 'drive' ? 'text-red-500' : 'text-slate-400'}`}>{node.label}</div>}
+                              {node.station  && <div className="text-sm font-bold text-slate-800 mt-0.5">{node.station}</div>}
+                              {node.cityLine && <div className="text-[11px] text-slate-500 mt-0.5 leading-tight">{node.cityLine}</div>}
+                            </div>
+                          </div>
+                        );})}
+
+                      </div>
+                    </div>
+                  );
+                })()}
             </div>
             
           ))}
