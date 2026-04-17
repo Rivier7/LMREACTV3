@@ -1837,38 +1837,51 @@ const LaneMappingLanes = () => {
                   </div>
 
                   {/* Additional Notes */}
-                  <div className="mb-6">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                      <FileText size={16} className="text-gray-500" />
+                  <div className="mb-3">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-2">
+                      <FileText size={13} className="text-gray-400" />
                       Additional Notes
                     </h3>
-                    <textarea
-                      value={lane.additionalNotes || ''}
-                      onChange={e => handleLaneChange(lane.id, 'additionalNotes', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
-                      placeholder="Enter any additional notes here..."
-                    />
+                    {(!lane.additionalNotes && !expandedNotes[lane.id]) ? (
+                      <button
+                        onClick={() => setExpandedNotes(prev => ({ ...prev, [lane.id]: true }))}
+                        className="w-full text-left px-3 py-2 border border-dashed border-gray-300 rounded-lg text-xs text-gray-400 hover:border-blue-300 hover:text-blue-400 transition-colors"
+                      >
+                        Click to add notes...
+                      </button>
+                    ) : (
+                      <textarea
+                        autoFocus={expandedNotes[lane.id] && !lane.additionalNotes}
+                        value={lane.additionalNotes || ''}
+                        onChange={e => handleLaneChange(lane.id, 'additionalNotes', e.target.value)}
+                        onBlur={() => {
+                          if (!lane.additionalNotes) setExpandedNotes(prev => ({ ...prev, [lane.id]: false }));
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[64px]"
+                        placeholder="Enter any additional notes here..."
+                      />
+                    )}
                   </div>
 
                   {/* Lane History */}
                   {(lane.lastValidatedAt || lane.lastUpdate || lane.lastUpdatedBy) && (
-                    <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 bg-white rounded-lg border border-gray-200 text-xs text-gray-500">
+                    <div className="mb-3 flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-200 text-xs text-gray-600">
                       {lane.lastValidatedAt && (
                         <span className="flex items-center gap-1.5">
-                          <Clock size={13} className="text-gray-400" />
-                          Last validated: <span className="font-medium text-gray-700 ml-0.5">{formatDateTime(lane.lastValidatedAt)}</span>
+                          <Clock size={12} className="text-gray-400" />
+                          Last validated: <span className="font-semibold text-gray-700 ml-0.5">{formatDateTime(lane.lastValidatedAt)}</span>
                         </span>
                       )}
                       {lane.lastUpdate && (
                         <span className="flex items-center gap-1.5">
-                          <Calendar size={13} className="text-gray-400" />
-                          Last updated: <span className="font-medium text-gray-700 ml-0.5">{formatDate(lane.lastUpdate)}</span>
+                          <Calendar size={12} className="text-gray-400" />
+                          Last updated: <span className="font-semibold text-gray-700 ml-0.5">{formatDate(lane.lastUpdate)}</span>
                         </span>
                       )}
                       {lane.lastUpdatedBy && (
                         <span className="flex items-center gap-1.5">
-                          <User size={13} className="text-gray-400" />
-                          By: <span className="font-medium text-gray-700 ml-0.5">{lane.lastUpdatedBy}</span>
+                          <User size={12} className="text-gray-400" />
+                          By: <span className="font-semibold text-gray-700 ml-0.5">{lane.lastUpdatedBy}</span>
                         </span>
                       )}
                     </div>
