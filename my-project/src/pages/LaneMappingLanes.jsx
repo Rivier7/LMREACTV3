@@ -1311,17 +1311,17 @@ const LaneMappingLanes = () => {
                       <MapPin size={13} className="text-gray-400" />
                       Location Details
                     </h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-white rounded-lg border border-gray-200 p-3">
-                        <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Origin</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-white rounded-lg border border-gray-200 p-2.5">
+                        <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Origin</h4>
                         <div className="grid grid-cols-3 gap-2">
                           <div>
-                            <label className="block text-xs text-gray-500 mb-1">City</label>
+                            <label className="block text-xs text-gray-500 mb-0.5">City</label>
                             <input
                               type="text"
                               value={lane.originCity || ''}
                               onChange={e => handleLaneChange(lane.id, 'originCity', e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                           </div>
                           <div>
@@ -1330,7 +1330,7 @@ const LaneMappingLanes = () => {
                               type="text"
                               value={lane.originState || ''}
                               onChange={e => handleLaneChange(lane.id, 'originState', e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                           </div>
                           <div>
@@ -1339,21 +1339,21 @@ const LaneMappingLanes = () => {
                               type="text"
                               value={lane.originCountry || ''}
                               onChange={e => handleLaneChange(lane.id, 'originCountry', e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                           </div>
                         </div>
                       </div>
-                      <div className="bg-white rounded-lg border border-gray-200 p-3">
-                        <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Destination</h4>
+                      <div className="bg-white rounded-lg border border-gray-200 p-2.5">
+                        <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Destination</h4>
                         <div className="grid grid-cols-3 gap-2">
                           <div>
-                            <label className="block text-xs text-gray-500 mb-1">City</label>
+                            <label className="block text-xs text-gray-500 mb-0.5">City</label>
                             <input
                               type="text"
                               value={lane.destinationCity || ''}
                               onChange={e => handleLaneChange(lane.id, 'destinationCity', e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                           </div>
                           <div>
@@ -1362,7 +1362,7 @@ const LaneMappingLanes = () => {
                               type="text"
                               value={lane.destinationState || ''}
                               onChange={e => handleLaneChange(lane.id, 'destinationState', e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                           </div>
                           <div>
@@ -1371,7 +1371,7 @@ const LaneMappingLanes = () => {
                               type="text"
                               value={lane.destinationCountry || ''}
                               onChange={e => handleLaneChange(lane.id, 'destinationCountry', e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                           </div>
                         </div>
@@ -1393,7 +1393,7 @@ const LaneMappingLanes = () => {
                             type="text"
                             value={lane.itemNumber || ''}
                             onChange={e => handleLaneChange(lane.id, 'itemNumber', e.target.value)}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                         <div>
@@ -1401,7 +1401,7 @@ const LaneMappingLanes = () => {
                           <select
                             value={lane.laneOption || ''}
                             onChange={e => handleLaneChange(lane.id, 'laneOption', e.target.value)}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                           >
                             <option value="">Select Option</option>
                             <option value="Primary">Primary</option>
@@ -1415,7 +1415,7 @@ const LaneMappingLanes = () => {
                             type="text"
                             value={lane.pickUpTime || ''}
                             onChange={e => handleLaneChange(lane.id, 'pickUpTime', e.target.value)}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                         <div>
@@ -1425,7 +1425,7 @@ const LaneMappingLanes = () => {
                             value={lane.driveToAirportDuration || ''}
                             onChange={e => handleLaneChange(lane.id, 'driveToAirportDuration', e.target.value)}
                             placeholder="e.g. 3hr"
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                         <div>
@@ -1435,7 +1435,7 @@ const LaneMappingLanes = () => {
                             value={lane.serviceLevel || ''}
                             onChange={e => handleLaneChange(lane.id, 'serviceLevel', e.target.value)}
                             placeholder="e.g. NFO, DIRECT DRIVE"
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                       </div>
@@ -1791,8 +1791,8 @@ const LaneMappingLanes = () => {
                       <Clock size={13} className="text-gray-400" />
                       Post-Route Details
                     </h3>
-                    <div className="bg-white rounded-lg border border-gray-200 p-3">
-                      <div className="grid grid-cols-4 gap-3">
+                    <div className="bg-white rounded-lg border border-gray-200 p-2.5">
+                      <div className="grid grid-cols-4 gap-2">
                         <div>
                           <label className="block text-xs text-gray-500 mb-1">Post Arrival Handling</label>
                           <input
@@ -1800,7 +1800,7 @@ const LaneMappingLanes = () => {
                             value={lane.postArrivalHandlingTime || ''}
                             onChange={e => handleLaneChange(lane.id, 'postArrivalHandlingTime', e.target.value)}
                             placeholder="e.g. 3hr"
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                         <div>
@@ -1810,7 +1810,7 @@ const LaneMappingLanes = () => {
                             value={lane.driveToDestination || ''}
                             onChange={e => handleLaneChange(lane.id, 'driveToDestination', e.target.value)}
                             placeholder="e.g. 3hr"
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                         <div>
@@ -1819,7 +1819,7 @@ const LaneMappingLanes = () => {
                             type="text"
                             value={lane.actualDeliveryTimeBasedOnReceiving || ''}
                             onChange={e => handleLaneChange(lane.id, 'actualDeliveryTimeBasedOnReceiving', e.target.value)}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                         <div>
@@ -1829,7 +1829,7 @@ const LaneMappingLanes = () => {
                             value={lane.tatToConsigneeDuration || ''}
                             onChange={e => handleLaneChange(lane.id, 'tatToConsigneeDuration', e.target.value)}
                             placeholder="e.g. 3hr"
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                       </div>
