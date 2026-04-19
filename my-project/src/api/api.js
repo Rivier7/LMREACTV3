@@ -467,7 +467,22 @@ export const deleteLaneById = async id => {
   });
   if (!response.ok) throw new Error(`Failed to delete lane with ID ${id}`);
   return await response.json();
-}
+};
+
+export const createLane = async lane => {
+  const response = await fetch(`${BASE_URL}/createLane`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(lane),
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    let msg = errorText || 'Failed to create lane.';
+    try { msg = JSON.parse(errorText).message || msg; } catch {}
+    throw new Error(msg);
+  }
+  return await response.json();
+};
 
 
 // ✅ Validate a flight

@@ -26,6 +26,7 @@ import {
   PackageCheck,
 } from 'lucide-react';
 import EditLaneMappingModal from '../components/EditLaneMappingModal';
+import CreateLaneModal from '../components/CreateLaneModal';
 import {
   getLanesByLaneMappingId,
   getLaneMappingById,
@@ -75,6 +76,7 @@ const LaneMappingLanes = () => {
   const [scheduleMismatchData, setScheduleMismatchData] = useState({});
   // { [laneId]: { hasSuggestedTimes, applySuggestedTimesMessage, legs: [{ legId, sequence, flightNumber, departureTime, arrivalTime, suggestedDepartureTime, suggestedArrivalTime }] } }
   const [applyingTimesLaneIds, setApplyingTimesLaneIds] = useState(new Set());
+  const [showCreateLaneModal, setShowCreateLaneModal] = useState(false);
 
   const handleSuggestRoute = async laneId => {
     setRouteLaneId(laneId);
@@ -817,14 +819,23 @@ const LaneMappingLanes = () => {
               {lanes.length > 0 && lanes.length !== filteredLanes.length && ` of ${lanes.length} total`}
             </p>
           </div>
-          <button
-            onClick={handleSaveChanges}
-            disabled={loading || !lanes.some(l => l.hasBeenUpdated)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-          >
-            <Save size={18} />
-            Save All Changes
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowCreateLaneModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-400 transition shadow-sm border border-blue-400"
+            >
+              <Plus size={17} />
+              New Lane
+            </button>
+            <button
+              onClick={handleSaveChanges}
+              disabled={loading || !lanes.some(l => l.hasBeenUpdated)}
+              className="flex items-center gap-2 px-5 py-2.5 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+            >
+              <Save size={18} />
+              Save All Changes
+            </button>
+          </div>
         </div>
       </div>
 
@@ -2000,6 +2011,18 @@ const LaneMappingLanes = () => {
           laneMappingId={laneMappingId}
           onClose={() => setShowEditNameModal(false)}
           onSuccess={handleEditNameSuccess}
+        />
+      )}
+
+      {/* Create Lane Modal */}
+      {showCreateLaneModal && (
+        <CreateLaneModal
+          laneMappingId={laneMappingId}
+          onClose={() => setShowCreateLaneModal(false)}
+          onCreated={newLane => {
+            setLanes(prev => [...prev, { ...newLane, hasBeenUpdated: false }]);
+            setError(null);
+          }}
         />
       )}
     </div>
