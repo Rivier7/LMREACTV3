@@ -914,3 +914,45 @@ export const getViableFlights = async (origin, destination, pickupTime, driveMin
   if (!response.ok) throw new Error(`Failed to load viable flights for ${origin} → ${destination}`);
   return await response.json();
 };
+
+// Manually set validation status for a lane mapping
+export const manuallyValidateLaneMapping = async (id, validationStatus, note = null) => {
+  const response = await fetch(`${BASE_URL2}/${id}/manual-validation`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ validationStatus, note }),
+  });
+  if (!response.ok) {
+    let errorMessage = 'Manual validation failed';
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.message || errorMessage;
+    } catch {
+      const errorText = await response.text();
+      if (errorText) errorMessage = errorText;
+    }
+    throw new Error(errorMessage);
+  }
+  return await response.json();
+};
+
+// Manually set validation status for a lane
+export const manuallyValidateLane = async (id, validationStatus, note = null) => {
+  const response = await fetch(`${BASE_URL}/${id}/manual-validation`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ validationStatus, note }),
+  });
+  if (!response.ok) {
+    let errorMessage = 'Manual validation failed';
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.message || errorMessage;
+    } catch {
+      const errorText = await response.text();
+      if (errorText) errorMessage = errorText;
+    }
+    throw new Error(errorMessage);
+  }
+  return await response.json();
+};

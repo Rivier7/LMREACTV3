@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getLaneMappingExcel, getAllLaneMappings, validateLaneMapping } from '../api/api';
 import LaneMappingModel from '../components/LaneMappingModel';
 import EditLaneMappingModal from '../components/EditLaneMappingModal';
+import ManualValidationModal from '../components/ManualValidationModal';
 import FileUploader from '../components/FileUploader';
 import Header from '../components/Header';
 
@@ -62,6 +63,35 @@ const ValidationBadge = ({ summary }) => {
   }
 };
 
+const ManualValidationBadge = ({ status, source, validatedBy }) => {
+  if (source !== 'MANUAL') return null;
+
+  const getStatusStyle = () => {
+    switch (status) {
+      case 'VALID':
+        return 'bg-purple-100 text-purple-700 border-purple-200';
+      case 'INVALID':
+        return 'bg-purple-100 text-purple-700 border-purple-200';
+      case 'PENDING':
+        return 'bg-purple-100 text-purple-700 border-purple-200';
+      default:
+        return 'bg-gray-100 text-gray-700 border-gray-200';
+    }
+  };
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full border ${getStatusStyle()}`}
+      title={validatedBy ? `Manually validated by ${validatedBy}` : 'Manually validated'}
+    >
+      <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+      </svg>
+      Manual: {status}
+    </span>
+  );
+};
+
 const LaneMappings = () => {
   const navigate = useNavigate();
   const [laneMappings, setLaneMappings] = useState([]);
@@ -69,7 +99,10 @@ const LaneMappings = () => {
   const [error, setError] = useState(null);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showManualValidationModal, setShowManualValidationModal] = useState(false);
   const [selectedLaneMappingId, setSelectedLaneMappingId] = useState(null);
+  const [selectedLaneMappingName, setSelectedLaneMappingName] = useState('');
+  const [selectedLaneMappingStatus, setSelectedLaneMappingStatus] = useState(null);
   const [validatingIds, setValidatingIds] = useState(new Set());
 
   const handleSelectLaneMapping = laneMappingId => {
@@ -104,6 +137,18 @@ const LaneMappings = () => {
   const handleEditClick = id => {
     setSelectedLaneMappingId(id);
     setShowEditModal(true);
+  };
+
+  const handleManualValidationClick = (id, name, status) => {
+    setSelectedLaneMappingId(id);
+    setSelectedLaneMappingName(name);
+    setSelectedLaneMappingStatus(status);
+    setShowManualValidationModal(true);
+  };
+
+  const handleManualValidationSuccess = async () => {
+    setShowManualValidationModal(false);
+    await loadLaneMappings();
   };
 
   const handleEditSuccess = async () => {
@@ -214,6 +259,23 @@ const LaneMappings = () => {
                   >
                     {/* Action Buttons */}
                     <div className="absolute top-3 right-3 flex gap-2">
+                      {/* Manual Validation Button */}
+                      <button
+                        type="button"
+                        onClick={() => handleManualValidationClick(laneMapping.id, laneMapping.name, laneMapping.validationStatus)}
+                        aria-label={`Manual validation for ${laneMapping.name}`}
+                        title="Manual Validation"
+                        className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center hover:bg-purple-200 focus:outline-none"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                          aria-hidden="true"
+                        >
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </button>
                       {/* Edit Button */}
                       <button
                         type="button"
@@ -266,8 +328,15 @@ const LaneMappings = () => {
                     </h2>
                     <p className="text-xs text-gray-400">ID: {laneMapping.id}</p>
 
-                    {/* Validation Status Badge */}
-                    <ValidationBadge summary={validationSummary} />
+                    {/* Validation Status Badges */}
+                    <div className="flex flex-col items-center gap-1">
+                      <ValidationBadge summary={validationSummary} />
+                      <ManualValidationBadge
+                        status={laneMapping.validationStatus}
+                        source={laneMapping.validationSource}
+                        validatedBy={laneMapping.manualValidatedBy}
+                      />
+                    </div>
 
                     {/* Actions */}
                     <div className="mt-3 w-full flex flex-col gap-2">
@@ -347,6 +416,17 @@ const LaneMappings = () => {
             laneMappingId={selectedLaneMappingId}
             onClose={() => setShowEditModal(false)}
             onSuccess={handleEditSuccess}
+          />
+        )}
+
+        {/* Manual Validation modal */}
+        {showManualValidationModal && (
+          <ManualValidationModal
+            laneMappingId={selectedLaneMappingId}
+            laneMappingName={selectedLaneMappingName}
+            currentStatus={selectedLaneMappingStatus}
+            onClose={() => setShowManualValidationModal(false)}
+            onSuccess={handleManualValidationSuccess}
           />
         )}
       </main>

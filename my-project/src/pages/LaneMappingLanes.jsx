@@ -24,9 +24,11 @@ import {
   Search,
   Truck,
   PackageCheck,
+  ClipboardCheck,
 } from 'lucide-react';
 import EditLaneMappingModal from '../components/EditLaneMappingModal';
 import CreateLaneModal from '../components/CreateLaneModal';
+import LaneManualValidationModal from '../components/LaneManualValidationModal';
 import {
   getLanesByLaneMappingId,
   getLaneMappingById,
@@ -77,6 +79,23 @@ const LaneMappingLanes = () => {
   // { [laneId]: { hasSuggestedTimes, applySuggestedTimesMessage, legs: [{ legId, sequence, flightNumber, departureTime, arrivalTime, suggestedDepartureTime, suggestedArrivalTime }] } }
   const [applyingTimesLaneIds, setApplyingTimesLaneIds] = useState(new Set());
   const [showCreateLaneModal, setShowCreateLaneModal] = useState(false);
+  const [showManualValidationModal, setShowManualValidationModal] = useState(false);
+  const [selectedLaneForValidation, setSelectedLaneForValidation] = useState(null);
+
+  const handleOpenManualValidation = (lane) => {
+    setSelectedLaneForValidation(lane);
+    setShowManualValidationModal(true);
+  };
+
+  const handleManualValidationSuccess = async () => {
+    // Refresh lanes after successful manual validation
+    try {
+      const freshLanes = await getLanesByLaneMappingId(laneMappingId);
+      setLanes(freshLanes.map(lane => ({ ...lane, hasBeenUpdated: false })));
+    } catch (err) {
+      console.error('Failed to refresh lanes after manual validation:', err);
+    }
+  };
 
   const handleSuggestRoute = async laneId => {
     setRouteLaneId(laneId);
@@ -1122,10 +1141,22 @@ const LaneMappingLanes = () => {
                       const vs = getValidationStatusDisplay(lane);
                       const StatusIcon = vs.icon;
                       return (
-                        <span className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold ${vs.color}`}>
-                          <StatusIcon size={12} />
-                          {vs.label}
-                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold ${vs.color}`}>
+                            <StatusIcon size={12} />
+                            {vs.label}
+                            {lane.validationSource === 'MANUAL' && (
+                              <span className="ml-0.5 text-[10px] opacity-75">(Manual)</span>
+                            )}
+                          </span>
+                          <button
+                            onClick={() => handleOpenManualValidation(lane)}
+                            className="p-1 hover:bg-purple-100 rounded transition-colors text-purple-500 hover:text-purple-700"
+                            title="Manually set validation status"
+                          >
+                            <Pencil size={12} />
+                          </button>
+                        </div>
                       );
                     })()}
                     {getLaneErrorMessages(lane) && (
@@ -2023,6 +2054,18 @@ const LaneMappingLanes = () => {
             setLanes(prev => [...prev, { ...newLane, hasBeenUpdated: false }]);
             setError(null);
           }}
+        />
+      )}
+
+      {/* Manual Validation Modal */}
+      {showManualValidationModal && selectedLaneForValidation && (
+        <LaneManualValidationModal
+          lane={selectedLaneForValidation}
+          onClose={() => {
+            setShowManualValidationModal(false);
+            setSelectedLaneForValidation(null);
+          }}
+          onSuccess={handleManualValidationSuccess}
         />
       )}
     </div>

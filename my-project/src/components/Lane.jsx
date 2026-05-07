@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { Edit3, Plane, Truck, CheckCircle, XCircle, AlertCircle, Trash2, Clock, Calendar, User, AlertTriangle } from 'lucide-react';
+import { Edit3, Plane, Truck, CheckCircle, XCircle, AlertCircle, Trash2, Clock, Calendar, User, AlertTriangle, ClipboardCheck } from 'lucide-react';
 
-function Lane({ lane, onDelete }) {
+function Lane({ lane, onDelete, onManualValidate }) {
   const navigate = useNavigate();
 
   if (!lane) {
@@ -87,6 +87,16 @@ function Lane({ lane, onDelete }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {onManualValidate && (
+            <button
+              onClick={() => onManualValidate(lane)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition-colors"
+              title="Manual Validation"
+            >
+              <ClipboardCheck className="w-3.5 h-3.5" />
+              Validate
+            </button>
+          )}
           <button
             onClick={() => editLane(lane)}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
@@ -231,8 +241,19 @@ function Lane({ lane, onDelete }) {
         )}
 
         {/* Metadata Footer */}
-        {(lane.lastValidatedAt || lane.lastUpdate || lane.lastUpdatedBy) && (
+        {(lane.lastValidatedAt || lane.lastUpdate || lane.lastUpdatedBy || lane.validationSource === 'MANUAL') && (
           <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-gray-500">
+            {lane.validationSource === 'MANUAL' && (
+              <span className="flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full font-medium">
+                <User className="w-3 h-3" />
+                Manual Validation by {lane.manualValidatedBy || 'Unknown'}
+                {lane.manualValidationNote && (
+                  <span className="ml-1 text-purple-500" title={lane.manualValidationNote}>
+                    (Note)
+                  </span>
+                )}
+              </span>
+            )}
             {lane.lastValidatedAt && (
               <span className="flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5 text-gray-400" />
