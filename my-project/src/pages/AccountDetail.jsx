@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Edit2, Save, X, Trash2, Plus, Link2Off, ChevronRight, Loader2 } from 'lucide-react';
-import Header from '../components/Header';
 import ErrorMessage from '../components/ErrorMessage';
 import {
   useAccount,
@@ -97,40 +96,31 @@ function AccountDetail() {
 
   if (isLoading) {
     return (
-      <>
-        <Header />
-        <div className="text-center py-12 text-lg text-gray-500">Loading account...</div>
-      </>
+      <div className="text-center py-12 text-lg text-gray-500">Loading account...</div>
     );
   }
 
   if (error || !account) {
     return (
-      <>
-        <Header />
-        <div className="max-w-7xl mx-auto p-6 lg:p-8">
-          <ErrorMessage
-            message={error?.message || 'Account not found'}
-            title="Error Loading Account"
-            severity="error"
-          />
-          <button
-            onClick={() => navigate('/accounts')}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Back to Accounts
-          </button>
-        </div>
-      </>
+      <div className="max-w-7xl mx-auto p-6 lg:p-8">
+        <ErrorMessage
+          message={error?.message || 'Account not found'}
+          title="Error Loading Account"
+          severity="error"
+        />
+        <button
+          onClick={() => navigate('/accounts')}
+          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+        >
+          Back to Accounts
+        </button>
+      </div>
     );
   }
 
   return (
-    <>
-      <Header />
-
-      <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        <div className="max-w-7xl mx-auto p-6 lg:p-8">
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="max-w-7xl mx-auto p-6 lg:p-8">
           {/* Back Button */}
           <button
             onClick={() => navigate('/accounts')}
@@ -282,75 +272,74 @@ function AccountDetail() {
             )}
           </section>
         </div>
-      </main>
 
-      {/* Assign Lane Mapping Modal */}
-      {showAssignModal && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-          onClick={() => setShowAssignModal(false)}
-        >
+        {/* Assign Lane Mapping Modal */}
+        {showAssignModal && (
           <div
-            className="bg-white rounded-2xl shadow-xl max-w-lg w-full mx-4 max-h-[80vh] overflow-hidden"
-            onClick={e => e.stopPropagation()}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+            onClick={() => setShowAssignModal(false)}
           >
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-900">Assign Lane Mapping</h2>
-                <button
-                  onClick={() => setShowAssignModal(false)}
-                  className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
-                >
-                  <X size={20} />
-                </button>
+            <div
+              className="bg-white rounded-2xl shadow-xl max-w-lg w-full mx-4 max-h-[80vh] overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-bold text-gray-900">Assign Lane Mapping</h2>
+                  <button
+                    onClick={() => setShowAssignModal(false)}
+                    className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                <p className="text-sm text-gray-500 mt-1">
+                  Select a lane mapping to assign to {account.name}
+                </p>
               </div>
-              <p className="text-sm text-gray-500 mt-1">
-                Select a lane mapping to assign to {account.name}
-              </p>
-            </div>
 
-            <div className="p-6 overflow-y-auto max-h-[60vh]">
-              {availableLaneMappings.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-500">All lane mappings are already assigned to this account.</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {availableLaneMappings.map(lm => (
-                    <button
-                      key={lm.id}
-                      onClick={() => handleAssignLaneMapping(lm.id)}
-                      disabled={assigningId !== null}
-                      className={`w-full flex items-center gap-3 p-3 border rounded-lg transition-colors ${
-                        assigningId === lm.id
-                          ? 'border-blue-400 bg-blue-50'
-                          : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
-                      } disabled:opacity-50 disabled:cursor-not-allowed`}
-                    >
-                      <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
-                        style={{ backgroundColor: lm.randomColor || '#3B82F6' }}
+              <div className="p-6 overflow-y-auto max-h-[60vh]">
+                {availableLaneMappings.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">All lane mappings are already assigned to this account.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {availableLaneMappings.map(lm => (
+                      <button
+                        key={lm.id}
+                        onClick={() => handleAssignLaneMapping(lm.id)}
+                        disabled={assigningId !== null}
+                        className={`w-full flex items-center gap-3 p-3 border rounded-lg transition-colors ${
+                          assigningId === lm.id
+                            ? 'border-blue-400 bg-blue-50'
+                            : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
                       >
-                        {lm.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="text-left">
-                        <p className="font-semibold text-gray-900">{lm.name}</p>
-                        <p className="text-xs text-gray-500">ID: {lm.id}</p>
-                      </div>
-                      {assigningId === lm.id ? (
-                        <Loader2 className="ml-auto text-blue-600 animate-spin" size={20} />
-                      ) : (
-                        <Plus className="ml-auto text-gray-400" size={20} />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
+                        <div
+                          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
+                          style={{ backgroundColor: lm.randomColor || '#3B82F6' }}
+                        >
+                          {lm.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="text-left">
+                          <p className="font-semibold text-gray-900">{lm.name}</p>
+                          <p className="text-xs text-gray-500">ID: {lm.id}</p>
+                        </div>
+                        {assigningId === lm.id ? (
+                          <Loader2 className="ml-auto text-blue-600 animate-spin" size={20} />
+                        ) : (
+                          <Plus className="ml-auto text-gray-400" size={20} />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </>
+        )}
+      </main>
   );
 }
 

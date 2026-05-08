@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Building2, ChevronRight, Plus, Search } from 'lucide-react';
-import Header from '../components/Header';
 import ErrorMessage from '../components/ErrorMessage';
 import AccountModal from '../components/AccountModal';
 import { useAccounts, useCreateAccount } from '../hooks/useAccountQueries';
@@ -34,18 +33,12 @@ function Accounts() {
 
   if (isLoading) {
     return (
-      <>
-        <Header />
-        <div className="text-center py-12 text-lg text-gray-500">Loading accounts...</div>
-      </>
+      <div className="text-center py-12 text-lg text-gray-500">Loading accounts...</div>
     );
   }
 
   return (
-    <>
-      <Header />
-
-      <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         <div className="max-w-7xl mx-auto p-6 lg:p-8">
           {/* Display error message if any */}
           {error && (
@@ -178,17 +171,16 @@ function Accounts() {
             </div>
           </section>
         </div>
-      </main>
 
-      {/* Create Account Modal */}
-      {showCreateModal && (
-        <AccountModal
-          onClose={() => setShowCreateModal(false)}
-          onSave={handleCreateAccount}
-          isLoading={createAccountMutation.isPending}
-        />
-      )}
-    </>
+        {/* Create Account Modal */}
+        {showCreateModal && (
+          <AccountModal
+            onClose={() => setShowCreateModal(false)}
+            onSave={handleCreateAccount}
+            isLoading={createAccountMutation.isPending}
+          />
+        )}
+      </main>
   );
 }
 

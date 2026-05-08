@@ -5,7 +5,6 @@ import LaneMappingModel from '../components/LaneMappingModel';
 import EditLaneMappingModal from '../components/EditLaneMappingModal';
 import ManualValidationModal from '../components/ManualValidationModal';
 import FileUploader from '../components/FileUploader';
-import Header from '../components/Header';
 
 /**
  * Determine the overall validation status for a lane mapping based on its lanes.
@@ -180,9 +179,7 @@ const LaneMappings = () => {
   };
 
   return (
-    <>
-      <Header />
-      <main className="px-6 py-8 max-w-7xl mx-auto font-sans">
+    <main className="px-6 py-8 max-w-7xl mx-auto font-sans">
         {/* Top bar */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
@@ -430,7 +427,6 @@ const LaneMappings = () => {
           />
         )}
       </main>
-    </>
   );
 };
 

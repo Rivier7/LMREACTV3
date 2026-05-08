@@ -4,6 +4,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import PageErrorFallback from './components/PageErrorFallback';
 import PrivateRoute from './components/PrivateRoute';
 import SessionExpirationWarning from './components/SessionExpirationWarning';
+import AppLayout from './layouts/AppLayout';
 
 // Lazy load all page components
 // This splits each page into its own chunk, loaded only when needed
@@ -47,7 +48,9 @@ function App() {
               element={
                 <ErrorBoundary fallback={<PageErrorFallback />}>
                   <PrivateRoute>
-                    <Dashboard />
+                    <AppLayout>
+                      <Dashboard />
+                    </AppLayout>
                   </PrivateRoute>
                 </ErrorBoundary>
               }
@@ -58,7 +61,9 @@ function App() {
               element={
                 <ErrorBoundary fallback={<PageErrorFallback />}>
                   <PrivateRoute>
-                    <AllLanes />
+                    <AppLayout>
+                      <AllLanes />
+                    </AppLayout>
                   </PrivateRoute>
                 </ErrorBoundary>
               }
@@ -69,7 +74,9 @@ function App() {
               element={
                 <ErrorBoundary fallback={<PageErrorFallback />}>
                   <PrivateRoute>
-                    <Edit />
+                    <AppLayout>
+                      <Edit />
+                    </AppLayout>
                   </PrivateRoute>
                 </ErrorBoundary>
               }
@@ -80,7 +87,9 @@ function App() {
               element={
                 <ErrorBoundary fallback={<PageErrorFallback />}>
                   <PrivateRoute>
-                    <LaneMappingLanes />
+                    <AppLayout>
+                      <LaneMappingLanes />
+                    </AppLayout>
                   </PrivateRoute>
                 </ErrorBoundary>
               }
@@ -91,7 +100,9 @@ function App() {
               element={
                 <ErrorBoundary fallback={<PageErrorFallback />}>
                   <PrivateRoute>
-                    <Accounts />
+                    <AppLayout>
+                      <Accounts />
+                    </AppLayout>
                   </PrivateRoute>
                 </ErrorBoundary>
               }
@@ -102,7 +113,9 @@ function App() {
               element={
                 <ErrorBoundary fallback={<PageErrorFallback />}>
                   <PrivateRoute>
-                    <AccountDetail />
+                    <AppLayout>
+                      <AccountDetail />
+                    </AppLayout>
                   </PrivateRoute>
                 </ErrorBoundary>
               }
@@ -113,7 +126,9 @@ function App() {
               element={
                 <ErrorBoundary fallback={<PageErrorFallback />}>
                   <PrivateRoute>
-                    <FlightSearch />
+                    <AppLayout>
+                      <FlightSearch />
+                    </AppLayout>
                   </PrivateRoute>
                 </ErrorBoundary>
               }
@@ -124,7 +139,9 @@ function App() {
               element={
                 <ErrorBoundary fallback={<PageErrorFallback />}>
                   <PrivateRoute>
-                    <Dashboard />
+                    <AppLayout>
+                      <Dashboard />
+                    </AppLayout>
                   </PrivateRoute>
                 </ErrorBoundary>
               }

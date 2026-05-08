@@ -6,9 +6,9 @@ import {
   getTAT,
   getFlights,
   validateFlight,
+  getSuggestedRoute,
+  getSuggestedRouteByLocation,
 } from '../api/api';
-import Header from '../components/Header';
-import { getSuggestedRoute, getSuggestedRouteByLocation } from '../api/api';
 
 const Edit = () => {
   const { laneId } = useParams();
@@ -406,8 +406,6 @@ const Edit = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 text-sm">
-      <Header />
-
       {/* Success Msg */}
       {showSuccess && (
         <div className="fixed top-4 right-4 z-50 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg">

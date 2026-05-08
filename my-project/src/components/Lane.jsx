@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Edit3, Plane, Truck, CheckCircle, XCircle, AlertCircle, Trash2, Clock, Calendar, User, AlertTriangle, ClipboardCheck } from 'lucide-react';
+import { Edit3, Plane, Truck, CheckCircle, XCircle, AlertCircle, Trash2, Clock, Calendar, User, AlertTriangle, ClipboardCheck, PackageCheck, RefreshCw } from 'lucide-react';
 
 function Lane({ lane, onDelete, onManualValidate }) {
   const navigate = useNavigate();
@@ -239,6 +239,85 @@ function Lane({ lane, onDelete, onManualValidate }) {
             <span>Direct Drive - Ground transportation only</span>
           </div>
         )}
+
+        {/* Journey Visualization */}
+        {(() => {
+          const sortedLegs = hasLegs
+            ? [...lane.legs].sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
+            : [];
+
+          const originCity = [lane.originCity, lane.originState, lane.originCountry].filter(Boolean).join(', ');
+          const destCity = [lane.destinationCity, lane.destinationState, lane.destinationCountry].filter(Boolean).join(', ');
+
+          // Build flat items: alternating { type:'node' } and { type:'connector', flight? }
+          const items = [];
+          const addNode = n => items.push({ type: 'node', ...n });
+          const addConn = (flight = null) => items.push({ type: 'connector', flight });
+
+          addNode({ icon: 'truck', label: 'PICKUP', labelTop: true, cityLine: originCity || lane.originStation });
+
+          if (isDirectDrive) {
+            addConn();
+            addNode({ icon: 'drive', label: 'DIRECT DRIVE', labelTop: true });
+          } else if (sortedLegs.length > 0) {
+            sortedLegs.forEach((leg, i) => {
+              addConn();
+              addNode({ time: leg.departureTime, icon: 'dep', label: 'ETD', station: leg.originStation });
+              addConn(leg.flightNumber);
+              const isLast = i === sortedLegs.length - 1;
+              addNode({ time: leg.arrivalTime, icon: isLast ? 'arr' : 'connect', label: isLast ? 'ETA' : 'CONNECT', station: leg.destinationStation });
+            });
+          }
+          addConn();
+          addNode({ time: lane.actualDeliveryTimeBasedOnReceiving, icon: 'delivery', label: 'DELIVERY', cityLine: destCity || lane.destinationStation });
+
+          return (
+            <div className="mt-4 border-t-2 border-gray-200 bg-gray-50 rounded-b-lg overflow-hidden -mx-4 -mb-4">
+              <div className="flex items-center px-4 py-4 w-full overflow-x-auto">
+                {items.map((item, i) => {
+                  if (item.type === 'connector') return (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-1 min-w-[40px]">
+                      {item.flight
+                        ? <span className="px-2 py-0.5 rounded-full bg-blue-100 border border-blue-200 text-xs font-bold text-blue-700 whitespace-nowrap">{item.flight}</span>
+                        : <div className="h-5" />}
+                      <div className="w-full h-[3px] bg-blue-200 rounded-full" />
+                    </div>
+                  );
+                  const node = item;
+                  return (
+                    <div key={i} className="flex flex-col items-center z-10 min-w-[56px] max-w-[80px]">
+                      {/* Above circle */}
+                      <div className="mb-1 text-center h-5 flex items-end justify-center">
+                        {node.labelTop
+                          ? <div className={`text-[9px] font-bold tracking-wider uppercase ${node.icon === 'drive' ? 'text-red-500' : 'text-slate-500'}`}>{node.label}</div>
+                          : node.time
+                            ? <div className="text-[10px] font-semibold text-blue-600 whitespace-nowrap">{node.time}</div>
+                            : null}
+                      </div>
+
+                      {/* Circle */}
+                      <div className={`h-8 w-8 rounded-full border-2 flex items-center justify-center shadow-sm bg-white shrink-0 ${node.icon === 'drive' ? 'border-red-400' : 'border-blue-400'}`}>
+                        {node.icon === 'truck' && <Truck size={14} className="text-blue-500" />}
+                        {node.icon === 'dep' && <Plane size={12} className="text-blue-500" />}
+                        {node.icon === 'arr' && <Plane size={12} className="text-blue-500 rotate-45" />}
+                        {node.icon === 'connect' && <RefreshCw size={11} className="text-blue-400" />}
+                        {node.icon === 'drive' && <Truck size={14} className="text-red-500" />}
+                        {node.icon === 'delivery' && <PackageCheck size={14} className="text-blue-500" />}
+                      </div>
+
+                      {/* Below circle */}
+                      <div className="mt-1 text-center">
+                        {!node.labelTop && <div className={`text-[9px] font-bold tracking-wider uppercase ${node.icon === 'drive' ? 'text-red-500' : 'text-slate-400'}`}>{node.label}</div>}
+                        {node.station && <div className="text-xs font-bold text-slate-800 mt-0.5">{node.station}</div>}
+                        {node.cityLine && <div className="text-[10px] text-slate-500 mt-0.5 leading-tight truncate max-w-[80px]">{node.cityLine}</div>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Metadata Footer */}
         {(lane.lastValidatedAt || lane.lastUpdate || lane.lastUpdatedBy || lane.validationSource === 'MANUAL') && (

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TrendingUp, Download, ChevronRight, Trash2 } from 'lucide-react';
-import Header from '../components/Header';
+import { TrendingUp, Download, ChevronRight, Trash2, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
 import FileUploader from '../components/FileUploader';
 import ErrorMessage from '../components/ErrorMessage';
 import { getLaneMappingExcel, deleteLaneMappingById } from '../api/api';
@@ -20,7 +19,7 @@ function Dashboard() {
   const { data: laneMappings = [], isLoading: laneMappingsLoading, error: laneMappingsError, refetch: refetchLaneMappings } = useLaneMappings();
 
   const {
-    data: counts = { total: 0, valid: 0, invalid: 0 },
+    data: counts = { total: 0, valid: 0, invalid: 0, pending: 0, scheduleMismatch: 0 },
     isLoading: countsLoading,
     error: countsError,
   } = useLaneCounts();
@@ -58,22 +57,23 @@ function Dashboard() {
 
   const validPercentage = counts.total > 0 ? (counts.valid / counts.total) * 100 : 0;
   const invalidPercentage = counts.total > 0 ? (counts.invalid / counts.total) * 100 : 0;
+  const pendingPercentage = counts.total > 0 ? (counts.pending / counts.total) * 100 : 0;
+  const scheduleMismatchPercentage = counts.total > 0 ? (counts.scheduleMismatch / counts.total) * 100 : 0;
 
   // Filter lane mappings
   const filteredLaneMappings = laneMappings.filter(laneMapping => {
     const matchesSearch = laneMapping.laneMappingName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus =
       statusFilter === 'all' ||
-      (statusFilter === 'valid' && laneMapping.validCount > 0 && laneMapping.invalidCount === 0) ||
-      (statusFilter === 'invalid' && laneMapping.invalidCount > 0);
+      (statusFilter === 'valid' && laneMapping.validCount > 0) ||
+      (statusFilter === 'invalid' && laneMapping.invalidCount > 0) ||
+      (statusFilter === 'pending' && laneMapping.pendingCount > 0) ||
+      (statusFilter === 'scheduleMismatch' && laneMapping.scheduleMismatchCount > 0);
     return matchesSearch && matchesStatus;
   });
 
   return (
-    <>
-      <Header />
-
-      <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="min-h-screen">
         <div className="max-w-7xl mx-auto p-6 lg:p-8">
           {/* Display error message if any */}
           {error && (
@@ -97,48 +97,80 @@ function Dashboard() {
             </div>
 
             {/* Right: Stats Cards */}
-            <div className="grid grid-cols-3 gap-4 flex-shrink-0">
+            <div className="grid grid-cols-5 gap-3 flex-shrink-0">
               {/* Total Lanes */}
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600 mb-1">Total Lanes</p>
-                    <p className="text-3xl font-bold text-gray-900">{counts.total ?? 0}</p>
+                    <p className="text-xs font-medium text-gray-600 mb-1">Total Lanes</p>
+                    <p className="text-2xl font-bold text-gray-900">{counts.total ?? 0}</p>
                   </div>
-                  <div className="text-blue-600 text-3xl opacity-20">
-                    <TrendingUp size={32} />
+                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                    <TrendingUp size={18} className="text-blue-600" />
                   </div>
                 </div>
               </div>
 
-              {/* Active Lanes */}
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
+              {/* Valid/Active Lanes */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600 mb-1">Active</p>
-                    <p className="text-3xl font-bold text-green-600">{counts.valid ?? 0}</p>
-                    <p className="text-xs text-gray-500 mt-2">
-                      {validPercentage.toFixed(0)}% healthy
+                    <p className="text-xs font-medium text-gray-600 mb-1">Valid</p>
+                    <p className="text-2xl font-bold text-green-600">{counts.valid ?? 0}</p>
+                    <p className="text-[10px] text-gray-500 mt-1">
+                      {validPercentage.toFixed(0)}%
                     </p>
                   </div>
-                  <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
-                    <span className="text-green-600 font-bold text-lg">✓</span>
+                  <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                    <CheckCircle size={18} className="text-green-600" />
                   </div>
                 </div>
               </div>
 
               {/* Invalid Lanes */}
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600 mb-1">Invalid</p>
-                    <p className="text-3xl font-bold text-red-600">{counts.invalid ?? 0}</p>
-                    <p className="text-xs text-gray-500 mt-2">
-                      {invalidPercentage.toFixed(0)}% attention
+                    <p className="text-xs font-medium text-gray-600 mb-1">Invalid</p>
+                    <p className="text-2xl font-bold text-red-600">{counts.invalid ?? 0}</p>
+                    <p className="text-[10px] text-gray-500 mt-1">
+                      {invalidPercentage.toFixed(0)}%
                     </p>
                   </div>
-                  <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
-                    <span className="text-red-600 font-bold text-lg">!</span>
+                  <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                    <XCircle size={18} className="text-red-600" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Pending Lanes */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-600 mb-1">Pending</p>
+                    <p className="text-2xl font-bold text-amber-600">{counts.pending ?? 0}</p>
+                    <p className="text-[10px] text-gray-500 mt-1">
+                      {pendingPercentage.toFixed(0)}%
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                    <Clock size={18} className="text-amber-600" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Outdated Schedule Lanes */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-600 mb-1">Outdated</p>
+                    <p className="text-2xl font-bold text-orange-600">{counts.scheduleMismatch ?? 0}</p>
+                    <p className="text-[10px] text-gray-500 mt-1">
+                      {scheduleMismatchPercentage.toFixed(0)}%
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+                    <AlertTriangle size={18} className="text-orange-600" />
                   </div>
                 </div>
               </div>
@@ -173,10 +205,10 @@ function Dashboard() {
               </div>
 
               {/* Status Filter */}
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <button
                   onClick={() => setStatusFilter('all')}
-                  className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
+                  className={`px-3 py-2 rounded-lg font-medium text-sm transition-all ${
                     statusFilter === 'all'
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -186,7 +218,7 @@ function Dashboard() {
                 </button>
                 <button
                   onClick={() => setStatusFilter('valid')}
-                  className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
+                  className={`px-3 py-2 rounded-lg font-medium text-sm transition-all ${
                     statusFilter === 'valid'
                       ? 'bg-green-600 text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -196,13 +228,33 @@ function Dashboard() {
                 </button>
                 <button
                   onClick={() => setStatusFilter('invalid')}
-                  className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
+                  className={`px-3 py-2 rounded-lg font-medium text-sm transition-all ${
                     statusFilter === 'invalid'
                       ? 'bg-red-600 text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
                   Invalid
+                </button>
+                <button
+                  onClick={() => setStatusFilter('pending')}
+                  className={`px-3 py-2 rounded-lg font-medium text-sm transition-all ${
+                    statusFilter === 'pending'
+                      ? 'bg-amber-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Pending
+                </button>
+                <button
+                  onClick={() => setStatusFilter('scheduleMismatch')}
+                  className={`px-3 py-2 rounded-lg font-medium text-sm transition-all ${
+                    statusFilter === 'scheduleMismatch'
+                      ? 'bg-orange-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Outdated
                 </button>
               </div>
             </div>
@@ -215,7 +267,26 @@ function Dashboard() {
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredLaneMappings.map(laneMapping => (
+              {filteredLaneMappings.map(laneMapping => {
+                // Determine the primary status of the lane mapping
+                const getStatusBadge = () => {
+                  if (laneMapping.invalidCount > 0) {
+                    return { label: 'Has Invalid', color: 'bg-red-600', textColor: 'text-white' };
+                  }
+                  if (laneMapping.scheduleMismatchCount > 0) {
+                    return { label: 'Outdated', color: 'bg-orange-500', textColor: 'text-white' };
+                  }
+                  if (laneMapping.pendingCount > 0) {
+                    return { label: 'Pending', color: 'bg-amber-500', textColor: 'text-white' };
+                  }
+                  if (laneMapping.validCount > 0) {
+                    return { label: 'All Valid', color: 'bg-green-600', textColor: 'text-white' };
+                  }
+                  return { label: 'Empty', color: 'bg-gray-400', textColor: 'text-white' };
+                };
+                const statusBadge = getStatusBadge();
+
+                return (
                 <div
                   key={laneMapping.laneMappingId}
                   className="group bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg hover:border-blue-200 transition-all duration-300"
@@ -229,8 +300,8 @@ function Dashboard() {
                         </h3>
                         <p className="text-xs text-gray-500 mt-1">ID: {laneMapping.laneMappingId}</p>
                       </div>
-                      <div className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
-                        Active
+                      <div className={`${statusBadge.color} ${statusBadge.textColor} px-3 py-1 rounded-full text-xs font-semibold`}>
+                        {statusBadge.label}
                       </div>
                     </div>
                   </div>
@@ -238,18 +309,26 @@ function Dashboard() {
                   {/* Card Body */}
                   <div className="p-5">
                     {/* Stats Grid */}
-                    <div className="grid grid-cols-3 gap-3 mb-5">
+                    <div className="grid grid-cols-5 gap-2 mb-5">
                       <div className="text-center">
-                        <p className="text-2xl font-bold text-blue-600">{laneMapping.totalCount}</p>
-                        <p className="text-xs text-gray-500 mt-1">Total</p>
+                        <p className="text-xl font-bold text-blue-600">{laneMapping.totalCount}</p>
+                        <p className="text-[10px] text-gray-500 mt-1">Total</p>
                       </div>
-                      <div className="text-center border-l border-r border-gray-100">
-                        <p className="text-2xl font-bold text-green-600">{laneMapping.validCount}</p>
-                        <p className="text-xs text-gray-500 mt-1">Active</p>
+                      <div className="text-center border-l border-gray-100">
+                        <p className="text-xl font-bold text-green-600">{laneMapping.validCount}</p>
+                        <p className="text-[10px] text-gray-500 mt-1">Valid</p>
                       </div>
-                      <div className="text-center">
-                        <p className="text-2xl font-bold text-red-600">{laneMapping.invalidCount}</p>
-                        <p className="text-xs text-gray-500 mt-1">Invalid</p>
+                      <div className="text-center border-l border-gray-100">
+                        <p className="text-xl font-bold text-red-600">{laneMapping.invalidCount}</p>
+                        <p className="text-[10px] text-gray-500 mt-1">Invalid</p>
+                      </div>
+                      <div className="text-center border-l border-gray-100">
+                        <p className="text-xl font-bold text-amber-600">{laneMapping.pendingCount ?? 0}</p>
+                        <p className="text-[10px] text-gray-500 mt-1">Pending</p>
+                      </div>
+                      <div className="text-center border-l border-gray-100">
+                        <p className="text-xl font-bold text-orange-600">{laneMapping.scheduleMismatchCount ?? 0}</p>
+                        <p className="text-[10px] text-gray-500 mt-1">Outdated</p>
                       </div>
                     </div>
 
@@ -296,12 +375,12 @@ function Dashboard() {
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         </div>
-      </main>
-    </>
+      </div>
   );
 }
 

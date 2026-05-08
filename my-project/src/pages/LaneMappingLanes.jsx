@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import Header from '../components/Header';
 import {
   ChevronDown,
   ChevronRight,
@@ -632,7 +631,7 @@ const LaneMappingLanes = () => {
     }
   };
 
-  const handleSearchViableFlights = async (laneId, legSequence, origin, destination, pickupTime, driveToAirportDuration) => {
+  const handleSearchViableFlights = async (laneId, legSequence, origin, destination, pickupTime, driveToAirportDuration, legs) => {
     const key = `${laneId}-${legSequence}`;
     if (openViableFlightsKey === key) {
       setOpenViableFlightsKey(null);
@@ -642,10 +641,20 @@ const LaneMappingLanes = () => {
     setViableFlights(prev => ({ ...prev, [key]: { loading: true, flights: [], error: null } }));
     try {
       let flights;
-      if (pickupTime && driveToAirportDuration) {
+
+      // For subsequent legs (sequence > 1), use the previous leg's arrival time + 1-hour buffer
+      const previousLeg = legs?.find(l => l.sequence === legSequence - 1);
+      const previousLegArrival = previousLeg?.arrivalTime || null;
+
+      if (legSequence > 1 && previousLegArrival) {
+        // Subsequent leg: use previous leg's arrival time (backend adds 1-hour buffer)
+        flights = await getViableFlights(origin, destination, null, 0, 0, 10, previousLegArrival);
+      } else if (pickupTime && driveToAirportDuration) {
+        // First leg: use pickup time + drive duration
         const driveMinutes = (parseInt(driveToAirportDuration) || 0) * 60;
         flights = await getViableFlights(origin, destination, pickupTime, driveMinutes);
       } else {
+        // Fallback: get all cached flights
         flights = await getCachedFlights(origin, destination);
       }
       setViableFlights(prev => ({ ...prev, [key]: { loading: false, flights, error: null } }));
@@ -816,8 +825,6 @@ const LaneMappingLanes = () => {
 
   return (
     <div className="w-full min-h-screen flex flex-col bg-gray-50">
-      <Header />
-
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-5 shadow-lg">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -1718,7 +1725,7 @@ const LaneMappingLanes = () => {
                                       </button>
                                       {leg.originStation && leg.destinationStation && (
                                         <button
-                                          onClick={() => handleSearchViableFlights(lane.id, leg.sequence, leg.originStation, leg.destinationStation, lane.pickUpTime, lane.driveToAirportDuration)}
+                                          onClick={() => handleSearchViableFlights(lane.id, leg.sequence, leg.originStation, leg.destinationStation, lane.pickUpTime, lane.driveToAirportDuration, lane.legs)}
                                           className={`p-1.5 rounded transition ${openViableFlightsKey === `${lane.id}-${leg.sequence}` ? 'bg-blue-100 text-blue-700' : 'hover:bg-blue-100 text-blue-500'}`}
                                           title="Find available flights"
                                         >
@@ -1765,12 +1772,19 @@ const LaneMappingLanes = () => {
                                         if (!vf.flights?.length) {
                                           return <p className="text-xs text-gray-500 italic">No flights found for {leg.originStation} → {leg.destinationStation}.</p>;
                                         }
+                                        const previousLeg = lane.legs?.find(l => l.sequence === leg.sequence - 1);
+                                        const getFlightSearchDescription = () => {
+                                          if (leg.sequence > 1 && previousLeg?.arrivalTime) {
+                                            return `Viable flights (after leg ${leg.sequence - 1} arrival ${previousLeg.arrivalTime} + 1hr buffer) for ${leg.originStation} → ${leg.destinationStation}:`;
+                                          } else if (lane.pickUpTime && lane.driveToAirportDuration) {
+                                            return `Viable flights (pickup ${lane.pickUpTime} + ${lane.driveToAirportDuration} drive) for ${leg.originStation} → ${leg.destinationStation}:`;
+                                          }
+                                          return `All flights for ${leg.originStation} → ${leg.destinationStation}:`;
+                                        };
                                         return (
                                           <div>
                                             <p className="text-xs font-semibold text-blue-700 mb-1.5">
-                                              {lane.pickUpTime && lane.driveToAirportDuration
-                                                ? `Viable flights (pickup ${lane.pickUpTime} + ${lane.driveToAirportDuration} drive) for ${leg.originStation} → ${leg.destinationStation}:`
-                                                : `All flights for ${leg.originStation} → ${leg.destinationStation}:`}
+                                              {getFlightSearchDescription()}
                                             </p>
                                             <table className="text-xs w-full max-w-2xl">
                                               <thead>
@@ -1784,8 +1798,15 @@ const LaneMappingLanes = () => {
                                               </thead>
                                               <tbody>
                                                 {vf.flights.map((f, fi) => (
-                                                  <tr key={fi} className="border-t border-blue-100">
-                                                    <td className="py-1 pr-3 font-medium">{f.flightNumber}</td>
+                                                  <tr key={fi} className={`border-t ${f.nextDay ? 'border-orange-200 bg-orange-50/50' : 'border-blue-100'}`}>
+                                                    <td className="py-1 pr-3 font-medium">
+                                                      {f.flightNumber}
+                                                      {f.nextDay && (
+                                                        <span className="ml-1.5 px-1.5 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-semibold rounded">
+                                                          +1 Day
+                                                        </span>
+                                                      )}
+                                                    </td>
                                                     <td className="py-1 pr-3">{f.departureTime}</td>
                                                     <td className="py-1 pr-3">{f.arrivalTime}</td>
                                                     <td className="py-1 pr-3">{f.operatingDays}</td>

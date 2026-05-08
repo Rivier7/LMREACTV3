@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Search, ArrowRightLeft, Plane, Loader2 } from 'lucide-react';
-import Header from '../components/Header';
 import ErrorMessage from '../components/ErrorMessage';
 import { searchFlights } from '../api/api';
 
@@ -51,9 +50,7 @@ function FlightSearch() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <Header />
-      <main className="p-6">
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
         <div className="max-w-7xl mx-auto">
           {/* Page Header */}
           <div className="mb-6">
@@ -214,7 +211,6 @@ function FlightSearch() {
           )}
         </div>
       </main>
-    </div>
   );
 }
 

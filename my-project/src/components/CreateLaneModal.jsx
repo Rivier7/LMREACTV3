@@ -39,7 +39,13 @@ const CreateLaneModal = ({ laneMappingId, onClose, onCreated }) => {
 
     setLoading(true);
     try {
-      const payload = { ...form, laneMappingId: Number(laneMappingId) };
+      // Build the request payload with lane data nested under 'lane' key
+      const payload = {
+        lane: { ...form },
+        legs: [],
+        directDrive: form.serviceLevel?.toLowerCase() === 'direct drive',
+        laneMappingId: Number(laneMappingId),
+      };
       const created = await createLane(payload);
       onCreated(created);
       onClose();

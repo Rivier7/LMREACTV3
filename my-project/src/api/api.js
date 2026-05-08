@@ -899,14 +899,21 @@ export const getCachedFlights = async (origin, destination) => {
   return await response.json();
 };
 
-// Get viable flights based on pickup time and drive duration
-export const getViableFlights = async (origin, destination, pickupTime, driveMinutes, bufferMinutes = 0, maxResults = 10) => {
-  const params = new URLSearchParams({
-    pickupTime,
-    driveMinutes: driveMinutes.toString(),
-    bufferMinutes: bufferMinutes.toString(),
-    maxResults: maxResults.toString(),
-  });
+// Get viable flights based on pickup time and drive duration (first leg) or previous leg arrival (subsequent legs)
+export const getViableFlights = async (origin, destination, pickupTime, driveMinutes, bufferMinutes = 0, maxResults = 10, previousLegArrival = null) => {
+  const params = new URLSearchParams();
+
+  // For subsequent legs, use previousLegArrival instead of pickupTime/driveMinutes
+  if (previousLegArrival) {
+    params.set('previousLegArrival', previousLegArrival);
+  } else if (pickupTime) {
+    params.set('pickupTime', pickupTime);
+    params.set('driveMinutes', driveMinutes.toString());
+  }
+
+  params.set('bufferMinutes', bufferMinutes.toString());
+  params.set('maxResults', maxResults.toString());
+
   const response = await fetch(
     `${API_BASE_URL}/flights/viable/${encodeURIComponent(origin)}/to/${encodeURIComponent(destination)}?${params}`,
     { headers: getAuthHeaders() }
