@@ -270,19 +270,19 @@ function Dashboard() {
               {filteredLaneMappings.map(laneMapping => {
                 // Determine the primary status of the lane mapping
                 const getStatusBadge = () => {
-                  if (laneMapping.invalidCount > 0) {
-                    return { label: 'Has Invalid', color: 'bg-red-600', textColor: 'text-white' };
-                  }
                   if (laneMapping.scheduleMismatchCount > 0) {
                     return { label: 'Outdated', color: 'bg-orange-500', textColor: 'text-white' };
                   }
                   if (laneMapping.pendingCount > 0) {
                     return { label: 'Pending', color: 'bg-amber-500', textColor: 'text-white' };
                   }
-                  if (laneMapping.validCount > 0) {
+                  if (laneMapping.validCount > 0 && laneMapping.invalidCount === 0) {
                     return { label: 'All Valid', color: 'bg-green-600', textColor: 'text-white' };
                   }
-                  return { label: 'Empty', color: 'bg-gray-400', textColor: 'text-white' };
+                  if (laneMapping.totalLanes === 0) {
+                    return { label: 'Empty', color: 'bg-gray-400', textColor: 'text-white' };
+                  }
+                  return null;
                 };
                 const statusBadge = getStatusBadge();
 
@@ -300,9 +300,11 @@ function Dashboard() {
                         </h3>
                         <p className="text-xs text-gray-500 mt-1">ID: {laneMapping.laneMappingId}</p>
                       </div>
-                      <div className={`${statusBadge.color} ${statusBadge.textColor} px-3 py-1 rounded-full text-xs font-semibold`}>
-                        {statusBadge.label}
-                      </div>
+                      {statusBadge && (
+                        <div className={`${statusBadge.color} ${statusBadge.textColor} px-3 py-1 rounded-full text-xs font-semibold`}>
+                          {statusBadge.label}
+                        </div>
+                      )}
                     </div>
                   </div>
 
