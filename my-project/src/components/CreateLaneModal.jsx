@@ -9,21 +9,21 @@ const field = (label, key, placeholder, required = false) => ({ label, key, plac
 const FIELDS = [
   field('Item Number', 'itemNumber', 'e.g. ITEM-001', true),
   field('Lane Option', 'laneOption', '', true),
-  field('Service Level', 'serviceLevel', ''),
-  field('Pick Up Time', 'pickUpTime', 'e.g. 08:00'),
+  field('Pick Up Time', 'pickUpTime', 'e.g. 08:00', true),
   field('Origin City', 'originCity', 'e.g. Raleigh', true),
   field('Origin State', 'originState', 'e.g. NC'),
-  field('Origin Country', 'originCountry', 'e.g. US'),
+  field('Origin Country', 'originCountry', 'e.g. US', true),
   field('Destination City', 'destinationCity', 'e.g. Orlando', true),
   field('Destination State', 'destinationState', 'e.g. FL'),
-  field('Destination Country', 'destinationCountry', 'e.g. US'),
+  field('Destination Country', 'destinationCountry', 'e.g. US', true),
+  field('Additional Notes', 'additionalNotes', 'Optional notes...'),
 ];
 
 const inputCls =
   'w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500';
 
 const CreateLaneModal = ({ laneMappingId, onClose, onCreated }) => {
-  const [form, setForm] = useState({ laneOption: 'Primary', serviceLevel: 'Air' });
+  const [form, setForm] = useState({ laneOption: 'Primary' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -34,8 +34,11 @@ const CreateLaneModal = ({ laneMappingId, onClose, onCreated }) => {
     setError(null);
 
     if (!form.itemNumber?.trim()) { setError('Item Number is required.'); return; }
+    if (!form.pickUpTime?.trim()) { setError('Pick Up Time is required.'); return; }
     if (!form.originCity?.trim()) { setError('Origin City is required.'); return; }
+    if (!form.originCountry?.trim()) { setError('Origin Country is required.'); return; }
     if (!form.destinationCity?.trim()) { setError('Destination City is required.'); return; }
+    if (!form.destinationCountry?.trim()) { setError('Destination Country is required.'); return; }
 
     setLoading(true);
     try {
@@ -43,7 +46,7 @@ const CreateLaneModal = ({ laneMappingId, onClose, onCreated }) => {
       const payload = {
         lane: { ...form },
         legs: [],
-        directDrive: form.serviceLevel?.toLowerCase() === 'direct drive',
+        directDrive: false,
         laneMappingId: Number(laneMappingId),
       };
       const created = await createLane(payload);
@@ -96,16 +99,7 @@ const CreateLaneModal = ({ laneMappingId, onClose, onCreated }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Service Level</label>
-                <input
-                  className={inputCls}
-                  placeholder="e.g. Air, Direct Drive"
-                  value={form.serviceLevel || ''}
-                  onChange={e => set('serviceLevel', e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Pick Up Time</label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Pick Up Time <span className="text-red-500">*</span></label>
                 <input
                   className={inputCls}
                   placeholder="e.g. 08:00"
@@ -120,7 +114,7 @@ const CreateLaneModal = ({ laneMappingId, onClose, onCreated }) => {
           <div>
             <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Origin</p>
             <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-2">
+              <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">City <span className="text-red-500">*</span></label>
                 <input
                   className={inputCls}
@@ -139,7 +133,7 @@ const CreateLaneModal = ({ laneMappingId, onClose, onCreated }) => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Country</label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Country <span className="text-red-500">*</span></label>
                 <input
                   className={inputCls}
                   placeholder="e.g. US"
@@ -154,7 +148,7 @@ const CreateLaneModal = ({ laneMappingId, onClose, onCreated }) => {
           <div>
             <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Destination</p>
             <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-2">
+              <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">City <span className="text-red-500">*</span></label>
                 <input
                   className={inputCls}
@@ -173,7 +167,7 @@ const CreateLaneModal = ({ laneMappingId, onClose, onCreated }) => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Country</label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Country <span className="text-red-500">*</span></label>
                 <input
                   className={inputCls}
                   placeholder="e.g. US"
@@ -181,6 +175,21 @@ const CreateLaneModal = ({ laneMappingId, onClose, onCreated }) => {
                   onChange={e => set('destinationCountry', e.target.value)}
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Additional Notes */}
+          <div>
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Additional Info</p>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Additional Notes</label>
+              <textarea
+                className={`${inputCls} resize-none`}
+                placeholder="Optional notes..."
+                rows={2}
+                value={form.additionalNotes || ''}
+                onChange={e => set('additionalNotes', e.target.value)}
+              />
             </div>
           </div>
         </form>
