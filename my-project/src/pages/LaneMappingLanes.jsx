@@ -827,7 +827,7 @@ const LaneMappingLanes = () => {
     <div className="w-full min-h-screen flex flex-col bg-gray-50">
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-5 shadow-lg">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
+        <div className="w-full flex justify-between items-center">
           <div>
             <p className="text-blue-200 text-sm font-medium">{laneMapping?.accountName || 'Account'}</p>
             <div className="flex items-center gap-2">
