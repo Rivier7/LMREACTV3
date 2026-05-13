@@ -82,7 +82,7 @@ function AllLanes() {
   return (
     <div className="min-h-screen">
       <main className="p-6">
-        <div className="max-w-[1600px] mx-auto">
+        <div className="w-full">
           {/* Page Header */}
           <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
