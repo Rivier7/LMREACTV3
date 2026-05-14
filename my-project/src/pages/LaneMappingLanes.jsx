@@ -106,6 +106,7 @@ const LaneMappingLanes = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expandedLanes, setExpandedLanes] = useState({});
+  const [expandedRouteGroups, setExpandedRouteGroups] = useState({});
   const [expandedNotes, setExpandedNotes] = useState({});
   const [editingLanes, setEditingLanes] = useState({});
   const [filters, setFilters] = useState({});
@@ -916,9 +917,32 @@ const LaneMappingLanes = () => {
   });
 
   const filteredRouteGroups = groupLanesForDisplay(filteredLanes);
+  const allFilteredRoutesOpen = filteredRouteGroups.length > 0
+    && filteredRouteGroups.every(group => expandedRouteGroups[group.routeKey]);
 
   const handleClearFilters = () => {
     setFilters({});
+  };
+
+  const handleToggleAllRouteGroups = () => {
+    if (allFilteredRoutesOpen) {
+      setExpandedRouteGroups(current => {
+        const next = { ...current };
+        filteredRouteGroups.forEach(group => {
+          delete next[group.routeKey];
+        });
+        return next;
+      });
+      return;
+    }
+
+    setExpandedRouteGroups(current => {
+      const next = { ...current };
+      filteredRouteGroups.forEach(group => {
+        next[group.routeKey] = true;
+      });
+      return next;
+    });
   };
 
   const applyRoute = routePattern => {
@@ -1208,6 +1232,14 @@ const LaneMappingLanes = () => {
                   <span className="bg-slate-900 text-white text-[10px] px-1.5 py-0.5 rounded-full">{activeFilterCount}</span>
                 )}
               </button>
+              <button
+                onClick={handleToggleAllRouteGroups}
+                disabled={filteredRouteGroups.length === 0}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {allFilteredRoutesOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                {allFilteredRoutesOpen ? 'Close all routes' : 'Open all routes'}
+              </button>
               {(filters.quickFilter || activeFilterCount > 0) && (
                 <button onClick={handleClearFilters} className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200 transition flex items-center gap-1">
                   <X size={13} /> Clear
@@ -1278,6 +1310,13 @@ const LaneMappingLanes = () => {
             <RouteLaneCard
               key={group.routeKey}
               group={group}
+              isOpen={!!expandedRouteGroups[group.routeKey]}
+              onToggle={() =>
+                setExpandedRouteGroups(current => ({
+                  ...current,
+                  [group.routeKey]: !current[group.routeKey],
+                }))
+              }
               renderOption={lane => (
             <div
               key={lane.id}

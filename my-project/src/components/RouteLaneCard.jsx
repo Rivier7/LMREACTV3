@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { ChevronDown, ChevronRight, MapPin } from 'lucide-react';
 
 const optionConfig = [
@@ -10,14 +9,12 @@ const optionConfig = [
 const formatLocation = location =>
   [location?.city, location?.state, location?.country].filter(Boolean).join(', ') || 'Unknown location';
 
-function RouteLaneCard({ group, renderOption }) {
-  const [isOpen, setIsOpen] = useState(false);
-
+function RouteLaneCard({ group, renderOption, isOpen = false, onToggle }) {
   return (
     <section className="bg-white rounded-xl border border-gray-200 shadow-md overflow-hidden">
       <button
         type="button"
-        onClick={() => setIsOpen(current => !current)}
+        onClick={onToggle}
         className="w-full px-5 py-4 border-b border-gray-200 bg-slate-50 text-left hover:bg-slate-100 transition"
       >
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
