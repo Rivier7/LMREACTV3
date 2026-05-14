@@ -34,6 +34,54 @@ export interface Lane {
   updatedAt?: string;
 }
 
+export interface Location {
+  city?: string;
+  state?: string;
+  country?: string;
+}
+
+export interface LaneOption {
+  id: number;
+  itemNumber?: string;
+  laneOption?: 'PRIMARY' | 'SECONDARY' | 'ALTERNATIVE' | string;
+  originCity?: string;
+  originState?: string;
+  originCountry?: string;
+  destinationCity?: string;
+  destinationState?: string;
+  destinationCountry?: string;
+  pickUpTime?: string;
+  driveToAirportDuration?: string;
+  serviceLevel?: string;
+  originStation?: string;
+  destinationStation?: string;
+  postArrivalHandlingTime?: string;
+  driveToDestination?: string;
+  actualDeliveryTimeBasedOnReceiving?: string;
+  tatToConsigneeDuration?: string;
+  additionalNotes?: string;
+  validationStatus?: string;
+  legs?: unknown[];
+}
+
+export interface RouteLaneGroup {
+  routeKey: string;
+  origin: Location;
+  destination: Location;
+  primary?: LaneOption | null;
+  secondary?: LaneOption | null;
+  alternative?: LaneOption | null;
+  totalOptions: number;
+  validationSummary?: {
+    pending: number;
+    valid: number;
+    invalid: number;
+    scheduleMismatch: number;
+    apiError: number;
+    outdatedSchedule: number;
+  };
+}
+
 // ============================================================================
 // Error Handling Types
 // ============================================================================

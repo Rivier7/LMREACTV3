@@ -79,14 +79,13 @@ export const updateLane = async (id, updatedLane, legs) => {
   }
 };
 
-export const updateAllTatTime = async (id, updatedLane) => {
-  const response = await fetch(`${BASE_URL2}/updateAllTatTime/${id}`, {
-    method: 'PUT',
+export const updateAllTatTime = async id => {
+  const response = await fetch(`${BASE_URL2}/${id}/calculate-tat`, {
+    method: 'POST',
     headers: {
       ...getAuthHeaders(),
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ updatedLane }),
   });
   if (!response.ok) throw new Error(`Failed to calculate TAT`);
 
@@ -143,7 +142,7 @@ export const updateLaneToDirectDrive = async (id, updatedLane) => {
   const response = await fetch(`${BASE_URL}/updateLane/${id}/directdrive`, {
     method: 'PUT',
     headers: getAuthHeaders(),
-    body: JSON.stringify({ lane: updatedLane }),
+    body: JSON.stringify({ updatedLane }),
   });
   if (!response.ok) throw new Error(`Failed to update lane with ID ${id}`);
   return await response.json();
@@ -438,6 +437,19 @@ export const getLanesByLaneMappingId = async id => {
   }
 };
 
+export const getRouteGroupsByLaneMappingId = async id => {
+  const response = await fetch(`${BASE_URL2}/${id}/route-groups`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch route groups for lane mapping with ID ${id}`);
+  }
+
+  return await response.json();
+};
+
 // ✅ Delete a lane mapping by ID
 export const deleteLaneMappingById = async id => {
   const response = await fetch(`${BASE_URL2}/delete/${id}`, {
@@ -466,6 +478,7 @@ export const deleteLaneById = async id => {
     headers: getAuthHeaders(),
   });
   if (!response.ok) throw new Error(`Failed to delete lane with ID ${id}`);
+  if (response.status === 204) return true;
   return await response.json();
 };
 
@@ -629,6 +642,7 @@ export const deleteAccountById = async id => {
     headers: getAuthHeaders(),
   });
   if (!response.ok) throw new Error(`Failed to delete account with ID ${id}`);
+  if (response.status === 204) return true;
   return await response.json();
 };
 
@@ -788,6 +802,79 @@ export const validateLaneMappingWithProgress = async (id, { onProgress, onComple
       }
     }
   }
+};
+
+// ✅ Bulk validate all lanes (synchronous, one-by-one)
+// NOTE: This is a long-running request. For large lane mappings (100+ lanes),
+// this can take several minutes due to rate limiting (8 API calls/minute).
+// A 10-minute timeout is set to handle this.
+export const bulkValidateLaneMapping = async id => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minute timeout
+
+  try {
+    const response = await fetch(`${BASE_URL2}/${id}/bulk-validate`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    // Handle 409 Conflict (bulk validation already in progress)
+    if (response.status === 409) {
+      const data = await response.json();
+      const err = new Error(data.message || 'Bulk validation already in progress');
+      err.status = 409;
+      err.data = data.data;
+      throw err;
+    }
+
+    if (!response.ok) {
+      let errorMessage = 'Bulk validation failed';
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorMessage;
+      } catch {
+        const errorText = await response.text();
+        if (errorText) errorMessage = errorText;
+      }
+      throw new Error(errorMessage);
+    }
+    return await response.json();
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      const err = new Error('Validation request timed out. Check status to see progress.');
+      err.isTimeout = true;
+      throw err;
+    }
+    throw error;
+  }
+};
+
+// ✅ Get bulk validation status/progress
+export const getBulkValidationStatus = async id => {
+  const response = await fetch(`${BASE_URL2}/${id}/bulk-validation-status`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to get bulk validation status');
+  }
+  return await response.json();
+};
+
+// ✅ Reset stuck bulk validation
+export const resetBulkValidation = async (id, thresholdMinutes = 30) => {
+  const response = await fetch(`${BASE_URL2}/${id}/reset-bulk-validation?thresholdMinutes=${thresholdMinutes}`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to reset bulk validation');
+  }
+  return await response.json();
 };
 
 // ✅ Sync lane schedule (for SCHEDULE_MISMATCH lanes)

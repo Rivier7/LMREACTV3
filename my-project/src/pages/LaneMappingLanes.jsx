@@ -28,22 +28,76 @@ import {
 import EditLaneMappingModal from '../components/EditLaneMappingModal';
 import CreateLaneModal from '../components/CreateLaneModal';
 import LaneManualValidationModal from '../components/LaneManualValidationModal';
+import RouteLaneCard from '../components/RouteLaneCard';
 import {
   getLanesByLaneMappingId,
+  getRouteGroupsByLaneMappingId,
   getLaneMappingById,
-updateLaneMappingLanes,
+  updateLaneMappingLanes,
   getSuggestedRoute,
   getSuggestedRouteByLocation,
   getTAT,
   calculateAllTAT,
   deleteLaneById,
-  validateLaneMappingWithProgress,
+  bulkValidateLaneMapping,
+  getBulkValidationStatus,
   validateAndSaveLane,
   syncLaneSchedule,
   getCachedFlights,
   getViableFlights,
   applySuggestedTimes,
 } from '../api/api.js';
+
+const getRouteKey = lane => {
+  const keyToken = value => (value || 'UNKNOWN').toString().trim().toUpperCase().replace(/\s+/g, '-');
+  return [
+    [lane.originCity, lane.originState, lane.originCountry].map(keyToken).join('-'),
+    [lane.destinationCity, lane.destinationState, lane.destinationCountry].map(keyToken).join('-'),
+  ].join('__');
+};
+
+const getLocation = (lane, prefix) => ({
+  city: lane[`${prefix}City`],
+  state: lane[`${prefix}State`],
+  country: lane[`${prefix}Country`],
+});
+
+const flattenRouteGroups = groups =>
+  (groups || []).flatMap(group =>
+    [group.primary, group.secondary, group.alternative].filter(Boolean)
+  );
+
+const groupLanesForDisplay = lanes => {
+  const groups = new Map();
+
+  lanes.forEach(lane => {
+    const routeKey = getRouteKey(lane);
+    if (!groups.has(routeKey)) {
+      groups.set(routeKey, {
+        routeKey,
+        origin: getLocation(lane, 'origin'),
+        destination: getLocation(lane, 'destination'),
+        primary: null,
+        secondary: null,
+        alternative: null,
+        totalOptions: 0,
+      });
+    }
+
+    const group = groups.get(routeKey);
+    const option = (lane.laneOption || '').toUpperCase();
+    if (option === 'PRIMARY' && !group.primary) group.primary = lane;
+    else if (option === 'SECONDARY' && !group.secondary) group.secondary = lane;
+    else if (option === 'ALTERNATIVE' && !group.alternative) group.alternative = lane;
+    group.totalOptions += 1;
+  });
+
+  return Array.from(groups.values()).sort((a, b) => {
+    const aSort = [a.origin.city, a.origin.state, a.origin.country, a.destination.city, a.destination.state, a.destination.country].filter(Boolean).join('|');
+    const bSort = [b.origin.city, b.origin.state, b.origin.country, b.destination.city, b.destination.state, b.destination.country].filter(Boolean).join('|');
+    return aSort.localeCompare(bSort);
+  });
+};
 
 const LaneMappingLanes = () => {
   const { laneMappingId } = useParams();
@@ -53,6 +107,7 @@ const LaneMappingLanes = () => {
   const [error, setError] = useState(null);
   const [expandedLanes, setExpandedLanes] = useState({});
   const [expandedNotes, setExpandedNotes] = useState({});
+  const [editingLanes, setEditingLanes] = useState({});
   const [filters, setFilters] = useState({});
   const [showColumnFilters, setShowColumnFilters] = useState(false);
   const [showSuggestedRoute, setShowSuggestedRoute] = useState(false);
@@ -252,7 +307,8 @@ const LaneMappingLanes = () => {
     const fetchLanes = async () => {
       setLoading(true);
       try {
-        const data = await getLanesByLaneMappingId(laneMappingId);
+        const routeGroups = await getRouteGroupsByLaneMappingId(laneMappingId);
+        const data = flattenRouteGroups(routeGroups);
         if (!data || data.length === 0) setError('No lanes available for this lane mapping');
         else {
           // Reset hasBeenUpdated to false for all lanes on initial load
@@ -470,19 +526,117 @@ const LaneMappingLanes = () => {
   };
 
   const handleBulkValidate = async () => {
-    setValidationProgress({ status: 'validating', percentage: 0, currentLane: 0, totalLanes: 0, validCount: 0, invalidCount: 0, scheduleMismatchCount: 0, message: 'Starting validation...' });
+    // Use lanes.length if available, otherwise show indeterminate state
+    const estimatedTotal = lanes.length > 0 ? lanes.length : null;
+    setValidationProgress({
+      status: 'validating',
+      percentage: 0,
+      currentLane: 0,
+      totalLanes: estimatedTotal,
+      validCount: 0,
+      invalidCount: 0,
+      scheduleMismatchCount: 0,
+      apiErrorCount: 0,
+      pendingCount: 0,
+      message: estimatedTotal ? 'Starting validation...' : 'Starting validation (loading lanes...)',
+    });
+
     try {
-      await validateLaneMappingWithProgress(laneMappingId, {
-        onProgress: data => setValidationProgress({ ...data, status: 'validating' }),
-        onComplete: async data => {
-          setValidationProgress({ ...data, status: 'completed' });
-          const freshLanes = await getLanesByLaneMappingId(laneMappingId);
-          setLanes(freshLanes.map(lane => ({ ...lane, hasBeenUpdated: false })));
-        },
-        onError: data => setValidationProgress({ ...data, status: 'error' }),
+      const response = await bulkValidateLaneMapping(laneMappingId);
+      const data = response.data;
+
+      // Map backend BulkValidationSummaryDTO to our progress state
+      setValidationProgress({
+        status: 'completed',
+        percentage: 100,
+        currentLane: data.totalLanes,
+        totalLanes: data.totalLanes,
+        validCount: data.valid ?? 0,
+        invalidCount: data.invalid ?? 0,
+        scheduleMismatchCount: data.scheduleMismatch ?? 0,
+        apiErrorCount: data.apiError ?? 0,
+        pendingCount: data.pending ?? 0,
+        message: data.message || 'Validation completed',
       });
+
+      // Refresh lanes to show updated statuses
+      const freshLanes = await getLanesByLaneMappingId(laneMappingId);
+      setLanes(freshLanes.map(lane => ({ ...lane, hasBeenUpdated: false })));
     } catch (err) {
-      setValidationProgress(prev => ({ ...prev, status: 'error', message: err.message || 'Validation failed' }));
+      // Handle 409 Conflict - validation already in progress
+      if (err.status === 409 && err.data) {
+        const data = err.data;
+        setValidationProgress({
+          status: 'in_progress',
+          percentage: data.totalLanes > 0 ? Math.round((data.currentLane / data.totalLanes) * 100) : 0,
+          currentLane: data.currentLane ?? 0,
+          totalLanes: data.totalLanes ?? 0,
+          validCount: data.valid ?? 0,
+          invalidCount: data.invalid ?? 0,
+          scheduleMismatchCount: data.scheduleMismatch ?? 0,
+          apiErrorCount: data.apiError ?? 0,
+          pendingCount: data.pending ?? 0,
+          message: err.message || 'Validation already in progress',
+        });
+      } else if (err.isTimeout) {
+        // Handle timeout - validation may still be running on server
+        setValidationProgress(prev => ({
+          ...prev,
+          status: 'in_progress',
+          message: 'Request timed out. Validation may still be running. Click Refresh to check status.',
+        }));
+      } else {
+        setValidationProgress(prev => ({
+          ...prev,
+          status: 'error',
+          message: err.message || 'Validation failed',
+        }));
+      }
+    }
+  };
+
+  // Refresh validation status (for polling when in_progress)
+  const handleRefreshValidationStatus = async () => {
+    try {
+      const data = await getBulkValidationStatus(laneMappingId);
+
+      if (data.bulkValidationStatus === 'IDLE' || data.bulkValidationStatus === 'COMPLETE') {
+        // Validation finished, refresh lanes and show completed
+        setValidationProgress({
+          status: 'completed',
+          percentage: 100,
+          currentLane: data.totalLanes,
+          totalLanes: data.totalLanes,
+          validCount: data.valid ?? 0,
+          invalidCount: data.invalid ?? 0,
+          scheduleMismatchCount: data.scheduleMismatch ?? 0,
+          apiErrorCount: data.apiError ?? 0,
+          pendingCount: data.pending ?? 0,
+          message: data.message || 'Validation completed',
+        });
+        const freshLanes = await getLanesByLaneMappingId(laneMappingId);
+        setLanes(freshLanes.map(lane => ({ ...lane, hasBeenUpdated: false })));
+      } else if (data.bulkValidationStatus === 'IN_PROGRESS') {
+        setValidationProgress({
+          status: 'in_progress',
+          percentage: data.totalLanes > 0 ? Math.round((data.currentLane / data.totalLanes) * 100) : 0,
+          currentLane: data.currentLane ?? 0,
+          totalLanes: data.totalLanes ?? 0,
+          validCount: data.valid ?? 0,
+          invalidCount: data.invalid ?? 0,
+          scheduleMismatchCount: data.scheduleMismatch ?? 0,
+          apiErrorCount: data.apiError ?? 0,
+          pendingCount: data.pending ?? 0,
+          message: 'Validation in progress...',
+        });
+      } else if (data.bulkValidationStatus === 'FAILED') {
+        setValidationProgress({
+          status: 'error',
+          message: data.message || 'Validation failed',
+        });
+      }
+    } catch (err) {
+      console.error('Failed to refresh validation status:', err);
     }
   };
 
@@ -694,6 +848,8 @@ const LaneMappingLanes = () => {
     if (status === 'VALID') return { label: 'Valid', color: 'bg-green-100 text-green-700', icon: CheckCircle };
     if (status === 'INVALID') return { label: 'Invalid', color: 'bg-red-100 text-red-700', icon: XCircle };
     if (status === 'SCHEDULE_MISMATCH') return { label: 'Outdated Schedule', color: 'bg-orange-100 text-orange-700', icon: AlertTriangle };
+    if (status === 'API_ERROR') return { label: 'API Error', color: 'bg-purple-100 text-purple-700', icon: RefreshCw };
+    if (status === 'OUTDATED_SCHEDULE') return { label: 'Stale Cache', color: 'bg-gray-100 text-gray-700', icon: Clock };
     return { label: 'Pending', color: 'bg-amber-100 text-amber-700', icon: Clock };
   };
 
@@ -759,6 +915,8 @@ const LaneMappingLanes = () => {
     });
   });
 
+  const filteredRouteGroups = groupLanesForDisplay(filteredLanes);
+
   const handleClearFilters = () => {
     setFilters({});
   };
@@ -816,7 +974,7 @@ const LaneMappingLanes = () => {
     return (
       <div className="w-full h-screen flex items-center justify-center bg-white">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <div className="w-8 h-8 border-3 border-slate-900 border-t-transparent rounded-full animate-spin"></div>
           <p className="text-gray-600 text-lg">Loading lanes...</p>
         </div>
       </div>
@@ -826,29 +984,30 @@ const LaneMappingLanes = () => {
   return (
     <div className="w-full min-h-screen flex flex-col bg-gray-50">
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-5 shadow-lg">
+      <div className="bg-slate-900 text-white px-6 py-5 shadow-lg">
         <div className="w-full flex justify-between items-center">
           <div>
-            <p className="text-blue-200 text-sm font-medium">{laneMapping?.accountName || 'Account'}</p>
+            <p className="text-slate-400 text-sm font-medium">{laneMapping?.accountName || 'Account'}</p>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold">{laneMapping?.name || 'Lane Mapping'} Lanes</h1>
               <button
                 onClick={() => setShowEditNameModal(true)}
-                className="p-1.5 rounded-full bg-blue-500 hover:bg-blue-400 transition"
+                className="p-1.5 rounded-full bg-slate-700 hover:bg-slate-600 transition"
                 aria-label="Edit lane mapping name"
               >
                 <Pencil size={14} />
               </button>
             </div>
-            <p className="text-blue-100 text-sm mt-1">
-              {filteredLanes.length} lane{filteredLanes.length !== 1 ? 's' : ''} displayed
+            <p className="text-slate-400 text-sm mt-1">
+              {filteredRouteGroups.length} route{filteredRouteGroups.length !== 1 ? 's' : ''} displayed
+              {' '}with {filteredLanes.length} lane option{filteredLanes.length !== 1 ? 's' : ''}
               {lanes.length > 0 && lanes.length !== filteredLanes.length && ` of ${lanes.length} total`}
             </p>
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowCreateLaneModal(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-400 transition shadow-sm border border-blue-400"
+              className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 text-white rounded-lg font-semibold hover:bg-slate-600 transition shadow-sm border border-slate-600"
             >
               <Plus size={17} />
               New Lane
@@ -856,7 +1015,7 @@ const LaneMappingLanes = () => {
             <button
               onClick={handleSaveChanges}
               disabled={loading || !lanes.some(l => l.hasBeenUpdated)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+              className="flex items-center gap-2 px-5 py-2.5 bg-transparent text-white border border-white/30 rounded-lg font-semibold hover:bg-white/10 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
             >
               <Save size={18} />
               Save All Changes
@@ -868,7 +1027,7 @@ const LaneMappingLanes = () => {
       {/* TAT Success Display */}
       {tatMessage && (
         <div className="bg-green-50 border-b border-green-200 px-6 py-3">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="w-full flex items-center justify-between">
             <div className="flex items-center gap-2 text-green-700">
               <CheckCircle size={18} />
               {tatMessage}
@@ -886,7 +1045,7 @@ const LaneMappingLanes = () => {
       {/* Sync Schedule Toast */}
       {syncToast && (
         <div className="bg-green-50 border-b border-green-200 px-6 py-3">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="w-full flex items-center justify-between">
             <div className="flex items-center gap-2 text-green-700">
               <CheckCircle size={18} />
               {syncToast}
@@ -900,19 +1059,39 @@ const LaneMappingLanes = () => {
 
       {/* Validation Progress */}
       {validationProgress && (
-        <div className={`border-b px-6 py-4 ${validationProgress.status === 'error' ? 'bg-red-50 border-red-200' : validationProgress.status === 'completed' ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
-          <div className="max-w-7xl mx-auto">
+        <div className={`border-b px-6 py-4 ${
+          validationProgress.status === 'error' ? 'bg-red-50 border-red-200' :
+          validationProgress.status === 'completed' ? 'bg-green-50 border-green-200' :
+          validationProgress.status === 'in_progress' ? 'bg-amber-50 border-amber-200' :
+          'bg-slate-50 border-slate-200'
+        }`}>
+          <div className="w-full">
             <div className="flex items-center justify-between mb-2">
-              <span className={`text-sm font-semibold ${validationProgress.status === 'error' ? 'text-red-700' : validationProgress.status === 'completed' ? 'text-green-700' : 'text-blue-700'}`}>
+              <span className={`text-sm font-semibold ${
+                validationProgress.status === 'error' ? 'text-red-700' :
+                validationProgress.status === 'completed' ? 'text-green-700' :
+                validationProgress.status === 'in_progress' ? 'text-amber-700' :
+                'text-slate-700'
+              }`}>
                 {validationProgress.status === 'validating' && 'Validating Lanes...'}
+                {validationProgress.status === 'in_progress' && 'Validation In Progress (Another Session)'}
                 {validationProgress.status === 'completed' && 'Validation Complete'}
                 {validationProgress.status === 'error' && 'Validation Failed'}
               </span>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                {validationProgress.status === 'in_progress' && (
+                  <button
+                    onClick={handleRefreshValidationStatus}
+                    className="flex items-center gap-1 text-xs px-2 py-1 bg-amber-600 text-white rounded hover:bg-amber-700"
+                  >
+                    <RefreshCw size={12} /> Refresh
+                  </button>
+                )}
                 {validationProgress.status !== 'validating' && (
                   <button
                     onClick={() => setValidationProgress(null)}
                     className="text-gray-500 hover:text-gray-700 p-1"
+                    title="Dismiss"
                   >
                     <X size={16} />
                   </button>
@@ -925,15 +1104,22 @@ const LaneMappingLanes = () => {
                 {/* Progress Bar */}
                 <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2 overflow-hidden">
                   <div
-                    className={`h-2.5 rounded-full transition-all duration-300 ${validationProgress.status === 'completed' ? 'bg-green-500' : 'bg-blue-500'}`}
+                    className={`h-2.5 rounded-full transition-all duration-300 ${
+                      validationProgress.status === 'completed' ? 'bg-green-500' :
+                      validationProgress.status === 'in_progress' ? 'bg-amber-500' : 'bg-slate-700'
+                    }`}
                     style={{ width: `${validationProgress.percentage ?? 0}%` }}
                   />
                 </div>
                 <div className="flex items-center justify-between text-xs text-gray-600">
-                  <span>{validationProgress.message || `${validationProgress.currentLane ?? 0}/${validationProgress.totalLanes ?? 0} lanes validated`}</span>
+                  <span>
+                    {validationProgress.status === 'in_progress'
+                      ? `Validation in progress by another session (${validationProgress.currentLane ?? 0}/${validationProgress.totalLanes ?? 0})`
+                      : validationProgress.message || `${validationProgress.currentLane ?? 0}/${validationProgress.totalLanes ?? 0} lanes validated`}
+                  </span>
                   <span className="font-medium">{validationProgress.percentage ?? 0}%</span>
                 </div>
-                <div className="flex items-center gap-4 mt-2 text-xs">
+                <div className="flex items-center gap-3 mt-2 text-xs flex-wrap">
                   <span className="flex items-center gap-1 text-green-700">
                     <CheckCircle size={13} /> Valid: <strong>{validationProgress.validCount ?? 0}</strong>
                   </span>
@@ -941,8 +1127,18 @@ const LaneMappingLanes = () => {
                     <XCircle size={13} /> Invalid: <strong>{validationProgress.invalidCount ?? 0}</strong>
                   </span>
                   <span className="flex items-center gap-1 text-orange-600">
-                    <AlertTriangle size={13} /> Outdated: <strong>{validationProgress.scheduleMismatchCount ?? 0}</strong>
+                    <AlertTriangle size={13} /> Mismatch: <strong>{validationProgress.scheduleMismatchCount ?? 0}</strong>
                   </span>
+                  {(validationProgress.apiErrorCount ?? 0) > 0 && (
+                    <span className="flex items-center gap-1 text-purple-700">
+                      <RefreshCw size={13} /> API Error: <strong>{validationProgress.apiErrorCount}</strong>
+                    </span>
+                  )}
+                  {(validationProgress.pendingCount ?? 0) > 0 && (
+                    <span className="flex items-center gap-1 text-gray-600">
+                      <Clock size={13} /> Pending: <strong>{validationProgress.pendingCount}</strong>
+                    </span>
+                  )}
                 </div>
               </>
             )}
@@ -965,7 +1161,7 @@ const LaneMappingLanes = () => {
       {/* Error Display */}
       {error && !loading && (
         <div className="bg-red-50 border-b border-red-200 px-6 py-3">
-          <div className="max-w-7xl mx-auto flex items-center gap-2 text-red-700">
+          <div className="w-full flex items-center gap-2 text-red-700">
             <XCircle size={18} />
             {error}
           </div>
@@ -974,64 +1170,72 @@ const LaneMappingLanes = () => {
 
 
       {/* Filter Bar */}
-      <div className="bg-white border-b border-gray-200 px-6 py-2 shadow-sm">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center gap-2 flex-wrap">
-            <input
-              type="text"
-              placeholder="Search lanes..."
-              value={filters.quickFilter || ''}
-              onChange={e => setFilters({ ...filters, quickFilter: e.target.value })}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-52"
-            />
-            <select
-              value={filters.validationStatus || ''}
-              onChange={e => setFilters(prev => ({ ...prev, validationStatus: e.target.value }))}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-            >
-              <option value="">All Statuses</option>
-              <option value="PENDING">Pending</option>
-              <option value="VALID">Valid</option>
-              <option value="INVALID">Invalid</option>
-              <option value="SCHEDULE_MISMATCH">Outdated Schedule</option>
-            </select>
-            <button
-              onClick={() => setShowColumnFilters(!showColumnFilters)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${showColumnFilters || activeFilterCount > 0
-                ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
-                }`}
-            >
-              <Filter size={13} />
-              Filters
-              {activeFilterCount > 0 && (
-                <span className="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">{activeFilterCount}</span>
-              )}
-            </button>
-            <button
-              onClick={handleBulkValidate}
-              disabled={validationProgress?.status === 'validating' || loading}
-              className="flex items-center gap-1 px-3 py-1.5 bg-orange-500 text-white rounded-lg text-xs font-medium hover:bg-orange-600 transition disabled:opacity-50"
-            >
-              {validationProgress?.status === 'validating' ? (
-                <><svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg> Validating...</>
-              ) : (
-                <><CheckCircle size={13} /> Validate All</>
-              )}
-            </button>
-            <button
-              onClick={computeAllTAT}
-              disabled={loading}
-              className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition disabled:opacity-50"
-            >
-              <Clock size={13} />
-              Calc TAT
-            </button>
-            {(filters.quickFilter || activeFilterCount > 0) && (
-              <button onClick={handleClearFilters} className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200 transition flex items-center gap-1">
-                <X size={13} /> Clear
+      <div className="px-32 py-4">
+        <div className="bg-white rounded-2xl shadow-md border border-gray-200 px-4 py-3 w-full">
+          <div className="flex items-center justify-between gap-2">
+            {/* Left: filters */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <input
+                type="text"
+                placeholder="Search lanes..."
+                value={filters.quickFilter || ''}
+                onChange={e => setFilters({ ...filters, quickFilter: e.target.value })}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent w-52"
+              />
+              <select
+                value={filters.validationStatus || ''}
+                onChange={e => setFilters(prev => ({ ...prev, validationStatus: e.target.value }))}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-slate-500 bg-white"
+              >
+                <option value="">All Statuses</option>
+                <option value="PENDING">Pending</option>
+                <option value="VALID">Valid</option>
+                <option value="INVALID">Invalid</option>
+                <option value="SCHEDULE_MISMATCH">Outdated Schedule</option>
+                <option value="API_ERROR">API Error</option>
+                <option value="OUTDATED_SCHEDULE">Stale Cache</option>
+              </select>
+              <button
+                onClick={() => setShowColumnFilters(!showColumnFilters)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${showColumnFilters || activeFilterCount > 0
+                  ? 'bg-slate-100 text-slate-800 border border-slate-400'
+                  : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
+                  }`}
+              >
+                <Filter size={13} />
+                Filters
+                {activeFilterCount > 0 && (
+                  <span className="bg-slate-900 text-white text-[10px] px-1.5 py-0.5 rounded-full">{activeFilterCount}</span>
+                )}
               </button>
-            )}
+              {(filters.quickFilter || activeFilterCount > 0) && (
+                <button onClick={handleClearFilters} className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200 transition flex items-center gap-1">
+                  <X size={13} /> Clear
+                </button>
+              )}
+            </div>
+            {/* Right: actions */}
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={handleBulkValidate}
+                disabled={validationProgress?.status === 'validating' || validationProgress?.status === 'in_progress' || loading}
+                className="flex items-center gap-1 px-3 py-1.5 bg-orange-500 text-white rounded-lg text-xs font-medium hover:bg-orange-600 transition disabled:opacity-50"
+              >
+                {validationProgress?.status === 'validating' || validationProgress?.status === 'in_progress' ? (
+                  <><svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg> {validationProgress?.status === 'in_progress' ? 'In Progress...' : 'Validating...'}</>
+                ) : (
+                  <><CheckCircle size={13} /> Validate All</>
+                )}
+              </button>
+              <button
+                onClick={computeAllTAT}
+                disabled={loading}
+                className="flex items-center gap-1 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-700 transition disabled:opacity-50"
+              >
+                <Clock size={13} />
+                Calc TAT
+              </button>
+            </div>
           </div>
 
           {/* Collapsible Column Filters */}
@@ -1043,7 +1247,7 @@ const LaneMappingLanes = () => {
                   <select
                     value={filters[col] || ''}
                     onChange={e => setFilters(prev => ({ ...prev, [col]: e.target.value }))}
-                    className={`w-full px-2 py-1 text-xs border rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${filters[col] ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}`}
+                    className={`w-full px-2 py-1 text-xs border rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-slate-500 ${filters[col] ? 'border-slate-700 bg-slate-50' : 'border-gray-300'}`}
                   >
                     <option value="">All</option>
                     {getUniqueValues(col).map(v => <option key={v} value={v}>{v}</option>)}
@@ -1055,7 +1259,7 @@ const LaneMappingLanes = () => {
                 <select
                   value={filters.tatStatus || ''}
                   onChange={e => setFilters(prev => ({ ...prev, tatStatus: e.target.value }))}
-                  className={`w-full px-2 py-1 text-xs border rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${filters.tatStatus ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}`}
+                  className={`w-full px-2 py-1 text-xs border rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-slate-500 ${filters.tatStatus ? 'border-slate-700 bg-slate-50' : 'border-gray-300'}`}
                 >
                   <option value="">All</option>
                   <option value="tbd">TBD Only</option>
@@ -1068,16 +1272,20 @@ const LaneMappingLanes = () => {
       </div>
 
       {/* Lanes List */}
-      <div className="flex-1 px-6 py-4">
-        <div className="max-w-7xl mx-auto space-y-3">
-          {filteredLanes.map(lane => (
+      <div className="flex-1 px-32 py-4">
+        <div className="w-full space-y-3">
+          {filteredRouteGroups.map(group => (
+            <RouteLaneCard
+              key={group.routeKey}
+              group={group}
+              renderOption={lane => (
             <div
               key={lane.id}
-              className={`bg-white rounded-xl border shadow-md transition-all overflow-hidden ${lane.hasBeenUpdated ? 'border-amber-300 ring-1 ring-amber-200' : expandedLanes[lane.id] ? 'border-blue-400 ring-1 ring-blue-100' : 'border-gray-200 hover:border-gray-300'} hover:shadow-lg ${expandedLanes[lane.id] ? 'border-l-4 border-l-blue-500' : 'hover:border-l-4 hover:border-l-blue-300'}`}
+              className={`bg-white rounded-xl border shadow-md transition-all overflow-hidden ${lane.hasBeenUpdated ? 'border-amber-300 ring-1 ring-amber-200' : expandedLanes[lane.id] ? 'border-slate-400 ring-1 ring-slate-100' : 'border-gray-200 hover:border-gray-300'} hover:shadow-lg ${expandedLanes[lane.id] ? 'border-l-4 border-l-slate-700' : 'hover:border-l-4 hover:border-l-slate-300'}`}
             >
               {/* Summary Row */}
               <div
-                className="px-4 py-3 flex items-center gap-4 cursor-pointer"
+                className="px-4 py-5 flex items-center gap-2 cursor-pointer"
                 onClick={() => toggleLaneExpansion(lane.id)}
               >
                 {/* Expand Toggle */}
@@ -1092,24 +1300,24 @@ const LaneMappingLanes = () => {
                 {/* Route Display */}
                 <div className="flex items-center gap-4 shrink-0">
                   <div>
-                    <div className="text-2xl font-bold text-slate-900 tracking-wide leading-none">{lane.originStation || '---'}</div>
-                    <div className="text-xs text-slate-500 mt-0.5">{[lane.originCity, lane.originState, lane.originCountry].filter(Boolean).join(', ') || '---'}</div>
+                    <div className="text-lg font-bold text-slate-900 tracking-wide leading-none">{lane.originStation || '---'}</div>
+                    <div className="text-[10px] text-slate-500 mt-0.5 max-w-[90px] truncate">{[lane.originCity, lane.originState, lane.originCountry].filter(Boolean).join(', ') || '---'}</div>
                   </div>
-                  <div className="flex items-center gap-2 group">
-                    <div className="h-px w-8 bg-slate-300 group-hover:bg-blue-300 transition-colors" />
-                    <div className="h-9 w-9 rounded-full bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center shadow-sm shrink-0 group-hover:bg-blue-100 group-hover:border-blue-400 transition-colors">
-                      <Plane size={15} />
+                  <div className="flex items-center gap-1.5 group">
+                    <div className="h-px w-5 bg-slate-300 group-hover:bg-slate-400 transition-colors" />
+                    <div className="h-7 w-7 rounded-full bg-slate-100 border border-slate-300 text-slate-600 flex items-center justify-center shadow-sm shrink-0 group-hover:bg-slate-200 group-hover:border-slate-500 transition-colors">
+                      <Plane size={12} />
                     </div>
-                    <div className="h-px w-8 bg-slate-300 group-hover:bg-blue-300 transition-colors" />
+                    <div className="h-px w-5 bg-slate-300 group-hover:bg-slate-400 transition-colors" />
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-slate-900 tracking-wide leading-none">{lane.destinationStation || '---'}</div>
-                    <div className="text-xs text-slate-500 mt-0.5">{[lane.destinationCity, lane.destinationState, lane.destinationCountry].filter(Boolean).join(', ') || '---'}</div>
+                    <div className="text-lg font-bold text-slate-900 tracking-wide leading-none">{lane.destinationStation || '---'}</div>
+                    <div className="text-[10px] text-slate-500 mt-0.5 max-w-[90px] truncate">{[lane.destinationCity, lane.destinationState, lane.destinationCountry].filter(Boolean).join(', ') || '---'}</div>
                   </div>
                 </div>
 
                 {/* Info Cards */}
-                <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-hidden">
+                <div className="flex items-center gap-1 shrink-0">
                   {(() => {
                     const opt = lane.laneOption?.toLowerCase();
                     const optCls = opt === 'primary'     ? 'bg-green-100 border-green-400 text-green-600'
@@ -1126,71 +1334,44 @@ const LaneMappingLanes = () => {
                       { label: 'Delivery', value: lane.actualDeliveryTimeBasedOnReceiving, cls: 'bg-gray-50 border-gray-200 text-gray-400', val: 'text-gray-700' },
                       { label: 'TAT',      value: lane.tatToConsigneeDuration,             cls: 'bg-gray-50 border-gray-200 text-gray-400', val: 'text-gray-700 font-bold' },
                     ].map(({ label, value, cls, val }) => (
-                      <div key={label} className={`rounded-xl px-2.5 py-1 border shrink-0 ${cls}`}>
-                        <div className={`text-[10px] uppercase tracking-wide leading-none ${cls.split(' ')[2]}`}>{label}</div>
-                        <div className={`text-xs mt-0.5 font-semibold leading-none ${val}`}>{value || '—'}</div>
+                      <div key={label} className={`rounded-lg px-2 py-0.5 border shrink-0 ${cls}`}>
+                        <div className={`text-[8px] uppercase tracking-wide leading-none ${cls.split(' ')[2]}`}>{label}</div>
+                        <div className={`text-[10px] mt-0.5 font-semibold leading-none ${val}`}>{value || '—'}</div>
                       </div>
                     ));
                   })()}
                 </div>
 
+                <div className="flex-1" />
+
                 {/* Status + Actions */}
                 <div className="flex items-center gap-2 shrink-0" onClick={e => e.stopPropagation()}>
-                  {/* Status badges group */}
-                  <div className="flex items-center gap-1.5">
-                    {lane.hasBeenUpdated && (
-                      <span className="px-2 py-0.5 rounded-md bg-orange-100 text-orange-700 text-xs font-medium">Unsaved</span>
-                    )}
-                    {savedLaneId === lane.id && (
-                      <span className="px-2 py-0.5 rounded-md bg-green-100 text-green-700 text-xs font-medium animate-pulse">Saved!</span>
-                    )}
-                    {(() => {
-                      const vs = getValidationStatusDisplay(lane);
-                      const StatusIcon = vs.icon;
-                      return (
-                        <div className="flex items-center gap-1">
-                          <span className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold ${vs.color}`}>
-                            <StatusIcon size={12} />
-                            {vs.label}
-                            {lane.validationSource === 'MANUAL' && (
-                              <span className="ml-0.5 text-[10px] opacity-75">(Manual)</span>
-                            )}
-                          </span>
-                          <button
-                            onClick={() => handleOpenManualValidation(lane)}
-                            className="p-1 hover:bg-purple-100 rounded transition-colors text-purple-500 hover:text-purple-700"
-                            title="Manually set validation status"
-                          >
-                            <Pencil size={12} />
-                          </button>
-                        </div>
-                      );
-                    })()}
-                    {getLaneErrorMessages(lane) && (
-                      <span className="px-2 py-0.5 rounded-md bg-red-100 text-red-700 text-xs font-medium">
-                        {getLaneErrorMessages(lane).length} error{getLaneErrorMessages(lane).length !== 1 ? 's' : ''}
-                      </span>
-                    )}
-                    {lane.lastValidatedAt && (
-                      <span className="flex items-center gap-1 text-xs text-gray-400">
-                        <Clock size={11} />
-                        {formatDateTime(lane.lastValidatedAt)}
-                      </span>
-                    )}
-                    {lane.syncMessage && lane.validationStatus === 'SCHEDULE_MISMATCH' && (
-                      <span className="flex items-center gap-1 text-xs text-orange-600 bg-orange-50 border border-orange-200 rounded px-2 py-0.5 max-w-[180px] truncate" title={lane.syncMessage}>
-                        <AlertTriangle size={11} />
-                        {lane.syncMessage}
-                      </span>
-                    )}
-                  </div>
+                  {/* Unsaved / Saved transient badges */}
+                  {lane.hasBeenUpdated && (
+                    <span className="px-2 py-0.5 rounded-md bg-orange-100 text-orange-700 text-xs font-medium">Unsaved</span>
+                  )}
+                  {savedLaneId === lane.id && (
+                    <span className="px-2 py-0.5 rounded-md bg-green-100 text-green-700 text-xs font-medium animate-pulse">Saved!</span>
+                  )}
 
-                  {/* Primary action */}
+                  {/* Validation status badge */}
+                  {(() => {
+                    const vs = getValidationStatusDisplay(lane);
+                    const StatusIcon = vs.icon;
+                    return (
+                      <span className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-semibold ${vs.color}`}>
+                        <StatusIcon size={12} />
+                        {vs.label}
+                      </span>
+                    );
+                  })()}
+
+                  {/* Primary action button */}
                   {lane.validationStatus === 'SCHEDULE_MISMATCH' && scheduleMismatchData[lane.id]?.hasSuggestedTimes && (
                     <button
                       onClick={() => handleApplySuggestedTimes(lane.id)}
                       disabled={applyingTimesLaneIds.has(lane.id) || loading}
-                      className="flex items-center gap-1 px-2.5 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition disabled:opacity-50"
+                      className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition disabled:opacity-50"
                     >
                       {applyingTimesLaneIds.has(lane.id) ? <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg> : <CheckCircle size={12} />}
                       Apply
@@ -1200,7 +1381,7 @@ const LaneMappingLanes = () => {
                     <button
                       onClick={() => handleSyncSchedule(lane.id)}
                       disabled={syncingLaneIds.has(lane.id) || loading}
-                      className="flex items-center gap-1 px-2.5 py-1.5 bg-orange-500 text-white rounded-lg text-xs font-medium hover:bg-orange-600 transition disabled:opacity-50"
+                      className="flex items-center gap-1 px-3 py-1.5 bg-orange-500 text-white rounded-lg text-xs font-medium hover:bg-orange-600 transition disabled:opacity-50"
                     >
                       {syncingLaneIds.has(lane.id) ? <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg> : <RefreshCw size={12} />}
                       Sync
@@ -1210,19 +1391,23 @@ const LaneMappingLanes = () => {
                     <button
                       onClick={() => handleValidateAndSave(lane.id)}
                       disabled={validateAndSavingLaneIds.has(lane.id) || loading}
-                      className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition disabled:opacity-50 whitespace-nowrap"
+                      className="flex items-center gap-1 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-700 transition disabled:opacity-50 whitespace-nowrap"
                     >
                       {validateAndSavingLaneIds.has(lane.id) ? <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg> : <CheckCircle size={12} />}
-                      Validate & Save
+                      Validate
                     </button>
                   )}
 
                   {/* Divider */}
-                  <div className="w-px h-5 bg-gray-200 mx-1" />
+                  <div className="w-px h-5 bg-gray-200 mx-0.5" />
 
-                  {/* Utility icons pushed right */}
-                  <button onClick={() => computeTATForLane(lane.id)} disabled={loading} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-blue-600 disabled:opacity-50" title="Calculate TAT">
-                    <Clock size={15} />
+                  {/* Edit + Calc TAT + Delete */}
+                  <button
+                    onClick={() => setEditingLanes(prev => ({ ...prev, [lane.id]: !prev[lane.id] }))}
+                    className={`p-1.5 rounded-lg transition-colors ${editingLanes[lane.id] ? 'bg-slate-900 text-white' : 'hover:bg-gray-100 text-gray-400 hover:text-slate-900'}`}
+                    title="Edit Lane"
+                  >
+                    <Pencil size={15} />
                   </button>
                   <button onClick={() => handleDeleteLane(lane.id)} disabled={loading} className="p-1.5 hover:bg-red-50 rounded-lg transition-colors text-gray-400 hover:text-red-600 disabled:opacity-50" title="Delete Lane">
                     <Trash2 size={15} />
@@ -1231,8 +1416,32 @@ const LaneMappingLanes = () => {
               </div>
 
               {/* Expanded Detail Panel */}
-              {expandedLanes[lane.id] && (
+              {editingLanes[lane.id] && (
                 <div className="border-t border-gray-200 bg-gray-50 px-5 py-3">
+                  {/* Panel toolbar */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      {lane.lastValidatedAt && (
+                        <span className="flex items-center gap-1">
+                          <Clock size={11} />
+                          Validated {formatDateTime(lane.lastValidatedAt)}
+                        </span>
+                      )}
+                      {getLaneErrorMessages(lane) && (
+                        <span className="px-2 py-0.5 rounded-md bg-red-100 text-red-700 font-medium">
+                          {getLaneErrorMessages(lane).length} error{getLaneErrorMessages(lane).length !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => handleOpenManualValidation(lane)}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-purple-600 hover:bg-purple-50 border border-purple-200 hover:border-purple-400 transition"
+                      title="Manually set validation status"
+                    >
+                      <Pencil size={11} />
+                      Set Status Manually
+                    </button>
+                  </div>
                   {/* Schedule Mismatch Banner */}
                   {scheduleMismatchData[lane.id] && (
                     <div className="mb-4 p-4 bg-amber-50 border border-amber-300 rounded-lg">
@@ -1370,7 +1579,7 @@ const LaneMappingLanes = () => {
                               type="text"
                               value={lane.originCity || ''}
                               onChange={e => handleLaneChange(lane.id, 'originCity', e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
                             />
                           </div>
                           <div>
@@ -1379,7 +1588,7 @@ const LaneMappingLanes = () => {
                               type="text"
                               value={lane.originState || ''}
                               onChange={e => handleLaneChange(lane.id, 'originState', e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
                             />
                           </div>
                           <div>
@@ -1388,7 +1597,7 @@ const LaneMappingLanes = () => {
                               type="text"
                               value={lane.originCountry || ''}
                               onChange={e => handleLaneChange(lane.id, 'originCountry', e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
                             />
                           </div>
                         </div>
@@ -1402,7 +1611,7 @@ const LaneMappingLanes = () => {
                               type="text"
                               value={lane.destinationCity || ''}
                               onChange={e => handleLaneChange(lane.id, 'destinationCity', e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
                             />
                           </div>
                           <div>
@@ -1411,7 +1620,7 @@ const LaneMappingLanes = () => {
                               type="text"
                               value={lane.destinationState || ''}
                               onChange={e => handleLaneChange(lane.id, 'destinationState', e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
                             />
                           </div>
                           <div>
@@ -1420,7 +1629,7 @@ const LaneMappingLanes = () => {
                               type="text"
                               value={lane.destinationCountry || ''}
                               onChange={e => handleLaneChange(lane.id, 'destinationCountry', e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
                             />
                           </div>
                         </div>
@@ -1442,7 +1651,7 @@ const LaneMappingLanes = () => {
                             type="text"
                             value={lane.itemNumber || ''}
                             onChange={e => handleLaneChange(lane.id, 'itemNumber', e.target.value)}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
                           />
                         </div>
                         <div>
@@ -1450,7 +1659,7 @@ const LaneMappingLanes = () => {
                           <select
                             value={lane.laneOption || ''}
                             onChange={e => handleLaneChange(lane.id, 'laneOption', e.target.value)}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
                           >
                             <option value="">Select Option</option>
                             <option value="Primary">Primary</option>
@@ -1464,7 +1673,7 @@ const LaneMappingLanes = () => {
                             type="text"
                             value={lane.pickUpTime || ''}
                             onChange={e => handleLaneChange(lane.id, 'pickUpTime', e.target.value)}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
                           />
                         </div>
                         <div>
@@ -1474,7 +1683,7 @@ const LaneMappingLanes = () => {
                             value={lane.driveToAirportDuration || ''}
                             onChange={e => handleLaneChange(lane.id, 'driveToAirportDuration', e.target.value)}
                             placeholder="e.g. 3hr"
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
                           />
                         </div>
                         <div>
@@ -1484,7 +1693,7 @@ const LaneMappingLanes = () => {
                             value={lane.serviceLevel || ''}
                             onChange={e => handleLaneChange(lane.id, 'serviceLevel', e.target.value)}
                             placeholder="e.g. NFO, DIRECT DRIVE"
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
                           />
                         </div>
                       </div>
@@ -1521,7 +1730,7 @@ const LaneMappingLanes = () => {
                           onClick={() => handleAddLeg(lane.id)}
                           disabled={(lane.legs?.length ?? 0) >= 3}
                           title={(lane.legs?.length ?? 0) >= 3 ? 'Maximum of 3 legs allowed' : undefined}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                          className="flex items-center gap-1 px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-lg hover:bg-slate-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           <Plus size={14} />
                           Add Leg
@@ -1597,7 +1806,7 @@ const LaneMappingLanes = () => {
                                 }}
                                 className={`w-full px-3 py-1.5 rounded-lg text-xs font-semibold transition ${selectedRouteIndex === routeIndex
                                   ? 'bg-green-600 text-white hover:bg-green-700'
-                                  : 'bg-blue-600 text-white hover:bg-blue-700'
+                                  : 'bg-slate-900 text-white hover:bg-slate-700'
                                   }`}
                               >
                                 {selectedRouteIndex === routeIndex ? 'Apply This Route' : 'Select'}
@@ -1639,7 +1848,7 @@ const LaneMappingLanes = () => {
                                           type="number"
                                           value={leg[col] || ''}
                                           onChange={e => handleLegChange(lane.id, leg.id, col, e.target.value)}
-                                          className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                          className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-slate-400"
                                         />
                                       ) : col === 'legValidationMessage' ? (
                                         (() => {
@@ -1653,8 +1862,8 @@ const LaneMappingLanes = () => {
                                                   {legErrs.errors.join('; ')}
                                                 </div>
                                                 {hasSuggestions && (
-                                                  <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg min-w-[320px]">
-                                                    <p className="text-xs font-semibold text-blue-700 mb-1.5">
+                                                  <div className="mt-2 p-2 bg-slate-50 border border-slate-200 rounded-lg min-w-[320px]">
+                                                    <p className="text-xs font-semibold text-slate-700 mb-1.5">
                                                       Available flights for {legErrs.suggestedAlternatives[0].origin} → {legErrs.suggestedAlternatives[0].destination}:
                                                     </p>
                                                     <table className="w-full text-xs">
@@ -1669,7 +1878,7 @@ const LaneMappingLanes = () => {
                                                       </thead>
                                                       <tbody>
                                                         {legErrs.suggestedAlternatives.map((alt, idx) => (
-                                                          <tr key={idx} className="border-t border-blue-100">
+                                                          <tr key={idx} className="border-t border-slate-100">
                                                             <td className="py-1 pr-2 font-medium">{alt.flightNumber}</td>
                                                             <td className="py-1 pr-2">{alt.departureTime}</td>
                                                             <td className="py-1 pr-2">{alt.arrivalTime}</td>
@@ -1677,7 +1886,7 @@ const LaneMappingLanes = () => {
                                                             <td className="py-1">
                                                               <button
                                                                 onClick={() => applyAlternative(lane.id, leg.sequence, alt)}
-                                                                className="px-2 py-0.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition whitespace-nowrap"
+                                                                className="px-2 py-0.5 bg-slate-900 text-white rounded text-xs hover:bg-slate-700 transition whitespace-nowrap"
                                                               >
                                                                 Select
                                                               </button>
@@ -1709,7 +1918,7 @@ const LaneMappingLanes = () => {
                                           type="text"
                                           value={leg[col] || ''}
                                           onChange={e => handleLegChange(lane.id, leg.id, col, e.target.value)}
-                                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-slate-400"
                                         />
                                       )}
                                     </td>
@@ -1726,7 +1935,7 @@ const LaneMappingLanes = () => {
                                       {leg.originStation && leg.destinationStation && (
                                         <button
                                           onClick={() => handleSearchViableFlights(lane.id, leg.sequence, leg.originStation, leg.destinationStation, lane.pickUpTime, lane.driveToAirportDuration, lane.legs)}
-                                          className={`p-1.5 rounded transition ${openViableFlightsKey === `${lane.id}-${leg.sequence}` ? 'bg-blue-100 text-blue-700' : 'hover:bg-blue-100 text-blue-500'}`}
+                                          className={`p-1.5 rounded transition ${openViableFlightsKey === `${lane.id}-${leg.sequence}` ? 'bg-slate-100 text-slate-800' : 'hover:bg-slate-100 text-slate-500'}`}
                                           title="Find available flights"
                                         >
                                           <Search size={14} />
@@ -1737,7 +1946,7 @@ const LaneMappingLanes = () => {
                                 </tr>
                                 {/* Aircraft by Day row */}
                                 <tr
-                                  className={`border-b border-gray-200 ${legIdx % 2 === 0 ? 'bg-blue-50/30' : 'bg-blue-50/50'
+                                  className={`border-b border-gray-200 ${legIdx % 2 === 0 ? 'bg-slate-50/30' : 'bg-slate-50/50'
                                     }`}
                                 >
                                   <td colSpan={legColumns.length + 1} className="px-3 py-1.5">
@@ -1751,13 +1960,13 @@ const LaneMappingLanes = () => {
                                 </tr>
                                 {/* Viable Flights panel */}
                                 {openViableFlightsKey === `${lane.id}-${leg.sequence}` && (
-                                  <tr className="border-b border-blue-200 bg-blue-50/40">
+                                  <tr className="border-b border-slate-200 bg-slate-50/40">
                                     <td colSpan={legColumns.length + 1} className="px-3 py-3">
                                       {(() => {
                                         const vf = viableFlights[`${lane.id}-${leg.sequence}`];
                                         if (!vf || vf.loading) {
                                           return (
-                                            <div className="flex items-center gap-2 text-xs text-blue-600">
+                                            <div className="flex items-center gap-2 text-xs text-slate-600">
                                               <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
                                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
@@ -1783,7 +1992,7 @@ const LaneMappingLanes = () => {
                                         };
                                         return (
                                           <div>
-                                            <p className="text-xs font-semibold text-blue-700 mb-1.5">
+                                            <p className="text-xs font-semibold text-slate-700 mb-1.5">
                                               {getFlightSearchDescription()}
                                             </p>
                                             <table className="text-xs w-full max-w-2xl">
@@ -1798,7 +2007,7 @@ const LaneMappingLanes = () => {
                                               </thead>
                                               <tbody>
                                                 {vf.flights.map((f, fi) => (
-                                                  <tr key={fi} className={`border-t ${f.nextDay ? 'border-orange-200 bg-orange-50/50' : 'border-blue-100'}`}>
+                                                  <tr key={fi} className={`border-t ${f.nextDay ? 'border-orange-200 bg-orange-50/50' : 'border-slate-100'}`}>
                                                     <td className="py-1 pr-3 font-medium">
                                                       {f.flightNumber}
                                                       {f.nextDay && (
@@ -1813,7 +2022,7 @@ const LaneMappingLanes = () => {
                                                     <td className="py-1">
                                                       <button
                                                         onClick={() => { applyAlternative(lane.id, leg.sequence, f); setOpenViableFlightsKey(null); }}
-                                                        className="px-2 py-0.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition whitespace-nowrap"
+                                                        className="px-2 py-0.5 bg-slate-900 text-white rounded text-xs hover:bg-slate-700 transition whitespace-nowrap"
                                                       >
                                                         Select
                                                       </button>
@@ -1840,7 +2049,7 @@ const LaneMappingLanes = () => {
                         <button
                           onClick={() => handleAddLeg(lane.id)}
                           disabled={(lane.legs?.length ?? 0) >= 3}
-                          className="mt-3 text-blue-600 text-sm font-medium hover:text-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                          className="mt-3 text-slate-700 text-sm font-medium hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           Add your first leg
                         </button>
@@ -1863,7 +2072,7 @@ const LaneMappingLanes = () => {
                             value={lane.postArrivalHandlingTime || ''}
                             onChange={e => handleLaneChange(lane.id, 'postArrivalHandlingTime', e.target.value)}
                             placeholder="e.g. 3hr"
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
                           />
                         </div>
                         <div>
@@ -1873,7 +2082,7 @@ const LaneMappingLanes = () => {
                             value={lane.driveToDestination || ''}
                             onChange={e => handleLaneChange(lane.id, 'driveToDestination', e.target.value)}
                             placeholder="e.g. 3hr"
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
                           />
                         </div>
                         <div>
@@ -1882,18 +2091,28 @@ const LaneMappingLanes = () => {
                             type="text"
                             value={lane.actualDeliveryTimeBasedOnReceiving || ''}
                             onChange={e => handleLaneChange(lane.id, 'actualDeliveryTimeBasedOnReceiving', e.target.value)}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
                           />
                         </div>
                         <div>
                           <label className="block text-xs text-gray-500 mb-1">TAT Duration</label>
-                          <input
-                            type="text"
-                            value={lane.tatToConsigneeDuration || ''}
-                            onChange={e => handleLaneChange(lane.id, 'tatToConsigneeDuration', e.target.value)}
-                            placeholder="e.g. 3hr"
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="text"
+                              value={lane.tatToConsigneeDuration || ''}
+                              onChange={e => handleLaneChange(lane.id, 'tatToConsigneeDuration', e.target.value)}
+                              placeholder="e.g. 3hr"
+                              className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            />
+                            <button
+                              onClick={() => computeTATForLane(lane.id)}
+                              disabled={loading}
+                              className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-slate-900 disabled:opacity-50"
+                              title="Calculate TAT"
+                            >
+                              <Clock size={15} />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1908,7 +2127,7 @@ const LaneMappingLanes = () => {
                     {(!lane.additionalNotes && !expandedNotes[lane.id]) ? (
                       <button
                         onClick={() => setExpandedNotes(prev => ({ ...prev, [lane.id]: true }))}
-                        className="w-full text-left px-3 py-2 border border-dashed border-gray-300 rounded-lg text-xs text-gray-400 hover:border-blue-300 hover:text-blue-400 transition-colors"
+                        className="w-full text-left px-3 py-2 border border-dashed border-gray-300 rounded-lg text-xs text-gray-400 hover:border-slate-400 hover:text-slate-500 transition-colors"
                       >
                         Click to add notes...
                       </button>
@@ -1920,7 +2139,7 @@ const LaneMappingLanes = () => {
                         onBlur={() => {
                           if (!lane.additionalNotes) setExpandedNotes(prev => ({ ...prev, [lane.id]: false }));
                         }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[64px]"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-slate-500 min-h-[64px]"
                         placeholder="Enter any additional notes here..."
                       />
                     )}
@@ -1953,7 +2172,7 @@ const LaneMappingLanes = () => {
 
                 </div>
               )}
-                {(() => {
+              {expandedLanes[lane.id] && (() => {
                   const isDirectDrive = lane.serviceLevel?.trim().toUpperCase() === 'DIRECT DRIVE';
                   const sortedLegs = [...(lane.legs || [])].sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
                   if (!isDirectDrive && sortedLegs.length === 0) return null;
@@ -1961,77 +2180,133 @@ const LaneMappingLanes = () => {
                   const originCity = [lane.originCity, lane.originState, lane.originCountry].filter(Boolean).join(', ');
                   const destCity   = [lane.destinationCity, lane.destinationState, lane.destinationCountry].filter(Boolean).join(', ');
 
-                  // Build flat items: alternating { type:'node' } and { type:'connector', flight? }
                   const items = [];
                   const addNode = n => items.push({ type: 'node', ...n });
-                  const addConn = (flight = null) => items.push({ type: 'connector', flight });
+                  const addConn = (flight = null, sublabel = null, topLabel = null) => items.push({ type: 'connector', flight, sublabel, topLabel });
 
-                  addNode({ icon: 'truck', label: 'PICKUP', labelTop: true, cityLine: originCity || lane.originStation });
+                  addNode({ icon: 'truck', label: 'PICKUP', time: lane.pickUpTime, cityLine: originCity || lane.originStation });
 
                   if (isDirectDrive) {
                     addConn();
                     addNode({ icon: 'drive', label: 'DIRECT DRIVE', labelTop: true });
                   } else {
-                    sortedLegs.forEach((leg, i) => {
-                      addConn();
-                      addNode({ time: leg.departureTime, icon: 'dep', label: 'ETD', station: leg.originStation });
-                      addConn(leg.flightNumber);
+                    // Pre-flight nodes
+                    const firstLegCutoff = sortedLegs[0]?.cutoffTime;
+                    if (firstLegCutoff) {
+                      // Drive to airport duration goes as label under the connector line before CUTOFF
+                      addConn(null, lane.driveToAirportDuration ? 'Drive to Airport' : null, lane.driveToAirportDuration || null);
+                      addNode({ icon: 'cutoff', label: 'CUTOFF', time: firstLegCutoff });
+                    }
+
+                    // Flight legs — merge consecutive connection nodes into one
+                    addConn();
+                    addNode({ time: sortedLegs[0].departureTime, icon: 'dep', label: 'ETD', station: sortedLegs[0].originStation });
+                    addConn(sortedLegs[0].flightNumber);
+
+                    for (let i = 0; i < sortedLegs.length; i++) {
+                      const leg = sortedLegs[i];
+                      const nextLeg = sortedLegs[i + 1];
                       const isLast = i === sortedLegs.length - 1;
-                      addNode({ time: leg.arrivalTime, icon: isLast ? 'arr' : 'connect', label: isLast ? 'ETA' : 'CONNECT', station: leg.destinationStation });
-                    });
+                      if (isLast) {
+                        addNode({ time: leg.arrivalTime, icon: 'arr', label: 'ETA', station: leg.destinationStation });
+                      } else {
+                        // Single merged node: shows arrival time + next departure time
+                        addNode({ time: leg.arrivalTime, time2: nextLeg.departureTime, icon: 'connect', label: 'CONNECT', station: leg.destinationStation });
+                        addConn(nextLeg.flightNumber);
+                      }
+                    }
+
+                    // Post-flight nodes
+                    if (lane.postArrivalHandlingTime) {
+                      addConn();
+                      addNode({ icon: 'post', label: 'POST ARRIVAL', time: lane.postArrivalHandlingTime });
+                    }
                   }
-                  addConn();
+
+                  addConn(null, lane.driveToDestination ? 'Drive to Consignee' : null, lane.driveToDestination || null);
                   addNode({ time: lane.actualDeliveryTimeBasedOnReceiving, icon: 'delivery', label: 'DELIVERY', cityLine: destCity || lane.destinationStation });
 
                   return (
                     <div className="border-t-2 border-gray-200 bg-gray-50 overflow-hidden">
-                      <div className="flex items-center px-4 py-4 w-full">
+                      <div className="flex items-center px-4 py-6 w-full">
                         {items.map((item, i) => {
                           if (item.type === 'connector') return (
                             <div key={i} className="flex-1 flex flex-col items-center gap-1 min-w-0">
                               {item.flight
-                                ? <span className="px-3 py-1 rounded-full bg-blue-100 border border-blue-200 text-base font-bold text-blue-700 whitespace-nowrap">{item.flight}</span>
-                                : <div className="h-5" />}
-                              <div className="w-full h-[3px] bg-blue-200 rounded-full" />
+                                ? <span className="px-3 py-1 rounded-full bg-slate-100 border border-slate-300 text-sm font-bold text-slate-800 whitespace-nowrap">{item.flight}</span>
+                                : item.topLabel
+                                  ? <span className="text-xs font-semibold text-slate-700 whitespace-nowrap">{item.topLabel}</span>
+                                  : <div className="h-5" />}
+                              <div className="w-full h-[3px] bg-slate-300 rounded-full" />
+                              {item.sublabel
+                                ? <span className="text-[10px] text-slate-500 font-medium whitespace-nowrap mt-0.5">{item.sublabel}</span>
+                                : <div className="h-4" />}
                             </div>
                           );
                           const node = item;
+                          const circleBorder =
+                            node.icon === 'drive'   ? 'border-red-400' :
+                            node.icon === 'cutoff'  ? 'border-amber-400' :
+                            node.icon === 'driveto' ? 'border-slate-300 border-dashed' :
+                            'border-slate-400';
                           return (
-                          <div key={i} className="flex flex-col items-center z-10 min-w-[64px] max-w-[96px]">
+                          <div key={i} className="flex flex-col items-center z-10 min-w-[64px] max-w-[100px]">
                             {/* Above circle */}
-                            <div className="mb-1.5 text-center h-6 flex items-end justify-center">
+                            <div className="mb-1.5 text-center min-h-[24px] flex items-end justify-center">
                               {node.labelTop
                                 ? <div className={`text-[10px] font-bold tracking-widest uppercase ${node.icon === 'drive' ? 'text-red-500' : 'text-slate-500'}`}>{node.label}</div>
-                                : node.time
-                                  ? <div className="text-xs font-semibold text-blue-600 whitespace-nowrap">{node.time}</div>
-                                  : null}
+                                : node.time2
+                                  ? <div className="flex items-center gap-1">
+                                      <div className="flex flex-col items-center">
+                                        <span className="text-[9px] font-bold uppercase text-slate-400 leading-none">ETA</span>
+                                        <span className="text-[10px] font-semibold text-slate-700 whitespace-nowrap leading-tight">{node.time}</span>
+                                      </div>
+                                      <span className="text-slate-300 font-light">|</span>
+                                      <div className="flex flex-col items-center">
+                                        <span className="text-[9px] font-bold uppercase text-slate-400 leading-none">ETD</span>
+                                        <span className="text-[10px] font-semibold text-slate-700 whitespace-nowrap leading-tight">{node.time2}</span>
+                                      </div>
+                                    </div>
+                                  : node.time
+                                    ? <div className="text-xs font-semibold text-slate-700 whitespace-nowrap">{node.time}</div>
+                                    : null}
                             </div>
 
                             {/* Circle */}
-                            <div className={`h-9 w-9 rounded-full border-2 flex items-center justify-center shadow-sm bg-white shrink-0 ${node.icon === 'drive' ? 'border-red-400' : 'border-blue-400'}`}>
-                              {node.icon === 'truck'    && <Truck size={15} className="text-blue-500" />}
-                              {node.icon === 'dep'      && <Plane size={14} className="text-blue-500" />}
-                              {node.icon === 'arr'      && <Plane size={14} className="text-blue-500 rotate-45" />}
-                              {node.icon === 'connect'  && <RefreshCw size={13} className="text-blue-400" />}
+                            <div className={`h-9 w-9 rounded-full border-2 flex items-center justify-center shadow-sm bg-white shrink-0 ${circleBorder}`}>
+                              {node.icon === 'truck'    && <Truck size={15} className="text-slate-500" />}
+                              {node.icon === 'driveto'  && <Truck size={14} className="text-slate-400" />}
+                              {node.icon === 'dep'      && <Plane size={14} className="text-slate-500" />}
+                              {node.icon === 'arr'      && <Plane size={14} className="text-slate-500 rotate-45" />}
+                              {node.icon === 'connect'  && <RefreshCw size={13} className="text-slate-400" />}
                               {node.icon === 'drive'    && <Truck size={15} className="text-red-500" />}
-                              {node.icon === 'delivery' && <PackageCheck size={15} className="text-blue-500" />}
+                              {node.icon === 'cutoff'   && <Clock size={14} className="text-amber-500" />}
+                              {node.icon === 'post'     && <ClipboardCheck size={14} className="text-slate-500" />}
+                              {node.icon === 'delivery' && <PackageCheck size={15} className="text-slate-500" />}
                             </div>
 
                             {/* Below circle */}
                             <div className="mt-1.5 text-center">
-                              {!node.labelTop && <div className={`text-[10px] font-bold tracking-widest uppercase ${node.icon === 'drive' ? 'text-red-500' : 'text-slate-400'}`}>{node.label}</div>}
+                              {!node.labelTop && (
+                                <div className={`text-[10px] font-bold tracking-widest uppercase leading-tight ${
+                                  node.icon === 'drive'  ? 'text-red-500' :
+                                  node.icon === 'cutoff' ? 'text-amber-500' :
+                                  'text-slate-400'
+                                }`}>{node.label}</div>
+                              )}
                               {node.station  && <div className="text-sm font-bold text-slate-800 mt-0.5">{node.station}</div>}
                               {node.cityLine && <div className="text-[11px] text-slate-500 mt-0.5 leading-tight">{node.cityLine}</div>}
                             </div>
                           </div>
                         );})}
-
                       </div>
                     </div>
                   );
                 })()}
             </div>
             
+              )}
+            />
           ))}
 
           {filteredLanes.length === 0 && !loading && (
@@ -2046,7 +2321,7 @@ const LaneMappingLanes = () => {
               {(filters.quickFilter || activeFilterCount > 0) && (
                 <button
                   onClick={handleClearFilters}
-                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+                  className="mt-4 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-700 transition"
                 >
                   Clear Filters
                 </button>

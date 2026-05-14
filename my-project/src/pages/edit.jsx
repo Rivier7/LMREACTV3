@@ -80,7 +80,7 @@ const Edit = () => {
       try {
         const legData = await getFlights(lane.id);
         // Ensure all legs have cutoffTime field initialized
-        const legsWithCutoffTime = legData.map((leg, index) => ({
+        const legsWithCutoffTime = (Array.isArray(legData) ? legData : []).map((leg, index) => ({
           ...leg,
           cutoffTime: leg.cutoffTime || (index === 0 ? '' : ''),
         }));

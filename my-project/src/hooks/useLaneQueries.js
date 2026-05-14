@@ -177,7 +177,7 @@ export function useUpdateAllTatTime() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ laneMappingId, updatedLane }) => updateAllTatTime(laneMappingId, updatedLane),
+    mutationFn: ({ laneMappingId }) => updateAllTatTime(laneMappingId),
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: laneKeys.byLaneMapping(variables.laneMappingId) });
     },
