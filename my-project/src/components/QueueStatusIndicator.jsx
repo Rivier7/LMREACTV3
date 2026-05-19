@@ -49,8 +49,9 @@ const QueueStatusIndicator = ({ collapsed }) => {
 
   // Queue is active if there are queued lanes
   const hasActiveQueue = totalQueued > 0;
-  // Cancel is only enabled if there are jobs that can actually be cancelled (not IN_PROGRESS)
-  const canCancel = cancellableJobs > 0;
+  // Cancel is enabled if there are queued lanes OR cancellable jobs
+  // (backend will handle gracefully if nothing can actually be cancelled)
+  const canCancel = totalQueued > 0 || cancellableJobs > 0;
 
   const handleCancel = async () => {
     if (window.confirm('Are you sure you want to cancel all pending validations?')) {
