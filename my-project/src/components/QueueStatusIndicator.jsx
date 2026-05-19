@@ -35,6 +35,7 @@ const QueueStatusIndicator = ({ collapsed }) => {
 
   // Calculate totals - Queue stats
   const totalQueued = queueStatus?.totalQueuedLanes || 0;
+  const pendingJobs = queueStatus?.pendingJobs || 0;
   const inProgressJobs = queueStatus?.inProgressJobs || 0;
   const cancellableJobs = queueStatus?.cancellableJobs || 0;
   const estimatedWait = queueStatus?.estimatedWaitMinutes || 0;
@@ -161,6 +162,10 @@ const QueueStatusIndicator = ({ collapsed }) => {
             <div className="flex justify-between text-sm">
               <span className="text-gray-400">In Queue</span>
               <span className="text-white font-medium">{totalQueued} lanes</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-400">Pending Jobs</span>
+              <span className="text-amber-400 font-medium">{pendingJobs}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-400">Processing</span>
