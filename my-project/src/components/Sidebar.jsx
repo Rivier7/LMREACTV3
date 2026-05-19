@@ -11,6 +11,7 @@ import {
   ChevronRight,
   User,
 } from 'lucide-react';
+import QueueStatusIndicator from './QueueStatusIndicator';
 
 const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -54,6 +55,11 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
         {collapsed && (
           <img src="/logo.png" alt="Marken" className="h-8 w-8 object-contain" />
         )}
+      </div>
+
+      {/* Queue Status */}
+      <div className="px-3 py-3 border-b border-gray-800">
+        <QueueStatusIndicator collapsed={collapsed} />
       </div>
 
       {/* Navigation */}
