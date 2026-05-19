@@ -34,7 +34,7 @@ const QueueStatusIndicator = ({ collapsed }) => {
 
   // Calculate totals - Queue stats
   const totalQueued = queueStatus?.totalQueuedLanes || 0;
-  const inProgressJobsJobs = queueStatus?.inProgressJobsJobs || 0;
+  const inProgressJobs = queueStatus?.inProgressJobs || 0;
   const cancellableJobs = queueStatus?.cancellableJobs || 0;
   const estimatedWait = queueStatus?.estimatedWaitMinutes || 0;
   const affectedMappings = queueStatus?.affectedLaneMappings || [];
