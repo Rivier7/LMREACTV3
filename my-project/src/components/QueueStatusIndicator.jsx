@@ -32,12 +32,19 @@ const QueueStatusIndicator = ({ collapsed }) => {
     }
   }, [toast]);
 
-  // Calculate totals
+  // Calculate totals - Queue stats
   const totalQueued = queueStatus?.totalQueuedLanes || 0;
-  const inProgress = queueStatus?.inProgressJobs || 0;
+  const inProgressJobsJobs = queueStatus?.inProgressJobsJobs || 0;
   const cancellableJobs = queueStatus?.cancellableJobs || 0;
   const estimatedWait = queueStatus?.estimatedWaitMinutes || 0;
   const affectedMappings = queueStatus?.affectedLaneMappings || [];
+
+  // Lane validation status counts
+  const pendingLanes = queueStatus?.pendingLanes || 0;
+  const validLanes = queueStatus?.validLanes || 0;
+  const invalidLanes = queueStatus?.invalidLanes || 0;
+  const apiErrorLanes = queueStatus?.apiErrorLanes || 0;
+  const mismatchLanes = queueStatus?.mismatchLanes || 0;
 
   // Queue is active if there are queued lanes
   const hasActiveQueue = totalQueued > 0;
@@ -71,7 +78,7 @@ const QueueStatusIndicator = ({ collapsed }) => {
 
   // Badge color based on queue status
   const getBadgeColor = () => {
-    if (inProgress > 0) return 'bg-blue-500'; // Processing
+    if (inProgressJobs > 0) return 'bg-blue-500'; // Processing
     if (totalQueued > 0) return 'bg-amber-500'; // Pending
     return 'bg-gray-600'; // Empty
   };
@@ -135,20 +142,52 @@ const QueueStatusIndicator = ({ collapsed }) => {
             </button>
           </div>
 
-          {/* Stats */}
+          {/* Queue Stats */}
           <div className="px-4 py-3 space-y-2 border-b border-gray-700">
+            <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Queue</p>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-400">Pending</span>
+              <span className="text-gray-400">In Queue</span>
               <span className="text-white font-medium">{totalQueued} lanes</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-400">In Progress</span>
-              <span className="text-blue-400 font-medium">{inProgress} jobs</span>
+              <span className="text-gray-400">Processing</span>
+              <span className="text-blue-400 font-medium">{inProgressJobs} jobs</span>
             </div>
             {estimatedWait > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-gray-400">Est. Wait</span>
                 <span className="text-amber-400 font-medium">~{estimatedWait} min</span>
+              </div>
+            )}
+          </div>
+
+          {/* Lane Validation Status */}
+          <div className="px-4 py-3 space-y-2 border-b border-gray-700">
+            <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Lane Status</p>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-400">Pending</span>
+              <span className="text-amber-400 font-medium">{pendingLanes}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-400">Valid</span>
+              <span className="text-green-400 font-medium">{validLanes}</span>
+            </div>
+            {invalidLanes > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">Invalid</span>
+                <span className="text-red-400 font-medium">{invalidLanes}</span>
+              </div>
+            )}
+            {apiErrorLanes > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">API Error</span>
+                <span className="text-orange-400 font-medium">{apiErrorLanes}</span>
+              </div>
+            )}
+            {mismatchLanes > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">Mismatch</span>
+                <span className="text-yellow-400 font-medium">{mismatchLanes}</span>
               </div>
             )}
           </div>
