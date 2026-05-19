@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { Clock, X, Play, Loader2, ChevronDown, AlertCircle, CheckCircle } from 'lucide-react';
-import { useQueueStatus, useCancelQueue, useValidateAllPending } from '../hooks/useQueueQueries';
+import { Clock, X, Play, Loader2, ChevronDown, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
+import { useQueueStatus, useCancelQueue, useValidateAllPending, useRevalidateAll } from '../hooks/useQueueQueries';
 
 const QueueStatusIndicator = ({ collapsed }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -10,7 +10,8 @@ const QueueStatusIndicator = ({ collapsed }) => {
   // Only poll frequently when dropdown is open, otherwise poll slowly
   const { data: queueStatus, isLoading, error } = useQueueStatus(isOpen ? 5000 : 30000);
   const cancelMutation = useCancelQueue();
-  const validateAllMutation = useValidateAllPending();
+  const validatePendingMutation = useValidateAllPending();
+  const revalidateAllMutation = useRevalidateAll();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -63,12 +64,23 @@ const QueueStatusIndicator = ({ collapsed }) => {
     }
   };
 
-  const handleValidateAll = async () => {
+  const handleValidatePending = async () => {
     try {
-      const result = await validateAllMutation.mutateAsync();
+      const result = await validatePendingMutation.mutateAsync();
       setToast({ type: 'success', message: result.message || 'Validation queued' });
     } catch (err) {
       setToast({ type: 'error', message: err.message || 'Failed to queue validation' });
+    }
+  };
+
+  const handleRevalidateAll = async () => {
+    if (window.confirm('This will reset ALL lanes to pending and re-validate them. Continue?')) {
+      try {
+        const result = await revalidateAllMutation.mutateAsync();
+        setToast({ type: 'success', message: result.message || 'Re-validation queued' });
+      } catch (err) {
+        setToast({ type: 'error', message: err.message || 'Failed to queue re-validation' });
+      }
     }
   };
 
@@ -216,11 +228,43 @@ const QueueStatusIndicator = ({ collapsed }) => {
           )}
 
           {/* Actions */}
-          <div className="px-4 py-3 bg-gray-800/50 flex gap-2">
+          <div className="px-4 py-3 bg-gray-800/50 space-y-2">
+            {/* Top row: Validate Pending & Revalidate All */}
+            <div className="flex gap-2">
+              <button
+                onClick={handleValidatePending}
+                disabled={pendingLanes === 0 || validatePendingMutation.isPending}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
+                  bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="Validate lanes that are already pending"
+              >
+                {validatePendingMutation.isPending ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Play size={16} />
+                )}
+                Pending
+              </button>
+              <button
+                onClick={handleRevalidateAll}
+                disabled={revalidateAllMutation.isPending}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
+                  bg-green-600/20 text-green-400 hover:bg-green-600/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="Reset ALL lanes to pending and re-validate"
+              >
+                {revalidateAllMutation.isPending ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <RefreshCw size={16} />
+                )}
+                Revalidate
+              </button>
+            </div>
+            {/* Bottom row: Cancel */}
             <button
               onClick={handleCancel}
               disabled={!canCancel || cancelMutation.isPending}
-              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
                 bg-red-600/20 text-red-400 hover:bg-red-600/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {cancelMutation.isPending ? (
@@ -228,20 +272,7 @@ const QueueStatusIndicator = ({ collapsed }) => {
               ) : (
                 <X size={16} />
               )}
-              Cancel
-            </button>
-            <button
-              onClick={handleValidateAll}
-              disabled={validateAllMutation.isPending}
-              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
-                bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {validateAllMutation.isPending ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Play size={16} />
-              )}
-              Validate All
+              Cancel Queue
             </button>
           </div>
         </div>

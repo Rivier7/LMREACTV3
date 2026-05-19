@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getQueueStatus, cancelValidationQueue, validateAllPendingLanes } from '../api/queue';
+import { getQueueStatus, cancelValidationQueue, validateAllPendingLanes, revalidateAllLanes } from '../api/queue';
 import { laneKeys } from './useLaneQueries';
 
 /**
@@ -58,6 +58,25 @@ export function useValidateAllPending() {
       // Invalidate queue status (new lanes in queue)
       queryClient.invalidateQueries({ queryKey: queueKeys.status() });
       // Invalidate all lane queries (lists, counts, byLaneMapping, etc.)
+      queryClient.invalidateQueries({ queryKey: laneKeys.all });
+    },
+  });
+}
+
+/**
+ * Revalidate ALL lanes.
+ * Resets all lanes to PENDING and queues them for validation.
+ * Invalidates queue status and all lane queries on success.
+ */
+export function useRevalidateAll() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: revalidateAllLanes,
+    onSuccess: () => {
+      // Invalidate queue status (all lanes now in queue)
+      queryClient.invalidateQueries({ queryKey: queueKeys.status() });
+      // Invalidate all lane queries (all lanes changed to PENDING)
       queryClient.invalidateQueries({ queryKey: laneKeys.all });
     },
   });

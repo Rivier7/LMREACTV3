@@ -47,3 +47,15 @@ export const validateAllPendingLanes = async () => {
   if (!response.ok) throw new Error(`Failed to queue pending lanes: ${response.status}`);
   return await response.json();
 };
+
+/**
+ * Revalidates ALL lanes by resetting them to PENDING and queuing for validation.
+ */
+export const revalidateAllLanes = async () => {
+  const response = await fetch(`${BASE_URL}/revalidate-all`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error(`Failed to revalidate all lanes: ${response.status}`);
+  return await response.json();
+};
