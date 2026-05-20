@@ -7,7 +7,42 @@ const optionConfig = [
 ];
 
 const formatLocation = location =>
-  [location?.city, location?.state, location?.country].filter(Boolean).join(', ') || 'Unknown location';
+  [location?.city, location?.state, location?.country].filter(Boolean).join(', ') ||
+  'Unknown location';
+
+const getOptionStatusDot = lane => {
+  if (!lane) return null;
+
+  const status = lane?.validationStatus || 'PENDING';
+
+  if (status === 'INVALID') {
+    return { className: 'bg-red-500', label: 'Invalid' };
+  }
+  if (status === 'SCHEDULE_MISMATCH') {
+    return { className: 'bg-orange-500', label: 'Outdated schedule' };
+  }
+  if (status === 'PENDING') {
+    return { className: 'bg-yellow-400', label: 'Pending' };
+  }
+  if (status === 'API_ERROR') {
+    return { className: 'bg-purple-500', label: 'API error' };
+  }
+
+  return null;
+};
+
+const StatusDot = ({ lane }) => {
+  const statusDot = getOptionStatusDot(lane);
+  if (!statusDot) return null;
+
+  return (
+    <span
+      className={`mt-0.5 h-1.5 w-1.5 rounded-full ${statusDot.className}`}
+      title={statusDot.label}
+      aria-label={statusDot.label}
+    />
+  );
+};
 
 function RouteLaneCard({ group, renderOption, isOpen = false, onToggle }) {
   return (
@@ -34,18 +69,22 @@ function RouteLaneCard({ group, renderOption, isOpen = false, onToggle }) {
             <span className="rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
               {group.totalOptions} option{group.totalOptions === 1 ? '' : 's'}
             </span>
-            {optionConfig.map(({ key, label }) => (
-              <span
-                key={key}
-                className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
-                  group[key]
-                    ? 'border-blue-200 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 bg-gray-100 text-gray-400'
-                }`}
-              >
-                {label}
-              </span>
-            ))}
+            {optionConfig.map(({ key, label }) => {
+              const lane = group[key];
+              return (
+                <span
+                  key={key}
+                  className={`inline-flex min-w-[76px] flex-col items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                    lane
+                      ? 'border-blue-200 bg-blue-50 text-blue-700'
+                      : 'border-gray-200 bg-gray-100 text-gray-400'
+                  }`}
+                >
+                  {label}
+                  <StatusDot lane={lane} />
+                </span>
+              );
+            })}
             <span className="text-slate-400">
               {isOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
             </span>
@@ -60,18 +99,15 @@ function RouteLaneCard({ group, renderOption, isOpen = false, onToggle }) {
             return (
               <div key={key} className="bg-gray-50 rounded-lg border border-gray-200">
                 <div className="px-5 pt-4">
-                  <span className="inline-flex items-center rounded-md bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white">
+                  <span className="inline-flex min-w-[76px] flex-col items-center rounded-md bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white">
                     {label}
+                    <StatusDot lane={lane} />
                   </span>
                   {!lane && (
                     <span className="ml-3 text-sm text-gray-400">No {label} option available</span>
                   )}
                 </div>
-                {lane && (
-                  <div className="px-5 pb-5 pt-3">
-                    {renderOption(lane)}
-                  </div>
-                )}
+                {lane && <div className="px-5 pb-5 pt-3">{renderOption(lane)}</div>}
               </div>
             );
           })}
