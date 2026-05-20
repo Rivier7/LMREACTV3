@@ -15,11 +15,19 @@ function Lanes({ lanes, onDelete, onManualValidate }) {
     itemNumber: '',
     destinationStation: '',
     laneOption: '',
+    sheetName: '',
     valid: '',
   });
 
   // Helper to get lane mapping name (stored as flat property from backend)
   const getLaneMappingName = lane => lane.laneMappingName || '';
+  const getSheetName = lane =>
+    lane.sheetName ||
+    lane.sheet ||
+    lane.worksheetName ||
+    lane.tabName ||
+    lane.sourceSheetName ||
+    '';
 
   const [filteredLanes, setFilteredLanes] = useState(lanes);
   const [showFilters, setShowFilters] = useState(true);
@@ -38,7 +46,11 @@ function Lanes({ lanes, onDelete, onManualValidate }) {
         (!filters.destinationCity || lane.destinationCity === filters.destinationCity) &&
         (!filters.itemNumber || lane.itemNumber === filters.itemNumber) &&
         (!filters.laneOption || lane.laneOption === filters.laneOption) &&
-        (filters.valid === '' || (filters.valid === 'true' ? lane.validationStatus === 'VALID' : lane.validationStatus !== 'VALID'))
+        (!filters.sheetName || getSheetName(lane) === filters.sheetName) &&
+        (filters.valid === '' ||
+          (filters.valid === 'true'
+            ? lane.validationStatus === 'VALID'
+            : lane.validationStatus !== 'VALID'))
       );
     });
     setFilteredLanes(result);
@@ -61,6 +73,7 @@ function Lanes({ lanes, onDelete, onManualValidate }) {
       itemNumber: '',
       destinationStation: '',
       laneOption: '',
+      sheetName: '',
       valid: '',
     });
   };
@@ -79,6 +92,7 @@ function Lanes({ lanes, onDelete, onManualValidate }) {
     { label: 'Dest. Airport', name: 'destinationStation', icon: '✈️' },
     { label: 'Item #', name: 'itemNumber', icon: '#️⃣' },
     { label: 'Option #', name: 'laneOption', icon: '🔢' },
+    { label: 'Sheet', name: 'sheetName', icon: '📄', nested: true },
     { label: 'Status', name: 'valid', icon: '✓' },
   ];
 
@@ -134,10 +148,18 @@ function Lanes({ lanes, onDelete, onManualValidate }) {
                 const tempFiltered = lanes.filter(lane => {
                   return Object.entries(tempFilters).every(([key, val]) => {
                     if (key === 'valid') {
-                      return !val || (val === 'true' ? lane.validationStatus === 'VALID' : lane.validationStatus !== 'VALID');
+                      return (
+                        !val ||
+                        (val === 'true'
+                          ? lane.validationStatus === 'VALID'
+                          : lane.validationStatus !== 'VALID')
+                      );
                     }
                     if (key === 'laneMappingName') {
                       return !val || getLaneMappingName(lane) === val;
+                    }
+                    if (key === 'sheetName') {
+                      return !val || getSheetName(lane) === val;
                     }
                     return !val || lane[key] === val;
                   });
@@ -147,7 +169,17 @@ function Lanes({ lanes, onDelete, onManualValidate }) {
                   field.name === 'valid'
                     ? ['true', 'false']
                     : field.nested
-                      ? [...new Set(tempFiltered.map(lane => getLaneMappingName(lane)).filter(Boolean))]
+                      ? [
+                          ...new Set(
+                            tempFiltered
+                              .map(lane =>
+                                field.name === 'sheetName'
+                                  ? getSheetName(lane)
+                                  : getLaneMappingName(lane)
+                              )
+                              .filter(Boolean)
+                          ),
+                        ]
                       : [...new Set(tempFiltered.map(lane => lane[field.name]).filter(Boolean))];
 
                 const hasValue = filters[field.name] !== '';
@@ -178,8 +210,18 @@ function Lanes({ lanes, onDelete, onManualValidate }) {
                         ))}
                       </select>
                       <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        <svg
+                          className="w-4 h-4 text-gray-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
                         </svg>
                       </div>
                     </div>
@@ -198,7 +240,9 @@ function Lanes({ lanes, onDelete, onManualValidate }) {
             <Search className="w-10 h-10 text-gray-400" />
           </div>
           <h3 className="text-xl font-semibold text-gray-800 mb-2">No lanes found</h3>
-          <p className="text-gray-600 mb-4">Try adjusting your filters to find what you're looking for.</p>
+          <p className="text-gray-600 mb-4">
+            Try adjusting your filters to find what you're looking for.
+          </p>
           <button
             onClick={clearFilters}
             className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
@@ -209,7 +253,12 @@ function Lanes({ lanes, onDelete, onManualValidate }) {
       ) : (
         <div className="space-y-4">
           {filteredLanes.map((lane, idx) => (
-            <Lane key={lane.id + '-' + idx} lane={lane} onDelete={onDelete} onManualValidate={onManualValidate} />
+            <Lane
+              key={lane.id + '-' + idx}
+              lane={lane}
+              onDelete={onDelete}
+              onManualValidate={onManualValidate}
+            />
           ))}
         </div>
       )}
