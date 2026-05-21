@@ -18,6 +18,7 @@ import {
   PackageCheck,
   RefreshCw,
 } from 'lucide-react';
+import AircraftCategoryBadge from './AircraftCategoryBadge';
 
 function Lane({ lane, onDelete, onManualValidate }) {
   const navigate = useNavigate();
@@ -372,6 +373,7 @@ function Lane({ lane, onDelete, onManualValidate }) {
                           'SUNDAY',
                         ].map(day => {
                           const aircraft = leg.aircraftByDay?.[day];
+                          const category = leg.aircraftCategoryByDay?.[day];
                           const dayAbbr = {
                             MONDAY: 'Mon',
                             TUESDAY: 'Tue',
@@ -392,6 +394,9 @@ function Lane({ lane, onDelete, onManualValidate }) {
                               >
                                 {aircraft || '-'}
                               </span>
+                              {aircraft && category && (
+                                <AircraftCategoryBadge category={category} size="xs" />
+                              )}
                             </div>
                           );
                         })}

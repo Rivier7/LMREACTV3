@@ -29,6 +29,7 @@ import EditLaneMappingModal from '../components/EditLaneMappingModal';
 import CreateLaneModal from '../components/CreateLaneModal';
 import LaneManualValidationModal from '../components/LaneManualValidationModal';
 import RouteLaneCard from '../components/RouteLaneCard';
+import AircraftCategoryBadge from '../components/AircraftCategoryBadge';
 import {
   getLanesByLaneMappingId,
   getRouteGroupsByLaneMappingId,
@@ -1989,11 +1990,22 @@ const LaneMappingLanes = () => {
                                     }`}
                                 >
                                   <td colSpan={legColumns.length + 1} className="px-3 py-1.5">
-                                    <div className="flex items-center gap-2 text-xs">
+                                    <div className="flex items-center gap-2 text-xs flex-wrap">
                                       <span className="font-medium text-gray-500">Aircraft by Day:</span>
-                                      <span className="text-gray-700">
-                                        {formatAircraftByDay(leg.aircraftByDay)}
-                                      </span>
+                                      {leg.aircraftByDay && Object.keys(leg.aircraftByDay).length > 0 ? (
+                                        Object.entries(leg.aircraftByDay).map(([day, aircraft]) => {
+                                          const category = leg.aircraftCategoryByDay?.[day];
+                                          return (
+                                            <span key={day} className="inline-flex items-center gap-1">
+                                              <span className="text-gray-500">{dayAbbreviations[day] || day}:</span>
+                                              <span className="font-semibold text-gray-800">{aircraft}</span>
+                                              {category && <AircraftCategoryBadge category={category} size="xs" />}
+                                            </span>
+                                          );
+                                        })
+                                      ) : (
+                                        <span className="text-gray-400">-</span>
+                                      )}
                                     </div>
                                   </td>
                                 </tr>
@@ -2040,6 +2052,7 @@ const LaneMappingLanes = () => {
                                                   <th className="text-left pb-1 pr-3 font-medium">Flight</th>
                                                   <th className="text-left pb-1 pr-3 font-medium">Dep</th>
                                                   <th className="text-left pb-1 pr-3 font-medium">Arr</th>
+                                                  <th className="text-left pb-1 pr-3 font-medium">Aircraft</th>
                                                   <th className="text-left pb-1 pr-3 font-medium">Days</th>
                                                   <th></th>
                                                 </tr>
@@ -2057,6 +2070,18 @@ const LaneMappingLanes = () => {
                                                     </td>
                                                     <td className="py-1 pr-3">{f.departureTime}</td>
                                                     <td className="py-1 pr-3">{f.arrivalTime}</td>
+                                                    <td className="py-1 pr-3">
+                                                      {f.aircraftType ? (
+                                                        <span className="inline-flex items-center gap-1">
+                                                          <span className="font-medium">{f.aircraftType}</span>
+                                                          {f.aircraftCategory && (
+                                                            <AircraftCategoryBadge category={f.aircraftCategory} size="xs" />
+                                                          )}
+                                                        </span>
+                                                      ) : (
+                                                        <span className="text-gray-400">-</span>
+                                                      )}
+                                                    </td>
                                                     <td className="py-1 pr-3">{f.operatingDays}</td>
                                                     <td className="py-1">
                                                       <button

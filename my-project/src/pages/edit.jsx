@@ -9,6 +9,7 @@ import {
   getSuggestedRoute,
   getSuggestedRouteByLocation,
 } from '../api/api';
+import AircraftCategoryBadge from '../components/AircraftCategoryBadge';
 
 const Edit = () => {
   const { laneId } = useParams();
@@ -1000,13 +1001,22 @@ const Edit = () => {
                         <label className="block mb-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
                           Aircraft by Day
                         </label>
-                        <div
-                          className="text-sm text-gray-700"
-                          title={Object.entries(leg.aircraftByDay)
-                            .map(([day, aircraft]) => `${day}: ${aircraft}`)
-                            .join('\n')}
-                        >
-                          {formatAircraftByDay(leg.aircraftByDay)}
+                        <div className="flex flex-wrap gap-2">
+                          {Object.entries(leg.aircraftByDay).map(([day, aircraft]) => {
+                            const category = leg.aircraftCategoryByDay?.[day];
+                            return (
+                              <div
+                                key={day}
+                                className="flex items-center gap-1.5 px-2 py-1 bg-white border border-gray-200 rounded text-sm"
+                              >
+                                <span className="font-medium text-gray-500">
+                                  {dayAbbreviations[day] || day}:
+                                </span>
+                                <span className="font-semibold text-gray-800">{aircraft}</span>
+                                {category && <AircraftCategoryBadge category={category} size="xs" />}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
