@@ -100,6 +100,18 @@ const groupLanesForDisplay = lanes => {
   });
 };
 
+// Day labels in correct order (Monday through Sunday)
+const DAY_ORDER = ['M', 'Tu', 'W', 'Th', 'F', 'Sa', 'Su'];
+
+// Sort operating days string to display in Monday-Sunday order
+const sortOperatingDays = (operatingDays) => {
+  if (!operatingDays) return '';
+  const daysSet = new Set(
+    operatingDays.split(',').map(d => d.trim()).filter(Boolean)
+  );
+  return DAY_ORDER.filter(day => daysSet.has(day)).join(', ');
+};
+
 const LaneMappingLanes = () => {
   const { laneMappingId } = useParams();
   const [lanes, setLanes] = useState([]);
@@ -1922,7 +1934,7 @@ const LaneMappingLanes = () => {
                                                             <td className="py-1 pr-2 font-medium">{alt.flightNumber}</td>
                                                             <td className="py-1 pr-2">{alt.departureTime}</td>
                                                             <td className="py-1 pr-2">{alt.arrivalTime}</td>
-                                                            <td className="py-1 pr-2">{alt.operatingDays}</td>
+                                                            <td className="py-1 pr-2">{sortOperatingDays(alt.operatingDays)}</td>
                                                             <td className="py-1">
                                                               <button
                                                                 onClick={() => applyAlternative(lane.id, leg.sequence, alt)}
@@ -2082,7 +2094,7 @@ const LaneMappingLanes = () => {
                                                         <span className="text-gray-400">-</span>
                                                       )}
                                                     </td>
-                                                    <td className="py-1 pr-3">{f.operatingDays}</td>
+                                                    <td className="py-1 pr-3">{sortOperatingDays(f.operatingDays)}</td>
                                                     <td className="py-1">
                                                       <button
                                                         onClick={() => { applyAlternative(lane.id, leg.sequence, f); setOpenViableFlightsKey(null); }}
