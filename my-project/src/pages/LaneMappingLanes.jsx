@@ -44,8 +44,8 @@ import {
   getBulkValidationStatus,
   validateAndSaveLane,
   syncLaneSchedule,
-  getCachedFlights,
-  getViableFlights,
+  getCoverageStatus,
+  searchFlightsWithCoverage,
   applySuggestedTimes,
 } from '../api/api.js';
 
@@ -102,13 +102,17 @@ const groupLanesForDisplay = lanes => {
 
 // Day labels in correct order (Monday through Sunday)
 const DAY_ORDER = ['M', 'Tu', 'W', 'Th', 'F', 'Sa', 'Su'];
+const ACTIVE_COLLECTION_STATUSES = new Set(['QUEUED', 'IN_PROGRESS']);
 
-// Sort operating days string to display in Monday-Sunday order
+// Sort operating days to display in Monday-Sunday order
+// Handles both array (from backend Set<String>) and comma-separated string formats
 const sortOperatingDays = (operatingDays) => {
   if (!operatingDays) return '';
-  const daysSet = new Set(
-    operatingDays.split(',').map(d => d.trim()).filter(Boolean)
-  );
+  // Handle both array (from JSON) and comma-separated string
+  const daysArray = Array.isArray(operatingDays)
+    ? operatingDays
+    : operatingDays.split(',').map(d => d.trim()).filter(Boolean);
+  const daysSet = new Set(daysArray);
   return DAY_ORDER.filter(day => daysSet.has(day)).join(', ');
 };
 
@@ -799,7 +803,16 @@ const LaneMappingLanes = () => {
     }
   };
 
-  const handleSearchViableFlights = async (laneId, legSequence, origin, destination, pickupTime, driveToAirportDuration, legs) => {
+  const normalizeSearchFlights = flights =>
+    (flights || []).map(flight => ({
+      ...flight,
+      flightNumber: flight.flightNumberIata || flight.flightNumber || '',
+      departureTime: flight.departureTimeLocal || flight.departureTime || '',
+      arrivalTime: flight.arrivalTimeLocal || flight.arrivalTime || '',
+      operatingDays: flight.operatingDays || '',
+    }));
+
+  const handleSearchViableFlights = async (laneId, legSequence, origin, destination) => {
     const key = `${laneId}-${legSequence}`;
     if (openViableFlightsKey === key) {
       setOpenViableFlightsKey(null);
@@ -808,28 +821,92 @@ const LaneMappingLanes = () => {
     setOpenViableFlightsKey(key);
     setViableFlights(prev => ({ ...prev, [key]: { loading: true, flights: [], error: null } }));
     try {
-      let flights;
+      const coverage = await searchFlightsWithCoverage(origin, destination);
+      const flights = normalizeSearchFlights(coverage.results);
 
-      // For subsequent legs (sequence > 1), use the previous leg's arrival time + 1-hour buffer
-      const previousLeg = legs?.find(l => l.sequence === legSequence - 1);
-      const previousLegArrival = previousLeg?.arrivalTime || null;
-
-      if (legSequence > 1 && previousLegArrival) {
-        // Subsequent leg: use previous leg's arrival time (backend adds 1-hour buffer)
-        flights = await getViableFlights(origin, destination, null, 0, 0, 10, previousLegArrival);
-      } else if (pickupTime && driveToAirportDuration) {
-        // First leg: use pickup time + drive duration
-        const driveMinutes = (parseInt(driveToAirportDuration) || 0) * 60;
-        flights = await getViableFlights(origin, destination, pickupTime, driveMinutes);
-      } else {
-        // Fallback: get all cached flights
-        flights = await getCachedFlights(origin, destination);
-      }
-      setViableFlights(prev => ({ ...prev, [key]: { loading: false, flights, error: null } }));
+      setViableFlights(prev => ({
+        ...prev,
+        [key]: {
+          loading: false,
+          flights,
+          error: null,
+          coverage,
+          searchContext: { origin, destination },
+        },
+      }));
     } catch (err) {
       setViableFlights(prev => ({ ...prev, [key]: { loading: false, flights: [], error: err.message } }));
     }
   };
+
+  const openViableFlightSearch = openViableFlightsKey ? viableFlights[openViableFlightsKey] : null;
+  const openCollectionStatus = openViableFlightSearch?.coverage?.collectionStatus;
+
+  useEffect(() => {
+    if (
+      !openViableFlightsKey ||
+      !openViableFlightSearch?.searchContext ||
+      !ACTIVE_COLLECTION_STATUSES.has(openCollectionStatus)
+    ) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const { origin, destination } = openViableFlightSearch.searchContext;
+
+    const pollCoverage = async () => {
+      try {
+        const status = await getCoverageStatus(origin, destination);
+        if (cancelled) return;
+
+        setViableFlights(prev => {
+          const current = prev[openViableFlightsKey];
+          if (!current) return prev;
+          return {
+            ...prev,
+            [openViableFlightsKey]: {
+              ...current,
+              coverage: {
+                ...current.coverage,
+                ...status,
+                message: current.coverage?.message,
+              },
+            },
+          };
+        });
+
+        if (!ACTIVE_COLLECTION_STATUSES.has(status.collectionStatus)) {
+          const coverage = await searchFlightsWithCoverage(origin, destination);
+          if (cancelled) return;
+
+          setViableFlights(prev => {
+            const current = prev[openViableFlightsKey];
+            if (!current) return prev;
+            return {
+              ...prev,
+              [openViableFlightsKey]: {
+                ...current,
+                loading: false,
+                flights: normalizeSearchFlights(coverage.results),
+                error: null,
+                coverage,
+              },
+            };
+          });
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Failed to poll route coverage:', err);
+        }
+      }
+    };
+
+    const interval = window.setInterval(pollCoverage, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [openViableFlightsKey, openViableFlightSearch?.searchContext, openCollectionStatus]);
 
   const applyAlternative = (laneId, legSequence, alt) => {
     setLanes(current =>
@@ -1986,7 +2063,7 @@ const LaneMappingLanes = () => {
                                       </button>
                                       {leg.originStation && leg.destinationStation && (
                                         <button
-                                          onClick={() => handleSearchViableFlights(lane.id, leg.sequence, leg.originStation, leg.destinationStation, lane.pickUpTime, lane.driveToAirportDuration, lane.legs)}
+                                          onClick={() => handleSearchViableFlights(lane.id, leg.sequence, leg.originStation, leg.destinationStation)}
                                           className={`p-1.5 rounded transition ${openViableFlightsKey === `${lane.id}-${leg.sequence}` ? 'bg-slate-100 text-slate-800' : 'hover:bg-slate-100 text-slate-500'}`}
                                           title="Find available flights"
                                         >
@@ -2041,17 +2118,26 @@ const LaneMappingLanes = () => {
                                         if (vf.error) {
                                           return <p className="text-xs text-red-600">{vf.error}</p>;
                                         }
+                                        const isCollecting = vf.coverage?.collectionStatus === 'QUEUED' || vf.coverage?.collectionStatus === 'IN_PROGRESS';
                                         if (!vf.flights?.length) {
-                                          return <p className="text-xs text-gray-500 italic">No flights found for {leg.originStation} → {leg.destinationStation}.</p>;
+                                          return (
+                                            <div className="text-xs">
+                                              {isCollecting ? (
+                                                <div className="flex items-center gap-2 text-slate-600">
+                                                  <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                                  </svg>
+                                                  <span>{vf.coverage?.message || 'Collecting flight data from FlightAware...'}</span>
+                                                </div>
+                                              ) : (
+                                                <p className="text-gray-500 italic">No flights found for {leg.originStation} → {leg.destinationStation}.</p>
+                                              )}
+                                            </div>
+                                          );
                                         }
-                                        const previousLeg = lane.legs?.find(l => l.sequence === leg.sequence - 1);
                                         const getFlightSearchDescription = () => {
-                                          if (leg.sequence > 1 && previousLeg?.arrivalTime) {
-                                            return `Viable flights (after leg ${leg.sequence - 1} arrival ${previousLeg.arrivalTime} + 1hr buffer) for ${leg.originStation} → ${leg.destinationStation}:`;
-                                          } else if (lane.pickUpTime && lane.driveToAirportDuration) {
-                                            return `Viable flights (pickup ${lane.pickUpTime} + ${lane.driveToAirportDuration} drive) for ${leg.originStation} → ${leg.destinationStation}:`;
-                                          }
-                                          return `All flights for ${leg.originStation} → ${leg.destinationStation}:`;
+                                          return `Available flights for ${leg.originStation} → ${leg.destinationStation}:`;
                                         };
                                         return (
                                           <div>
@@ -2107,6 +2193,19 @@ const LaneMappingLanes = () => {
                                                 ))}
                                               </tbody>
                                             </table>
+                                            {isCollecting && (
+                                              <div className="flex items-center gap-2 text-xs text-slate-500 mt-2 pt-2 border-t border-slate-200">
+                                                <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                                </svg>
+                                                <span>
+                                                  {vf.coverage?.coverageDays != null && vf.coverage?.targetCoverageDays
+                                                    ? `Collecting more data (${vf.coverage.coverageDays}/${vf.coverage.targetCoverageDays} days)...`
+                                                    : 'Collecting additional flight data...'}
+                                                </span>
+                                              </div>
+                                            )}
                                           </div>
                                         );
                                       })()}

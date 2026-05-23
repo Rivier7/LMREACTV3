@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
-import { Search, ArrowRightLeft, Plane, Loader2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Search, ArrowRightLeft, Plane, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
 import ErrorMessage from '../components/ErrorMessage';
-import { searchFlights } from '../api/api';
+import { getCoverageStatus, searchFlightsWithCoverage } from '../api/api';
+
+const ACTIVE_COLLECTION_STATUSES = new Set(['QUEUED', 'IN_PROGRESS']);
 
 function FlightSearch() {
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
   const [flights, setFlights] = useState(null);
+  const [coverage, setCoverage] = useState(null);
+  const [activeRoute, setActiveRoute] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -19,10 +23,13 @@ function FlightSearch() {
     setLoading(true);
     setError(null);
     setFlights(null);
+    setCoverage(null);
+    setActiveRoute({ origin: trimmedOrigin, destination: trimmedDest });
 
     try {
-      const results = await searchFlights(trimmedOrigin, trimmedDest);
-      setFlights(results);
+      const response = await searchFlightsWithCoverage(trimmedOrigin, trimmedDest);
+      setFlights(response.results || []);
+      setCoverage(response);
     } catch (err) {
       setError(err.message || 'Failed to search flights');
     } finally {
@@ -34,6 +41,44 @@ function FlightSearch() {
     setOrigin(destination);
     setDestination(origin);
   };
+
+  useEffect(() => {
+    if (!activeRoute || !ACTIVE_COLLECTION_STATUSES.has(coverage?.collectionStatus)) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const pollCoverage = async () => {
+      try {
+        const status = await getCoverageStatus(activeRoute.origin, activeRoute.destination);
+        if (cancelled) return;
+
+        setCoverage(prev => ({
+          ...prev,
+          ...status,
+          message: prev?.message,
+        }));
+
+        if (!ACTIVE_COLLECTION_STATUSES.has(status.collectionStatus)) {
+          const response = await searchFlightsWithCoverage(activeRoute.origin, activeRoute.destination);
+          if (cancelled) return;
+          setFlights(response.results || []);
+          setCoverage(response);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Failed to poll route coverage:', err);
+        }
+      }
+    };
+
+    const interval = window.setInterval(pollCoverage, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [activeRoute, coverage?.collectionStatus]);
 
   // Day labels using unique abbreviations to distinguish all 7 days
   const DAY_LABELS = ['M', 'Tu', 'W', 'Th', 'F', 'Sa', 'Su'];
@@ -48,6 +93,14 @@ function FlightSearch() {
     }
     return new Set();
   };
+
+  const collectionIsActive = ACTIVE_COLLECTION_STATUSES.has(coverage?.collectionStatus);
+  const coverageTone =
+    coverage?.collectionStatus === 'FAILED'
+      ? 'border-red-200 bg-red-50 text-red-700'
+      : coverage?.coverageStatus === 'FULL'
+        ? 'border-green-200 bg-green-50 text-green-700'
+        : 'border-amber-200 bg-amber-50 text-amber-800';
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
@@ -121,6 +174,36 @@ function FlightSearch() {
             </div>
           )}
 
+          {coverage && !loading && (
+            <div className={`mb-6 rounded-lg border px-4 py-3 ${coverageTone}`}>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-semibold">
+                    {collectionIsActive ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : coverage.collectionStatus === 'FAILED' ? (
+                      <AlertTriangle size={16} />
+                    ) : (
+                      <CheckCircle size={16} />
+                    )}
+                    <span>
+                      Coverage: {coverage.coverageDays ?? 0}/{coverage.targetCoverageDays ?? 7} days
+                    </span>
+                    <span className="text-xs font-medium uppercase tracking-wide">
+                      {coverage.coverageStatus}
+                    </span>
+                  </div>
+                  {coverage.message && (
+                    <p className="mt-1 text-sm opacity-90">{coverage.message}</p>
+                  )}
+                </div>
+                <span className="shrink-0 rounded bg-white/60 px-2 py-1 text-xs font-semibold">
+                  {coverage.collectionStatus}
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Loading */}
           {loading && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
@@ -142,8 +225,14 @@ function FlightSearch() {
               {flights.length === 0 ? (
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
                   <Plane size={40} className="text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-800 mb-2">No flights found</h3>
-                  <p className="text-gray-600">No direct flights available for this route. Try different airport codes.</p>
+                  <h3 className="text-xl font-semibold text-gray-800 mb-2">
+                    {collectionIsActive ? 'No cached flights yet' : 'No flights found'}
+                  </h3>
+                  <p className="text-gray-600">
+                    {collectionIsActive
+                      ? 'Flight data collection is running in the background. Results will refresh when collection finishes.'
+                      : 'No direct flights available for this route. Try different airport codes.'}
+                  </p>
                 </div>
               ) : (
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">

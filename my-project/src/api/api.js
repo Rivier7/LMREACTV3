@@ -963,6 +963,26 @@ export const searchFlights = async (origin, destination) => {
   return await response.json();
 };
 
+// Search flights with route coverage metadata.
+// Returns { results, coverageStatus, collectionStatus, coverageDays, targetCoverageDays, ... }.
+export const searchFlightsWithCoverage = async (origin, destination) => {
+  const response = await fetch(
+    `${API_BASE_URL}/flights/search/airports/${encodeURIComponent(origin)}/to/${encodeURIComponent(destination)}/coverage`,
+    { headers: getAuthHeaders() }
+  );
+  if (!response.ok) throw new Error(`Failed to search flights from ${origin} to ${destination}`);
+  return await response.json();
+};
+
+export const getCoverageStatus = async (origin, destination) => {
+  const response = await fetch(
+    `${API_BASE_URL}/flights/coverage/${encodeURIComponent(origin)}/to/${encodeURIComponent(destination)}`,
+    { headers: getAuthHeaders() }
+  );
+  if (!response.ok) throw new Error(`Failed to load coverage status for ${origin} to ${destination}`);
+  return await response.json();
+};
+
 // Apply pre-stored suggested flight times (fast, no external API call)
 export const applySuggestedTimes = async (laneId) => {
   const response = await fetch(
