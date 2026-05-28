@@ -1070,3 +1070,34 @@ export const manuallyValidateLane = async (id, validationStatus, note = null) =>
   }
   return await response.json();
 };
+
+// =====================
+// Nearby Airports API
+// =====================
+
+/**
+ * Find airports near a given city/state/country location
+ * @param {Object} payload - { city, state, country, radiusMiles }
+ * @returns {Promise<Object>} - { airports[], fromCache, totalFound, suggestedRadiusMiles, searchParams }
+ */
+export const findNearbyAirports = async (payload) => {
+  const response = await fetch(`${API_BASE_URL}/airports/nearby`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    let errorMessage = 'Failed to find nearby airports';
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.message || errorMessage;
+    } catch {
+      const errorText = await response.text();
+      if (errorText) errorMessage = errorText;
+    }
+    throw new Error(errorMessage);
+  }
+
+  return await response.json();
+};

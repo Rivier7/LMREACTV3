@@ -216,3 +216,50 @@ export interface ImportMetaEnv {
 export interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+// ============================================================================
+// Nearby Airports Types
+// ============================================================================
+
+export interface NearbyAirport {
+  airportCode: string;
+  iataCode: string;
+  icaoCode: string;
+  lidCode?: string;
+  name: string;
+  city: string;
+  state?: string;
+  countryCode: string;
+  latitude: number;
+  longitude: number;
+  timezone?: string;
+  elevation?: number;
+  distanceMiles: number;
+  heading: number;
+  direction: string;
+}
+
+export interface NearbyAirportsSearchParams {
+  city: string;
+  state?: string;
+  country: string;
+  latitude?: number;
+  longitude?: number;
+  radiusMiles: number;
+  onlyIap: boolean;
+}
+
+export interface NearbyAirportsResponse {
+  airports: NearbyAirport[];
+  fromCache: boolean;
+  totalFound: number;
+  suggestedRadiusMiles?: number;
+  searchParams: NearbyAirportsSearchParams;
+}
+
+export interface NearbyAirportsRequest {
+  city: string;
+  state?: string;
+  country: string;
+  radiusMiles?: number;
+}

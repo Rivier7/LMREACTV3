@@ -19,6 +19,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import AircraftCategoryBadge from './AircraftCategoryBadge';
+import NearbyAirportsDropdown from './NearbyAirportsDropdown';
 
 function Lane({ lane, onDelete, onManualValidate }) {
   const navigate = useNavigate();
@@ -261,6 +262,14 @@ function Lane({ lane, onDelete, onManualValidate }) {
                   {lane.originCity}, {lane.originState}
                 </div>
                 <div className="text-xs text-gray-400">{lane.originCountry}</div>
+                <div className="mt-1">
+                  <NearbyAirportsDropdown
+                    city={lane.originCity}
+                    state={lane.originState}
+                    country={lane.originCountry}
+                    label="Shipper"
+                  />
+                </div>
               </div>
               <div className="flex items-center px-3">
                 <div className="w-8 h-px bg-gray-300"></div>
@@ -277,6 +286,14 @@ function Lane({ lane, onDelete, onManualValidate }) {
                   {lane.destinationCity}, {lane.destinationState}
                 </div>
                 <div className="text-xs text-gray-400">{lane.destinationCountry}</div>
+                <div className="mt-1">
+                  <NearbyAirportsDropdown
+                    city={lane.destinationCity}
+                    state={lane.destinationState}
+                    country={lane.destinationCountry}
+                    label="Consignee"
+                  />
+                </div>
               </div>
             </div>
 

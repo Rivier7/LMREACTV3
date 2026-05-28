@@ -30,6 +30,7 @@ import CreateLaneModal from '../components/CreateLaneModal';
 import LaneManualValidationModal from '../components/LaneManualValidationModal';
 import RouteLaneCard from '../components/RouteLaneCard';
 import AircraftCategoryBadge from '../components/AircraftCategoryBadge';
+import NearbyAirportsDropdown from '../components/NearbyAirportsDropdown';
 import {
   getLanesByLaneMappingId,
   getRouteGroupsByLaneMappingId,
@@ -284,7 +285,6 @@ const LaneMappingLanes = () => {
     'destinationStation',
     'arrivalTime',
     'flightOperatingDays',
-    'cutoffTime',
     'legValidationMessage',
   ];
 
@@ -296,7 +296,6 @@ const LaneMappingLanes = () => {
     destinationStation: 'Destination',
     arrivalTime: 'Arrival',
     flightOperatingDays: 'Operating Days',
-    cutoffTime: 'Cutoff',
     legValidationMessage: 'Leg Status',
   };
 
@@ -458,7 +457,6 @@ const LaneMappingLanes = () => {
                 flightOperatingDays: '',
                 aircraft: '',
                 aircraftType: '',
-                cutoffTime: '',
                 valid: false,
               },
             ],
@@ -1049,7 +1047,6 @@ const LaneMappingLanes = () => {
         departureTime: leg.departureTime,
         arrivalTime: leg.arrivalTime,
         flightOperatingDays: leg.flightOperatingDays,
-        cutoffTime: leg.cutoffTime || '',
         aircraft: leg.aircraft || '',
         aircraftType: leg.aircraftType || '',
         valid: false,
@@ -1692,6 +1689,46 @@ const LaneMappingLanes = () => {
                     </div>
                   )}
 
+                  {/* Lane Info */}
+                  <div className="mb-3">
+                    <div className="bg-white rounded-lg border border-gray-200 p-3">
+                      <div className="flex gap-4">
+                        <div className="w-32">
+                          <label className="block text-xs text-gray-500 mb-1">Item Number</label>
+                          <input
+                            type="text"
+                            value={lane.itemNumber || ''}
+                            onChange={e => handleLaneChange(lane.id, 'itemNumber', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
+                          />
+                        </div>
+                        <div className="w-40">
+                          <label className="block text-xs text-gray-500 mb-1">Lane Option</label>
+                          <select
+                            value={lane.laneOption || ''}
+                            onChange={e => handleLaneChange(lane.id, 'laneOption', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
+                          >
+                            <option value="">Select Option</option>
+                            <option value="Primary">Primary</option>
+                            <option value="Secondary">Secondary</option>
+                            <option value="Alternative">Alternative</option>
+                          </select>
+                        </div>
+                        <div className="w-48">
+                          <label className="block text-xs text-gray-500 mb-1">Service Level</label>
+                          <input
+                            type="text"
+                            value={lane.serviceLevel || ''}
+                            onChange={e => handleLaneChange(lane.id, 'serviceLevel', e.target.value)}
+                            placeholder="e.g. NFO, DIRECT DRIVE"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Location Details */}
                   <div className="mb-3">
                     <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
@@ -1700,8 +1737,10 @@ const LaneMappingLanes = () => {
                     </h3>
                     <div className="grid grid-cols-2 gap-2">
                       <div className="bg-white rounded-lg border border-gray-200 p-2.5">
-                        <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Origin</h4>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Origin</h4>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 mb-2">
                           <div>
                             <label className="block text-xs text-gray-500 mb-0.5">City</label>
                             <input
@@ -1730,10 +1769,41 @@ const LaneMappingLanes = () => {
                             />
                           </div>
                         </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1">
+                            <label className="block text-xs text-gray-500 mb-0.5">Origin Airport (First Leg)</label>
+                            <input
+                              type="text"
+                              value={lane.legs?.[0]?.originStation || ''}
+                              onChange={e => {
+                                if (lane.legs?.[0]) {
+                                  handleLegChange(lane.id, lane.legs[0].id, 'originStation', e.target.value);
+                                }
+                              }}
+                              placeholder="e.g. ATL"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            />
+                          </div>
+                          <div className="pt-4">
+                            <NearbyAirportsDropdown
+                              city={lane.originCity}
+                              state={lane.originState}
+                              country={lane.originCountry}
+                              label="Origin"
+                              onSelect={(code) => {
+                                if (lane.legs?.[0]) {
+                                  handleLegChange(lane.id, lane.legs[0].id, 'originStation', code);
+                                }
+                              }}
+                            />
+                          </div>
+                        </div>
                       </div>
                       <div className="bg-white rounded-lg border border-gray-200 p-2.5">
-                        <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Destination</h4>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Destination</h4>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 mb-2">
                           <div>
                             <label className="block text-xs text-gray-500 mb-0.5">City</label>
                             <input
@@ -1762,6 +1832,38 @@ const LaneMappingLanes = () => {
                             />
                           </div>
                         </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1">
+                            <label className="block text-xs text-gray-500 mb-0.5">Destination Airport (Last Leg)</label>
+                            <input
+                              type="text"
+                              value={lane.legs?.[lane.legs.length - 1]?.destinationStation || ''}
+                              onChange={e => {
+                                const lastLeg = lane.legs?.[lane.legs.length - 1];
+                                if (lastLeg) {
+                                  handleLegChange(lane.id, lastLeg.id, 'destinationStation', e.target.value);
+                                }
+                              }}
+                              placeholder="e.g. JFK"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            />
+                          </div>
+                          <div className="pt-4">
+                            <NearbyAirportsDropdown
+                              city={lane.destinationCity}
+                              state={lane.destinationState}
+                              country={lane.destinationCountry}
+                              label="Destination"
+                              align="right"
+                              onSelect={(code) => {
+                                const lastLeg = lane.legs?.[lane.legs.length - 1];
+                                if (lastLeg) {
+                                  handleLegChange(lane.id, lastLeg.id, 'destinationStation', code);
+                                }
+                              }}
+                            />
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1773,29 +1875,7 @@ const LaneMappingLanes = () => {
                       Pre-Route Details
                     </h3>
                     <div className="bg-white rounded-lg border border-gray-200 p-3">
-                      <div className="grid grid-cols-5 gap-3">
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">Item Number</label>
-                          <input
-                            type="text"
-                            value={lane.itemNumber || ''}
-                            onChange={e => handleLaneChange(lane.id, 'itemNumber', e.target.value)}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">Lane Option</label>
-                          <select
-                            value={lane.laneOption || ''}
-                            onChange={e => handleLaneChange(lane.id, 'laneOption', e.target.value)}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
-                          >
-                            <option value="">Select Option</option>
-                            <option value="Primary">Primary</option>
-                            <option value="Secondary">Secondary</option>
-                            <option value="Alternative">Alternative</option>
-                          </select>
-                        </div>
+                      <div className="grid grid-cols-3 gap-3">
                         <div>
                           <label className="block text-xs text-gray-500 mb-1">Pick Up Time</label>
                           <input
@@ -1816,12 +1896,16 @@ const LaneMappingLanes = () => {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs text-gray-500 mb-1">Service Level</label>
+                          <label className="block text-xs text-gray-500 mb-1">First Leg Cutoff</label>
                           <input
                             type="text"
-                            value={lane.serviceLevel || ''}
-                            onChange={e => handleLaneChange(lane.id, 'serviceLevel', e.target.value)}
-                            placeholder="e.g. NFO, DIRECT DRIVE"
+                            value={lane.legs?.[0]?.cutoffTime || ''}
+                            onChange={e => {
+                              if (lane.legs?.[0]) {
+                                handleLegChange(lane.id, lane.legs[0].id || 0, 'cutoffTime', e.target.value);
+                              }
+                            }}
+                            placeholder="e.g. 14:00"
                             className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-slate-500"
                           />
                         </div>
@@ -2156,7 +2240,7 @@ const LaneMappingLanes = () => {
                                                 </tr>
                                               </thead>
                                               <tbody>
-                                                {vf.flights.map((f, fi) => (
+                                                {[...vf.flights].sort((a, b) => (a.departureTime || '').localeCompare(b.departureTime || '')).map((f, fi) => (
                                                   <tr key={fi} className={`border-t ${f.nextDay ? 'border-orange-200 bg-orange-50/50' : 'border-slate-100'}`}>
                                                     <td className="py-1 pr-3 font-medium">
                                                       {f.flightNumber}

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Search, ArrowRightLeft, Plane, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
 import ErrorMessage from '../components/ErrorMessage';
+import { AircraftWithCategory } from '../components/AircraftCategoryBadge';
 import { getCoverageStatus, searchFlightsWithCoverage } from '../api/api';
 
 const ACTIVE_COLLECTION_STATUSES = new Set(['QUEUED', 'IN_PROGRESS']);
@@ -264,9 +265,11 @@ function FlightSearch() {
                           <td className="px-4 py-3 font-medium text-gray-900">{flight.departureTimeLocal}</td>
                           <td className="px-4 py-3 font-medium text-gray-900">{flight.arrivalTimeLocal}</td>
                           <td className="px-4 py-3 text-gray-700">
-                            <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-xs font-medium">
-                              {flight.aircraftType || '-'}
-                            </span>
+                            <AircraftWithCategory
+                              aircraftCode={flight.aircraftType}
+                              category={flight.aircraftCategory}
+                              size="xs"
+                            />
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex gap-1">
