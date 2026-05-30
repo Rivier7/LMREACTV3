@@ -92,27 +92,25 @@ function RouteLaneCard({ group, renderOption, isOpen = false, onToggle }) {
         </div>
       </button>
 
-      {isOpen && (
-        <div className="border-t border-gray-100 p-4 space-y-4">
-          {optionConfig.map(({ key, label }) => {
-            const lane = group[key];
-            return (
-              <div key={key} className="bg-gray-50 rounded-lg border border-gray-200">
-                <div className="px-5 pt-4">
-                  <span className="inline-flex min-w-[76px] flex-col items-center rounded-md bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white">
-                    {label}
-                    <StatusDot lane={lane} />
-                  </span>
-                  {!lane && (
-                    <span className="ml-3 text-sm text-gray-400">No {label} option available</span>
-                  )}
-                </div>
-                {lane && <div className="px-5 pb-5 pt-3">{renderOption(lane)}</div>}
+      <div className="border-t border-gray-100 p-4 space-y-4">
+        {optionConfig.map(({ key, label }) => {
+          const lane = group[key];
+          return (
+            <div key={key} className="bg-gray-50 rounded-lg border border-gray-200">
+              <div className="px-5 pt-4">
+                <span className="inline-flex min-w-[76px] flex-col items-center rounded-md bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white">
+                  {label}
+                  <StatusDot lane={lane} />
+                </span>
+                {!lane && (
+                  <span className="ml-3 text-sm text-gray-400">No {label} option available</span>
+                )}
               </div>
-            );
-          })}
-        </div>
-      )}
+              {lane && <div className="px-5 pb-5 pt-3">{renderOption(lane)}</div>}
+            </div>
+          );
+        })}
+      </div>
     </section>
   );
 }

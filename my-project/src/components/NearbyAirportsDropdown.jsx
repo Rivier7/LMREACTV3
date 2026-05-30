@@ -1,11 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
-import { MapPin, Loader2, ChevronDown, Plane, AlertCircle } from 'lucide-react';
+import { MapPin, Loader2, ChevronDown, Plane, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useFindNearbyAirports } from '../hooks/useNearbyAirports';
 
 function NearbyAirportsDropdown({ city, state, country, label, onSelect, align = 'left' }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
   const dropdownRef = useRef(null);
   const { mutate, data, isPending, isError, error, reset } = useFindNearbyAirports();
+
+  const AIRPORTS_PER_PAGE = 5;
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -24,6 +27,25 @@ function NearbyAirportsDropdown({ city, state, country, label, onSelect, align =
       mutate({ city, state, country, radiusMiles: 150 });
     }
     setIsOpen(!isOpen);
+    setCurrentPage(0); // Reset to first page when opening
+  };
+
+  // Calculate pagination
+  const totalPages = data?.airports ? Math.ceil(data.airports.length / AIRPORTS_PER_PAGE) : 0;
+  const startIndex = currentPage * AIRPORTS_PER_PAGE;
+  const endIndex = startIndex + AIRPORTS_PER_PAGE;
+  const currentAirports = data?.airports?.slice(startIndex, endIndex) || [];
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages - 1) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const goToPrevPage = () => {
+    if (currentPage > 0) {
+      setCurrentPage(currentPage - 1);
+    }
   };
 
   const handleExpandSearch = () => {
@@ -103,7 +125,7 @@ function NearbyAirportsDropdown({ city, state, country, label, onSelect, align =
                   </div>
                 ) : (
                   <>
-                    {data.airports.map((airport, idx) => {
+                    {currentAirports.map((airport, idx) => {
                       // Get display code: prefer IATA, fallback to ICAO with K-prefix stripped
                       const getDisplayCode = () => {
                         // Use IATA code if available
@@ -129,7 +151,7 @@ function NearbyAirportsDropdown({ city, state, country, label, onSelect, align =
                       <div
                         key={airport.airportCode || idx}
                         onClick={handleSelect}
-                        className={`px-3 py-2 hover:bg-blue-50 cursor-pointer ${idx !== data.airports.length - 1 ? 'border-b border-gray-100' : ''} ${onSelect ? 'hover:bg-blue-50' : 'hover:bg-gray-50'}`}
+                        className={`px-3 py-2 hover:bg-blue-50 cursor-pointer ${idx !== currentAirports.length - 1 ? 'border-b border-gray-100' : ''}`}
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1 min-w-0">
@@ -150,9 +172,34 @@ function NearbyAirportsDropdown({ city, state, country, label, onSelect, align =
                       );
                     })}
 
+                    {/* Pagination Controls */}
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-between px-3 py-2 border-t border-gray-100 bg-gray-50">
+                        <button
+                          onClick={goToPrevPage}
+                          disabled={currentPage === 0}
+                          className="flex items-center gap-1 px-2 py-1 text-xs text-gray-700 hover:text-blue-600 disabled:text-gray-300 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <ChevronLeft size={14} />
+                          <span>Prev</span>
+                        </button>
+                        <div className="text-xs text-gray-600">
+                          {startIndex + 1}-{Math.min(endIndex, data.airports.length)} of {data.airports.length}
+                        </div>
+                        <button
+                          onClick={goToNextPage}
+                          disabled={currentPage === totalPages - 1}
+                          className="flex items-center gap-1 px-2 py-1 text-xs text-gray-700 hover:text-blue-600 disabled:text-gray-300 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <span>Next</span>
+                          <ChevronRight size={14} />
+                        </button>
+                      </div>
+                    )}
+
                     {data.totalFound > data.airports.length && (
                       <div className="px-3 py-2 text-center text-xs text-gray-500 bg-gray-50 border-t border-gray-100">
-                        Showing top {data.airports.length} of {data.totalFound} airports
+                        Showing {data.airports.length} of {data.totalFound} within radius
                       </div>
                     )}
 

@@ -154,6 +154,7 @@ const LaneMappingLanes = () => {
   const [showCreateLaneModal, setShowCreateLaneModal] = useState(false);
   const [showManualValidationModal, setShowManualValidationModal] = useState(false);
   const [selectedLaneForValidation, setSelectedLaneForValidation] = useState(null);
+  const [editMode, setEditMode] = useState(false);
 
   const handleOpenManualValidation = (lane) => {
     setSelectedLaneForValidation(lane);
@@ -1117,20 +1118,35 @@ const LaneMappingLanes = () => {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setShowCreateLaneModal(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 text-white rounded-lg font-semibold hover:bg-slate-600 transition shadow-sm border border-slate-600"
+              onClick={() => setEditMode(!editMode)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold transition shadow-sm border ${
+                editMode
+                  ? 'bg-orange-600 text-white border-orange-700 hover:bg-orange-700'
+                  : 'bg-slate-700 text-white border-slate-600 hover:bg-slate-600'
+              }`}
             >
-              <Plus size={17} />
-              New Lane
+              <Pencil size={17} />
+              {editMode ? 'Edit Mode' : 'View Mode'}
             </button>
-            <button
-              onClick={handleSaveChanges}
-              disabled={loading || !lanes.some(l => l.hasBeenUpdated)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-transparent text-white border border-white/30 rounded-lg font-semibold hover:bg-white/10 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-            >
-              <Save size={18} />
-              Save All Changes
-            </button>
+            {editMode && (
+              <>
+                <button
+                  onClick={() => setShowCreateLaneModal(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 text-white rounded-lg font-semibold hover:bg-slate-600 transition shadow-sm border border-slate-600"
+                >
+                  <Plus size={17} />
+                  New Lane
+                </button>
+                <button
+                  onClick={handleSaveChanges}
+                  disabled={loading || !lanes.some(l => l.hasBeenUpdated)}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-transparent text-white border border-white/30 rounded-lg font-semibold hover:bg-white/10 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                >
+                  <Save size={18} />
+                  Save All Changes
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -1529,13 +1545,18 @@ const LaneMappingLanes = () => {
 
                   {/* Edit + Calc TAT + Delete */}
                   <button
-                    onClick={() => setEditingLanes(prev => ({ ...prev, [lane.id]: !prev[lane.id] }))}
-                    className={`p-1.5 rounded-lg transition-colors ${editingLanes[lane.id] ? 'bg-slate-900 text-white' : 'hover:bg-gray-100 text-gray-400 hover:text-slate-900'}`}
-                    title="Edit Lane"
+                    onClick={() => editMode && setEditingLanes(prev => ({ ...prev, [lane.id]: !prev[lane.id] }))}
+                    disabled={!editMode}
+                    className={`p-1.5 rounded-lg transition-colors ${
+                      !editMode
+                        ? 'text-gray-300 cursor-not-allowed'
+                        : editingLanes[lane.id] ? 'bg-slate-900 text-white' : 'hover:bg-gray-100 text-gray-400 hover:text-slate-900'
+                    }`}
+                    title={editMode ? 'Edit Lane' : 'Switch to Edit Mode to edit lanes'}
                   >
                     <Pencil size={15} />
                   </button>
-                  <button onClick={() => handleDeleteLane(lane.id)} disabled={loading} className="p-1.5 hover:bg-red-50 rounded-lg transition-colors text-gray-400 hover:text-red-600 disabled:opacity-50" title="Delete Lane">
+                  <button onClick={() => handleDeleteLane(lane.id)} disabled={loading || !editMode} className={`p-1.5 rounded-lg transition-colors ${!editMode ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-red-50 text-gray-400 hover:text-red-600'}`} title={editMode ? 'Delete Lane' : 'Switch to Edit Mode to delete lanes'}>
                     <Trash2 size={15} />
                   </button>
                 </div>
